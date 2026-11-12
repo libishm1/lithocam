@@ -116,6 +116,29 @@ def test_rough_plane_stays_above_the_part_and_inside_the_stock(part, tools):
         assert p[2] >= h + 0.5 - 1e-9 or not math.isfinite(h)
 
 
+def test_spindle_stack_sets_the_tcp_and_checks_the_collet(part, tools):
+    from lithocam.studio import spindles
+    st = program.Station(robot="ur10e", work_xyz=[0.55, 0.15, 0.05], stock=cam.stock_box(part[0], 3.0))
+    sp = st.spindle_model()
+    assert sp.id == "ur10e_example"
+    t = tools["W7"]
+    T = st.tool_tcp(t)
+    assert abs(T[2, 3] * 1000 - (sp.gauge() + spindles.stickout(t))) < 1e-9
+    # the cutter parts end exactly at the tip (collet face + stickout)
+    parts = spindles.cutter_parts(t, spindles.stickout(t))
+    assert abs(parts[-1][2] + parts[-1][3] - spindles.stickout(t)) < 1e-9
+    # a 20 mm shank does not fit the UR example's ER11 collet: the expansion says so
+    prog = program.Program("big", [program.Step("set_tool", {"tool": "S14"})])
+    ex = program.expand(st, program.load_robot("ur10e"), prog, tools, part)
+    assert any("exceeds the ER11 collet" in m for m in ex.messages), ex.messages
+    rec = [r for r in ex.records if r.kind == "tool"][0]
+    assert np.allclose(np.asarray(rec.data["tcp"]), st.tool_tcp(tools["S14"]))
+    # the robot's TCP during machining is the cutter tip of that stack
+    st2 = program.Station(robot="ur10e", work_xyz=[0.55, 0.15, 0.05], stock=cam.stock_box(part[0], 3.0),
+                          spindle=spindles.to_dict(spindles.PRESETS["ur10e_example"]))
+    assert program.Station.from_json(st2.to_json()).spindle_model() == st2.spindle_model()
+
+
 def test_station_json_round_trip():
     st = program.Station(stock={"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1, "zmin": 0, "zmax": 1},
                          programs=[raster_program()])

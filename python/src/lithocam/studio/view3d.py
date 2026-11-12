@@ -293,16 +293,32 @@ class CellView:
             if getattr(self, "_tool_tf", None) is not None:
                 self._tool_tf.setMatrix(qmatrix(self._tool_flange(tcp)))
 
-    # tool on the flange: cylinder from the flange to the TCP
-    def set_tool(self, diameter_mm: float, length_mm: float, tcp_offset: np.ndarray):
+    # spindle and cutter on the flange, drawn in the flange frame
+    SPINDLE_RGB = {"plate": (0.35, 0.36, 0.4), "body": (0.78, 0.8, 0.84), "nose": (0.3, 0.3, 0.33),
+                   "shank": (0.62, 0.62, 0.66), "flutes": (0.9, 0.68, 0.2)}
+
+    def set_tool(self, spindle, cutter_parts, tcp_offset: np.ndarray):
+        """spindle: studio.spindles.Spindle or None; cutter_parts: [(name, D mm, z0 mm from the collet face,
+        length mm)]; tcp_offset: cutter tip in the flange frame (m)."""
         self._tool_off = tcp_offset
-        if diameter_mm <= 0 or length_mm <= 0:
+        if spindle is None:
             self._replace("tool", [])
             self._tool_tf = None
             return
-        tris = cylinder_tris(diameter_mm / 2000, length_mm / 1000, 20, z0=0.0)
-        e, tf = mesh_entity(self.root, tris, (0.85, 0.65, 0.2))
-        self._replace("tool", [e])
+        holder = Qt3DCore.QEntity(self.root)
+        tf = Qt3DCore.QTransform(holder)
+        holder.addComponent(tf)
+        ox, oy = spindle.axis_offset
+        for name, d, z0, length in spindle.parts():
+            if d > 0 and length > 0:
+                t = cylinder_tris(d / 2000, length / 1000, 28, z0=z0 / 1000) + np.array([ox, oy, 0]) / 1000
+                mesh_entity(holder, t, self.SPINDLE_RGB[name])
+        g = spindle.gauge()
+        for name, d, z0, length in cutter_parts:
+            if d > 0 and length > 0:
+                t = cylinder_tris(d / 2000, length / 1000, 20, z0=(g + z0) / 1000) + np.array([ox, oy, 0]) / 1000
+                mesh_entity(holder, t, self.SPINDLE_RGB[name])
+        self._replace("tool", [holder])
         self._tool_tf = tf
 
     def _tool_flange(self, tcp: np.ndarray) -> np.ndarray:

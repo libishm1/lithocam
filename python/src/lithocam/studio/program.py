@@ -23,10 +23,21 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from .. import post
-from . import catalog
+from . import catalog, spindles
 from .kinematics import Robot, axis_angle, load_urdf, rotation_error, transform
 
-CELLS = Path(__file__).resolve().parents[4] / "cells"
+def _cells_dir() -> Path:
+    """LITHOCAM_CELLS, else the bundle's cells/ in a frozen executable, else the repo's cells/."""
+    import os
+    import sys
+    if os.environ.get("LITHOCAM_CELLS"):
+        return Path(os.environ["LITHOCAM_CELLS"])
+    if getattr(sys, "frozen", False):
+        return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent)) / "cells"
+    return Path(__file__).resolve().parents[4] / "cells"
+
+
+CELLS = _cells_dir()
 ROBOTS = {"ur10e": ("UR10e", "ur10e.urdf", "urscript"), "kr120": ("KUKA KR120 R2500 PRO", "kr120.urdf", "krl")}
 HOME = {"ur10e": [0.0, -1.5708, 1.5708, -1.5708, -1.5708, 0.0], "kr120": [0.0, -1.5708, 1.5708, 0.0, 0.5, 0.0]}
 
@@ -64,10 +75,25 @@ class Station:
     stock: Optional[Dict[str, float]] = None                                  # mm, work frame
     tool_library: str = ""                                                    # CSV; "" = built-in survey tools
     tool_length: float = 0.0                                                  # mm; 0 = from the tool
+    spindle: Optional[Dict[str, object]] = None                               # None = the cell's default preset
     programs: List[Program] = field(default_factory=lambda: [Program()])
 
     def work_frame(self) -> np.ndarray:
         return transform(self.work_xyz, [math.radians(a) for a in self.work_rpy])
+
+    def spindle_model(self) -> "spindles.Spindle":
+        if self.spindle:
+            return spindles.from_dict(self.spindle)
+        return spindles.PRESETS[spindles.DEFAULT_FOR_ROBOT.get(self.robot, "ur10e_example")]
+
+    def tool_tcp(self, tool) -> np.ndarray:
+        """Cutter tip in the flange frame (metres): the spindle stack plus the cutter's stickout, or the tool
+        length override measured from the flange."""
+        if self.tool_length > 0:
+            T = np.eye(4)
+            T[2, 3] = self.tool_length / 1000
+            return T
+        return self.spindle_model().tcp(spindles.stickout(tool))
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), indent=1)
@@ -83,14 +109,6 @@ class Station:
 
 def load_robot(name: str) -> Robot:
     return load_urdf(CELLS / ROBOTS[name][1])
-
-
-def tool_tcp(tool, length_override: float = 0.0) -> np.ndarray:
-    """TCP of a milling tool in the flange frame: along +z by the gauge length (stickout, else flute + 50 mm)."""
-    L = length_override or getattr(tool, "stickout", 0.0) or (getattr(tool, "flute_length", 0.0) + 50.0)
-    T = np.eye(4)
-    T[2, 3] = L / 1000
-    return T
 
 
 def down_pose(work: np.ndarray, p_mm: Sequence[float]) -> np.ndarray:
@@ -137,6 +155,15 @@ class Expansion:
         return int(sum((~s.ok).sum() for s in self.segments))
 
 
+def lc_kinds_without_shank():
+    """Tool kinds that do not sit in a collet (arbor-mounted or not rotary)."""
+    from .core import lc
+    K = lc.ToolKind
+    return (K.DiscSaw, K.DiamondWire, K.MultiWireSaw, K.GangSaw, K.ChainSaw, K.ChainMortiser, K.BandSaw,
+            K.PlanerHead, K.Waterjet, K.Knife, K.BushHammer, K.Chisel, K.Splitter, K.FlameTorch, K.AggregateHead,
+            K.FaceMill, K.CupWheel, K.ProfileWheel, K.PolishingPad, K.AbrasiveBrush, K.GrindingDisc)
+
+
 def solve_start(robot: Robot, target: np.ndarray, q_now: Sequence[float], tries: int = 24,
                 seed: int = 7) -> Tuple[np.ndarray, bool]:
     """Pose solve from the current joints, then from home and random seeds; keeps the solution closest to q_now."""
@@ -168,6 +195,20 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
     msgs: List[str] = []
     tool = None
 
+    sp = station.spindle_model()
+
+    def mount(i, tid):
+        """Put the cutter in the spindle: TCP, tool record (with the spindle mass), collet check."""
+        t = tools[tid]
+        robot.tcp_offset = station.tool_tcp(t)
+        recs.append(post.Rec("tool", {"id": tid, "tcp": robot.tcp_offset.tolist(), "mass": sp.mass_kg}))
+        shank = float(getattr(t, "shank_diameter", 0.0) or 0.0) or float(getattr(t, "diameter", 0.0) or 0.0)
+        if sp.max_collet_mm and shank > sp.max_collet_mm + 1e-9 and t.kind not in (
+                lc_kinds_without_shank()):
+            msgs.append("step {}: {} shank {:g} mm exceeds the {} collet ({:g} mm max)".format(
+                i + 1, tid, shank, sp.collet, sp.max_collet_mm))
+        return t
+
     def add(i, label, qs, feed, ok):
         qs = np.asarray(qs, dtype=float).reshape(-1, robot.dof)
         tcp = np.array([robot.tcp(x)[:3, 3] for x in qs]) if len(qs) else np.zeros((0, 3))
@@ -185,9 +226,7 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
         if st.kind in ("set_tool", "tool_change"):
             tid = str(p.get("tool", ""))
             if tid in tools:
-                tool = tools[tid]
-                robot.tcp_offset = tool_tcp(tool, station.tool_length)
-                recs.append(post.Rec("tool", {"id": tid, "tcp": robot.tcp_offset.tolist()}))
+                tool = mount(i, tid)
             else:
                 msgs.append("step {}: tool '{}' is not in the library".format(i + 1, tid))
         elif st.kind == "movej":
@@ -232,9 +271,7 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
                 if tid not in tools:
                     msgs.append("step {}: tool '{}' is not in the library".format(i + 1, tid))
                     continue
-                tool = tools[tid]
-                robot.tcp_offset = tool_tcp(tool, station.tool_length)
-                recs.append(post.Rec("tool", {"id": tid, "tcp": robot.tcp_offset.tolist()}))
+                tool = mount(i, tid)
             if tool is None or part is None or station.stock is None:
                 msgs.append("step {}: {} needs a part, a stock and a tool".format(i + 1, spec.label))
                 continue

@@ -32,7 +32,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QComb
                                QToolBar, QToolBox, QToolButton, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from .. import post
-from . import cam, catalog, program
+from . import cam, catalog, program, spindles
 from .core import lc
 from .kinematics import matrix_rpy, rpy_matrix
 from .view3d import CellView, link_meshes
@@ -275,6 +275,7 @@ class RobotPanel(QWidget):
     moved = Signal(object)          # joint vector (rad)
     teach = Signal(str)             # "movej" or "movel"
     robot_changed = Signal(str)
+    spindle_changed = Signal(str)
 
     STEPS_MM = [0.1, 1.0, 5.0, 10.0, 50.0, 100.0]
     STEPS_DEG = [0.5, 1.0, 5.0, 15.0, 45.0]
@@ -294,6 +295,14 @@ class RobotPanel(QWidget):
         top.addWidget(self.combo, 1)
         v.addLayout(top)
         self.combo.currentIndexChanged.connect(lambda *_: self.robot_changed.emit(self.combo.currentData()))
+        sp = QHBoxLayout()
+        self.spindle = QComboBox()
+        for k, s in spindles.PRESETS.items():
+            self.spindle.addItem(s.name, k)
+        self.spindle.currentIndexChanged.connect(lambda *_: self.spindle_changed.emit(self.spindle.currentData()))
+        sp.addWidget(QLabel("Spindle"))
+        sp.addWidget(self.spindle, 1)
+        v.addLayout(sp)
         # joints
         g = QGridLayout()
         self.sliders, self.spins = [], []
@@ -634,6 +643,7 @@ class Studio(QMainWindow):
         self.robot_panel.moved.connect(self._robot_moved)
         self.robot_panel.teach.connect(self._teach)
         self.robot_panel.robot_changed.connect(self._set_robot)
+        self.robot_panel.spindle_changed.connect(self._set_spindle)
         self.props = Properties()
         self.props.edited.connect(self._step_edited)
         self.props.teach_into.connect(self._teach_into)
@@ -757,11 +767,48 @@ class Studio(QMainWindow):
             self.station.work_xyz = [1.6, 0.0, 0.3]
         elif name == "ur10e" and first is False:
             self.station.work_xyz = [0.7, 0.0, 0.0]
+        if not first:
+            self.station.spindle = None   # the new cell's default spindle
+        key = spindles.DEFAULT_FOR_ROBOT.get(name)
+        self.robot_panel.spindle.blockSignals(True)
+        self.robot_panel.spindle.setCurrentIndex(max(0, self.robot_panel.spindle.findData(key)))
+        self.robot_panel.spindle.blockSignals(False)
+        self._mount(self._first_tool())
         self._refresh_scene()
         self._rebuild_tree()
 
     def _robot_moved(self, q):
         self.view.update_robot(self.robot.link_transforms(q), self.robot.tcp(q))
+
+    def _set_spindle(self, key):
+        self.station.spindle = spindles.to_dict(spindles.PRESETS[key])
+        self._mount(self._first_tool())
+        self._rebuild_tree()
+
+    def _first_tool(self):
+        tools = self._tools()
+        for p in self.station.programs:
+            for s in p.steps:
+                if s.params.get("tool") in tools:
+                    return tools[s.params["tool"]]
+        return None
+
+    def _mount(self, tool):
+        """Show the spindle with `tool` in its collet and make the cutter tip the robot's TCP (wire tools: the bow
+        from the cell URDF, flange TCP)."""
+        wire = tool is not None and tool.kind in (lc.ToolKind.DiamondWire, lc.ToolKind.MultiWireSaw)
+        self.view.show_wire_tool(wire)
+        if wire:
+            self.robot.tcp_offset = np.eye(4)
+            self.view.set_tool(None, [], np.eye(4))
+        else:
+            sp = self.station.spindle_model()
+            so = spindles.stickout(tool) if tool is not None else 0.0
+            self.robot.tcp_offset = self.station.tool_tcp(tool) if tool is not None else sp.tcp(0.0)
+            self.view.set_tool(sp, spindles.cutter_parts(tool, so) if tool is not None else [],
+                               self.robot.tcp_offset)
+        self._robot_moved(self.robot_panel.q)
+        self.robot_panel.set_q(self.robot_panel.q, emit=False)
 
     def _load_builtin_tools(self):
         self.tool_lib = list(lc.stone_tool_library().tools) + list(lc.wood_tool_library().tools)
@@ -818,7 +865,11 @@ class Studio(QMainWindow):
         rob = QTreeWidgetItem(root, ["{} (base)".format(program.ROBOTS[st.robot][0])])
         rob.setIcon(0, glyph_icon("R", "#3d7bd9", 20))
         used = sorted({s.params.get("tool") for p in st.programs for s in p.steps if s.params.get("tool")})
-        tools = QTreeWidgetItem(rob, ["Tools ({} in library)".format(len(self.tool_lib))])
+        sp = st.spindle_model()
+        spi = QTreeWidgetItem(rob, ["Spindle: {} ({}, gauge {:.0f} mm{})".format(
+            sp.name, sp.collet, sp.gauge(), "" if sp.source != "example" else ", example size")])
+        spi.setIcon(0, glyph_icon("Sp", "#78909c", 20))
+        tools = QTreeWidgetItem(spi, ["Tools ({} in library)".format(len(self.tool_lib))])
         tools.setIcon(0, glyph_icon("T", "#455a64", 20))
         for tid in used:
             t = self._tools().get(tid)
@@ -1016,6 +1067,7 @@ class Studio(QMainWindow):
             program.Step("polish", {"tool": "S8"}),
             program.Step("movej", {"joints": [math.degrees(v) for v in program.HOME[self.station.robot]]}),
         ])]
+        self._mount(self._first_tool())
         self._refresh_scene()
         self._rebuild_tree()
         self.say("Demo station: a dome on a {:.0f} mm stock; the program roughs, finishes and lists a polish step. "
@@ -1152,11 +1204,8 @@ class Studio(QMainWindow):
             self._sim_seg = k
             seg = self.expansion.segments[k]
             robot.tcp_offset = seg.tcp_offset
-            t = self._tools().get(seg.tool)
-            wire = t is not None and t.kind in (lc.ToolKind.DiamondWire, lc.ToolKind.MultiWireSaw)
-            self.view.show_wire_tool(wire)
-            self.view.set_tool(0.0 if wire or t is None else t.diameter, seg.tcp_offset[2, 3] * 1000,
-                               seg.tcp_offset)
+            self._mount(self._tools().get(seg.tool))
+            robot.tcp_offset = seg.tcp_offset
             self.sim_label.setToolTip(seg.label)
         self.robot_panel.set_q(q, emit=False)
         self.view.update_robot(robot.link_transforms(q), robot.tcp(q))
