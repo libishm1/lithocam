@@ -87,6 +87,8 @@ class Station:
     tool_library: str = ""                                                    # CSV; "" = built-in survey tools
     tool_length: float = 0.0                                                  # mm; 0 = from the tool
     spindle: Optional[Dict[str, object]] = None                               # None = the cell's default preset
+    material: str = "granite"     # workpiece material class (lithocam.cutting_data.MATERIALS)
+    robot_factor: float = 1.0     # feed factor for robot stiffness (user-set; no published value)
     ruled_path: str = ""          # ruled-face JSON of the part (python -m lithocam.ruled part.step --json)
     turntable: Optional[Dict[str, float]] = None   # {"diameter": m, "height": m}: the part sits on a rotary table
     programs: List[Program] = field(default_factory=lambda: [Program()])
@@ -217,7 +219,8 @@ def wire_rungs(face, work: np.ndarray, yaw: float, wire_radius: float, bow: floa
     turntable at `yaw`; rulings ordered along the sweep, with one lead-in and one lead-out ruling outside the face."""
     from ..wirepath import order_rulings, turned_face, wire_target
     f = turned_face(face, yaw)
-    rs = order_rulings(f.rulings)
+    rs = list(f.rulings) if getattr(f, "ordered", False) else order_rulings(f.rulings)   # profiles keep their order
+    lead = lead and not getattr(f, "ordered", False)                                      # profiles carry their leads
     R, o = work[:3, :3], work[:3, 3]
     lines = [(R @ (np.asarray(r.p0) / 1000) + o, R @ (np.asarray(r.p1) / 1000) + o, R @ np.asarray(r.normal))
              for r in rs]
@@ -263,7 +266,12 @@ def _wire_step(i, st, p, station, robot, tools, backend, q, add, recs, msgs, yaw
             msgs.append("step {}: wire face {} faces down onto the table; cut it before the part is set down".format(
                 i + 1, f.index))
             continue
-        if station.turntable is not None and p.get("auto_table", True) and nz < 0.7:   # top faces: keep the angle
+        if station.turntable is not None and getattr(f, "yaw_deg", None) is not None:   # the face names its angle
+            yaw[0] = math.radians(float(f.yaw_deg))
+            recs.append(post.Rec("table", {"deg": float(f.yaw_deg)}))
+            if hasattr(be, "place_part"):
+                be.place_part(work, yaw[0])
+        elif station.turntable is not None and p.get("auto_table", True) and nz < 0.7:   # top faces: keep the angle
             yaw[0] = facing_yaw(f, work[:3, 3])
             recs.append(post.Rec("table", {"deg": math.degrees(yaw[0])}))
             if hasattr(be, "place_part"):
@@ -316,6 +324,22 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
 
     sp = station.spindle_model()
     yaw = [0.0]                     # turntable angle, radians (a list so the helpers can update it)
+    tilt = [0.0]                    # 3+2 tool tilt about the table x axis, radians
+    framed = {}                     # tilt -> (tris, trimesh, stock) of the part seen from that setup
+
+    def in_setup_frame(F):
+        """The part and its stock box expressed in the setup frame F (rotation only)."""
+        key = round(float(tilt[0]), 9)
+        if key not in framed:
+            tris, _ = part
+            tf = (tris.reshape(-1, 3) @ F[:3, :3]).reshape(-1, 3, 3)
+            s = station.stock
+            c = np.array([[x, y, z] for x in (s["xmin"], s["xmax"]) for y in (s["ymin"], s["ymax"])
+                          for z in (s["zmin"], s["zmax"])]) @ F[:3, :3]
+            box = {"xmin": c[:, 0].min(), "xmax": c[:, 0].max(), "ymin": c[:, 1].min(), "ymax": c[:, 1].max(),
+                   "zmin": c[:, 2].min(), "zmax": c[:, 2].max()}
+            framed[key] = (tf, cam.trimesh(tf), box)
+        return framed[key]
 
     def mount(i, tid):
         """Put the cutter in the spindle: TCP, tool record (with the spindle mass), collet check."""
@@ -389,6 +413,10 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
             if station.turntable is not None:
                 yaw[0] = math.radians(float(p.get("yaw", 0.0)))
                 recs.append(post.Rec("table", {"deg": math.degrees(yaw[0])}))
+            tilt[0] = math.radians(float(p.get("tilt", 0.0)))
+            if tilt[0]:
+                recs.append(post.Rec("comment", {"text": "3+2 setup: tool tilted {:.1f} deg about the table x axis"
+                                                 .format(math.degrees(tilt[0]))}))
         elif st.kind == "wire_ruled":
             q = _wire_step(i, st, p, station, robot, tools, backend, q, add, recs, msgs, yaw)
         elif st.kind in cam.GENERATORS:
@@ -401,9 +429,15 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
             if tool is None or part is None or station.stock is None:
                 msgs.append("step {}: {} needs a part, a stock and a tool".format(i + 1, spec.label))
                 continue
-            tris, mesh = part
+            F = np.eye(4)
+            ct, sn = math.cos(tilt[0]), math.sin(tilt[0])
+            F[:3, :3] = np.array([[1, 0, 0], [0, ct, -sn], [0, sn, ct]])   # setup frame: tilted about table x
+            if tilt[0]:
+                tris, mesh, stock_f = in_setup_frame(F)
+            else:
+                (tris, mesh), stock_f = part, station.stock
             try:
-                moves = cam.GENERATORS[st.kind](tris, mesh, tool, station.stock,
+                moves = cam.GENERATORS[st.kind](tris, mesh, tool, stock_f,
                                                 **{k: v for k, v in p.items() if k != "tool"})
             except Exception as e:   # noqa: BLE001 - report generator errors in the program log
                 msgs.append("step {}: {} failed: {}".format(i + 1, spec.label, e))
@@ -417,7 +451,7 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
             Rz = np.eye(4)
             Rz[:3, :3] = np.array([[math.cos(yaw[0]), -math.sin(yaw[0]), 0], [math.sin(yaw[0]), math.cos(yaw[0]), 0],
                                    [0, 0, 1.0]])
-            wk = work @ Rz                                   # the work frame turned with the table
+            wk = work @ Rz @ F                               # the work frame turned with the table, then tilted
             first = down_pose(wk, rmoves[0][1])
             q, ok = solve_start(robot, first, q)
             if not ok:
@@ -439,8 +473,22 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
                 msgs.append("step {}: collision check ({}): {} of {} samples in contact".format(
                     i + 1, backend.name, len(hits), len(qs)))
             add(i, st.title(), qs, feeds, oks)
-            if p.get("rpm") or getattr(tool, "spindle_rpm", 0):
-                recs.append(post.Rec("spindle", {"rpm": p.get("rpm") or tool.spindle_rpm}))
+            rpm = float(p.get("rpm") or getattr(tool, "spindle_rpm", 0) or 0)
+            feed = float(p.get("feed") or getattr(tool, "feed", 0) or 0)
+            if not rpm or not feed:   # sourced starting values for the material (lithocam.cutting_data)
+                from .. import cutting_data
+                sg = cutting_data.suggest(tool, station.material, float(p.get("stepdown", 0) or 0),
+                                          sp.max_rpm, station.robot_factor)
+                rpm = rpm or sg.rpm
+                feed = feed or sg.feed
+                recs.append(post.Rec("comment", {"text": "cutting data ({}): {}; {}; sources: {}".format(
+                    station.material, sg.text(), "; ".join(sg.notes) or "-", ", ".join(sg.sources) or "none")}))
+                msgs.append("step {}: cutting data for {} in {}: {} ({} source{})".format(
+                    i + 1, tid, station.material, sg.text(), len(sg.sources), "" if len(sg.sources) == 1 else "s"))
+            if rpm:
+                recs.append(post.Rec("spindle", {"rpm": rpm}))
+            if feed:
+                recs.append(post.Rec("speed", {"linear": feed / 60.0}))
             recs.append(post.Rec("comment", {"text": "{} with {} ({} points)".format(spec.label, tid or "tool",
                                                                                    len(rmoves))}))
             for (kind, pt), qq in zip(rmoves, qs):

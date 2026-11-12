@@ -51,7 +51,8 @@ def turned_face(face, yaw: float):
     Rz = rot_z(yaw)
     rs = [NS(p0=(Rz @ np.asarray(r.p0)).tolist(), p1=(Rz @ np.asarray(r.p1)).tolist(),
              normal=(Rz @ np.asarray(r.normal)).tolist()) for r in face.rulings]
-    return NS(index=face.index, label=face.label, rulings=rs)
+    return NS(index=face.index, label=face.label, rulings=rs, ordered=getattr(face, "ordered", False),
+              yaw_deg=getattr(face, "yaw_deg", None))
 
 
 def facing_yaw(face, placement: Sequence[float]) -> float:
@@ -78,5 +79,6 @@ def load_ruled_json(path: str):
     This keeps the OCP environment (ruled) and the Tesseract environment (robot) separate.
     """
     d = json.loads(Path(path).read_text(encoding="utf-8"))
-    faces = [NS(index=f["index"], label=f["label"], rulings=[NS(**r) for r in f["rulings"]]) for f in d["faces"]]
+    faces = [NS(index=f["index"], label=f["label"], rulings=[NS(**r) for r in f["rulings"]],
+                ordered=bool(f.get("ordered", False)), yaw_deg=f.get("yaw_deg")) for f in d["faces"]]
     return NS(faces=faces, rules=NS(**d["rules"]), scale=d["scale"])

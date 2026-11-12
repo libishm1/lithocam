@@ -68,7 +68,8 @@ STEPS: List[StepSpec] = [
     StepSpec("comment", "Comment", "Robot", "#", "done", params=(("text", "Text", "text", "", ""),)),
     # ---------------------------------------------------------------- setup
     StepSpec("setup", "Setup: work frame and stock", "Setup", "S", "done",
-             params=(("stock_margin", "Stock margin", "float", 5.0, "mm"), ("yaw", "Turntable", "float", 0.0, "deg"))),
+             params=(("stock_margin", "Stock margin", "float", 5.0, "mm"), ("yaw", "Turntable", "float", 0.0, "deg"),
+                     ("tilt", "Tool tilt (3+2)", "float", 0.0, "deg about the table x axis"))),
     StepSpec("tool_change", "Tool change", "Setup", "TC", "done", "any", params=(("tool", "Tool", "tool", "", ""),)),
     # ---------------------------------------------------------------- stone (the niche, first)
     StepSpec("wire_ruled", "Diamond wire: ruled surface", "Stone", "W", "partial", "wire_cut",
