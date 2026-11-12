@@ -1,0 +1,7851 @@
+{
+ "faces": [
+  {
+   "index": 0,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:0",
+   "label": "wire",
+   "reason": "every ruling is free on both sides; corners keep the wire radius",
+   "max_ruling": 30.0,
+   "rulings": [
+    {
+     "p0": [
+      0.0,
+      377.77777777777777,
+      0.0
+     ],
+     "p1": [
+      0.0,
+      377.77777777777777,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      0.0,
+      333.33333333333337,
+      0.0
+     ],
+     "p1": [
+      0.0,
+      333.33333333333337,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      0.0,
+      288.8888888888889,
+      0.0
+     ],
+     "p1": [
+      0.0,
+      288.8888888888889,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      0.0,
+      244.44444444444443,
+      0.0
+     ],
+     "p1": [
+      0.0,
+      244.44444444444443,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      0.0,
+      200.0,
+      0.0
+     ],
+     "p1": [
+      0.0,
+      200.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      0.0,
+      155.55555555555554,
+      0.0
+     ],
+     "p1": [
+      0.0,
+      155.55555555555554,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      0.0,
+      111.11111111111114,
+      0.0
+     ],
+     "p1": [
+      0.0,
+      111.11111111111114,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      0.0,
+      66.66666666666663,
+      0.0
+     ],
+     "p1": [
+      0.0,
+      66.66666666666663,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      0.0,
+      22.22222222222223,
+      0.0
+     ],
+     "p1": [
+      0.0,
+      22.22222222222223,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    }
+   ]
+  },
+  {
+   "index": 1,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:0",
+   "label": "wire",
+   "reason": "every ruling is free on both sides; corners keep the wire radius",
+   "max_ruling": 30.0,
+   "rulings": [
+    {
+     "p0": [
+      33.333333333333314,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      33.333333333333314,
+      0.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      100.0,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      100.0,
+      0.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      166.66666666666669,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      166.66666666666669,
+      0.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      233.33333333333334,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      233.33333333333334,
+      0.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      300.0,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      300.0,
+      0.0,
+      13.500072173477012
+     ],
+     "length": 13.500072173477012,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      300.0,
+      0.0,
+      16.499927826522985
+     ],
+     "p1": [
+      300.0,
+      0.0,
+      30.0
+     ],
+     "length": 13.500072173477015,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      366.6666666666667,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      366.6666666666667,
+      0.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      433.3333333333333,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      433.3333333333333,
+      0.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      500.0,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      500.0,
+      0.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      566.6666666666666,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      566.6666666666666,
+      0.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    }
+   ]
+  },
+  {
+   "index": 2,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:90",
+   "label": "wire",
+   "reason": "every ruling is free on both sides; corners keep the wire radius",
+   "max_ruling": 400.0,
+   "rulings": [
+    {
+     "p0": [
+      566.6666666666667,
+      0.0,
+      30.0
+     ],
+     "p1": [
+      566.6666666666667,
+      400.0,
+      30.0
+     ],
+     "length": 400.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      500.0,
+      0.0,
+      30.0
+     ],
+     "p1": [
+      500.0,
+      400.0,
+      30.0
+     ],
+     "length": 400.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      433.3333333333333,
+      0.0,
+      30.0
+     ],
+     "p1": [
+      433.3333333333333,
+      400.0,
+      30.0
+     ],
+     "length": 400.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      366.66666666666663,
+      0.0,
+      30.0
+     ],
+     "p1": [
+      366.66666666666663,
+      400.0,
+      30.0
+     ],
+     "length": 400.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      300.0,
+      0.0,
+      30.0
+     ],
+     "p1": [
+      300.0,
+      400.0,
+      30.0
+     ],
+     "length": 400.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      233.3333333333333,
+      0.0,
+      30.0
+     ],
+     "p1": [
+      233.33333333333334,
+      400.0,
+      30.0
+     ],
+     "length": 400.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      166.66666666666666,
+      0.0,
+      30.0
+     ],
+     "p1": [
+      166.6666666666667,
+      400.0,
+      30.0
+     ],
+     "length": 400.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      99.99999999999999,
+      0.0,
+      30.0
+     ],
+     "p1": [
+      100.00000000000001,
+      400.0,
+      30.0
+     ],
+     "length": 400.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      33.33333333333336,
+      0.0,
+      30.0
+     ],
+     "p1": [
+      33.333333333333385,
+      400.0,
+      30.0
+     ],
+     "length": 400.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    }
+   ]
+  },
+  {
+   "index": 3,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:0",
+   "label": "wire",
+   "reason": "every ruling is free on both sides; corners keep the wire radius",
+   "max_ruling": 30.0,
+   "rulings": [
+    {
+     "p0": [
+      33.333333333333314,
+      400.0,
+      0.0
+     ],
+     "p1": [
+      33.333333333333314,
+      400.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      100.0,
+      400.0,
+      0.0
+     ],
+     "p1": [
+      100.0,
+      400.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      166.66666666666669,
+      400.0,
+      0.0
+     ],
+     "p1": [
+      166.66666666666669,
+      400.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      233.33333333333334,
+      400.0,
+      0.0
+     ],
+     "p1": [
+      233.33333333333334,
+      400.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      300.0,
+      400.0,
+      0.0
+     ],
+     "p1": [
+      300.0,
+      400.0,
+      13.500072173477012
+     ],
+     "length": 13.500072173477012,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      300.0,
+      400.0,
+      16.499927826522985
+     ],
+     "p1": [
+      300.0,
+      400.0,
+      30.0
+     ],
+     "length": 13.500072173477015,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      366.6666666666667,
+      400.0,
+      0.0
+     ],
+     "p1": [
+      366.6666666666667,
+      400.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      433.3333333333333,
+      400.0,
+      0.0
+     ],
+     "p1": [
+      433.3333333333333,
+      400.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      500.0,
+      400.0,
+      0.0
+     ],
+     "p1": [
+      500.0,
+      400.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      566.6666666666666,
+      400.0,
+      0.0
+     ],
+     "p1": [
+      566.6666666666666,
+      400.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    }
+   ]
+  },
+  {
+   "index": 4,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:90",
+   "label": "wire",
+   "reason": "every ruling is free on both sides; corners keep the wire radius",
+   "max_ruling": 400.0,
+   "rulings": [
+    {
+     "p0": [
+      566.6666666666667,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      566.6666666666667,
+      400.0,
+      0.0
+     ],
+     "length": 400.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      500.0,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      500.0,
+      75.00007217330858,
+      0.0
+     ],
+     "length": 75.00007217330858,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      500.0,
+      84.99992782669142,
+      0.0
+     ],
+     "p1": [
+      500.0,
+      315.0000721733086,
+      0.0
+     ],
+     "length": 230.00014434661716,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      500.0,
+      324.9999278266914,
+      0.0
+     ],
+     "p1": [
+      500.0,
+      400.0,
+      0.0
+     ],
+     "length": 75.00007217330858,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      433.3333333333333,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      433.3333333333333,
+      400.0,
+      0.0
+     ],
+     "length": 400.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      366.66666666666663,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      366.66666666666663,
+      400.0,
+      0.0
+     ],
+     "length": 400.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      300.0,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      300.0,
+      400.0,
+      0.0
+     ],
+     "length": 400.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      233.3333333333333,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      233.33333333333334,
+      400.0,
+      0.0
+     ],
+     "length": 400.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      166.66666666666666,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      166.6666666666667,
+      400.0,
+      0.0
+     ],
+     "length": 400.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      99.99999999999999,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      99.99999999999999,
+      75.00007217330858,
+      0.0
+     ],
+     "length": 75.00007217330858,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      99.99999999999999,
+      84.99992782669142,
+      0.0
+     ],
+     "p1": [
+      100.00000000000001,
+      315.0000721733086,
+      0.0
+     ],
+     "length": 230.00014434661716,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      100.00000000000001,
+      324.9999278266914,
+      0.0
+     ],
+     "p1": [
+      100.00000000000001,
+      400.0,
+      0.0
+     ],
+     "length": 75.00007217330858,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      33.33333333333336,
+      0.0,
+      0.0
+     ],
+     "p1": [
+      33.333333333333385,
+      400.0,
+      0.0
+     ],
+     "length": 400.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    }
+   ]
+  },
+  {
+   "index": 5,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:0",
+   "label": "wire",
+   "reason": "every ruling is free on both sides; corners keep the wire radius",
+   "max_ruling": 30.0,
+   "rulings": [
+    {
+     "p0": [
+      600.0,
+      377.77777777777777,
+      0.0
+     ],
+     "p1": [
+      600.0,
+      377.77777777777777,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      600.0,
+      333.33333333333337,
+      0.0
+     ],
+     "p1": [
+      600.0,
+      333.33333333333337,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      600.0,
+      288.8888888888889,
+      0.0
+     ],
+     "p1": [
+      600.0,
+      288.8888888888889,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      600.0,
+      244.44444444444443,
+      0.0
+     ],
+     "p1": [
+      600.0,
+      244.44444444444443,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      600.0,
+      200.0,
+      0.0
+     ],
+     "p1": [
+      600.0,
+      200.0,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      600.0,
+      155.55555555555554,
+      0.0
+     ],
+     "p1": [
+      600.0,
+      155.55555555555554,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      600.0,
+      111.11111111111114,
+      0.0
+     ],
+     "p1": [
+      600.0,
+      111.11111111111114,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      600.0,
+      66.66666666666663,
+      0.0
+     ],
+     "p1": [
+      600.0,
+      66.66666666666663,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    },
+    {
+     "p0": [
+      600.0,
+      22.22222222222223,
+      0.0
+     ],
+     "p1": [
+      600.0,
+      22.22222222222223,
+      30.0
+     ],
+     "length": 30.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      true
+     ],
+     "tool_free": [
+      true,
+      true
+     ],
+     "wire_room": [
+      true,
+      true
+     ],
+     "tool_room": [
+      true,
+      true
+     ]
+    }
+   ]
+  },
+  {
+   "index": 6,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:90",
+   "label": "point",
+   "reason": "9 of 9 rulings blocked on both sides",
+   "max_ruling": 15.0,
+   "rulings": [
+    {
+     "p0": [
+      344.44444444444446,
+      -1.9897278269453977e-15,
+      16.5
+     ],
+     "p1": [
+      344.44444444444446,
+      14.999999999999998,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      333.33333333333337,
+      -1.9897278269453977e-15,
+      16.5
+     ],
+     "p1": [
+      333.33333333333337,
+      14.999999999999998,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      322.22222222222223,
+      -1.9897278269453977e-15,
+      16.5
+     ],
+     "p1": [
+      322.22222222222223,
+      14.999999999999998,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      311.1111111111111,
+      -1.9897278269453977e-15,
+      16.5
+     ],
+     "p1": [
+      311.1111111111111,
+      14.999999999999998,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      300.0,
+      -1.9897278269453977e-15,
+      16.5
+     ],
+     "p1": [
+      300.0,
+      14.999999999999998,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      288.8888888888889,
+      -1.9897278269453977e-15,
+      16.5
+     ],
+     "p1": [
+      288.8888888888889,
+      14.999999999999998,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      277.77777777777777,
+      -1.9897278269453977e-15,
+      16.5
+     ],
+     "p1": [
+      277.77777777777777,
+      14.999999999999998,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      266.66666666666663,
+      -1.9897278269453977e-15,
+      16.5
+     ],
+     "p1": [
+      266.66666666666663,
+      14.999999999999998,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      255.55555555555554,
+      -1.9897278269453977e-15,
+      16.5
+     ],
+     "p1": [
+      255.55555555555554,
+      14.999999999999998,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    }
+   ]
+  },
+  {
+   "index": 7,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:0",
+   "label": "point",
+   "reason": "9 of 9 rulings blocked on both sides",
+   "max_ruling": 3.0,
+   "rulings": [
+    {
+     "p0": [
+      350.0,
+      14.166666666666666,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      14.166666666666666,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      350.0,
+      12.5,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      12.5,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      350.0,
+      10.833333333333334,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      10.833333333333334,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      350.0,
+      9.166666666666666,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      9.166666666666666,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      350.0,
+      7.5,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      7.5,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      350.0,
+      5.833333333333332,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      5.833333333333332,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      350.0,
+      4.166666666666666,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      4.166666666666666,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      350.0,
+      2.5,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      2.5,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      350.0,
+      0.8333333333333337,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      0.8333333333333337,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    }
+   ]
+  },
+  {
+   "index": 8,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:90",
+   "label": "point",
+   "reason": "9 of 9 rulings blocked on both sides",
+   "max_ruling": 15.0,
+   "rulings": [
+    {
+     "p0": [
+      344.44444444444446,
+      -1.9897278269453977e-15,
+      13.5
+     ],
+     "p1": [
+      344.44444444444446,
+      14.999999999999998,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      333.33333333333337,
+      -1.9897278269453977e-15,
+      13.5
+     ],
+     "p1": [
+      333.33333333333337,
+      14.999999999999998,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      322.22222222222223,
+      -1.9897278269453977e-15,
+      13.5
+     ],
+     "p1": [
+      322.22222222222223,
+      14.999999999999998,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      311.1111111111111,
+      -1.9897278269453977e-15,
+      13.5
+     ],
+     "p1": [
+      311.1111111111111,
+      14.999999999999998,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      300.0,
+      -1.9897278269453977e-15,
+      13.5
+     ],
+     "p1": [
+      300.0,
+      14.999999999999998,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      288.8888888888889,
+      -1.9897278269453977e-15,
+      13.5
+     ],
+     "p1": [
+      288.8888888888889,
+      14.999999999999998,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      277.77777777777777,
+      -1.9897278269453977e-15,
+      13.5
+     ],
+     "p1": [
+      277.77777777777777,
+      14.999999999999998,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      266.66666666666663,
+      -1.9897278269453977e-15,
+      13.5
+     ],
+     "p1": [
+      266.66666666666663,
+      14.999999999999998,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      255.55555555555554,
+      -1.9897278269453977e-15,
+      13.5
+     ],
+     "p1": [
+      255.55555555555554,
+      14.999999999999998,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    }
+   ]
+  },
+  {
+   "index": 9,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:0",
+   "label": "point",
+   "reason": "9 of 9 rulings blocked on both sides",
+   "max_ruling": 3.0,
+   "rulings": [
+    {
+     "p0": [
+      250.0,
+      14.166666666666666,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      14.166666666666666,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      250.0,
+      12.5,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      12.5,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      250.0,
+      10.833333333333334,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      10.833333333333334,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      250.0,
+      9.166666666666666,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      9.166666666666666,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      250.0,
+      7.5,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      7.5,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      250.0,
+      5.833333333333332,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      5.833333333333332,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      250.0,
+      4.166666666666666,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      4.166666666666666,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      250.0,
+      2.5,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      2.5,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      250.0,
+      0.8333333333333337,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      0.8333333333333337,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    }
+   ]
+  },
+  {
+   "index": 10,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:90",
+   "label": "point",
+   "reason": "9 of 9 rulings blocked on both sides",
+   "max_ruling": 15.0,
+   "rulings": [
+    {
+     "p0": [
+      344.44444444444446,
+      385.0,
+      16.5
+     ],
+     "p1": [
+      344.44444444444446,
+      400.0,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      333.33333333333337,
+      385.0,
+      16.5
+     ],
+     "p1": [
+      333.33333333333337,
+      400.0,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      322.22222222222223,
+      385.0,
+      16.5
+     ],
+     "p1": [
+      322.22222222222223,
+      400.0,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      311.1111111111111,
+      385.0,
+      16.5
+     ],
+     "p1": [
+      311.1111111111111,
+      400.0,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      300.0,
+      385.0,
+      16.5
+     ],
+     "p1": [
+      300.0,
+      400.0,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      288.8888888888889,
+      385.0,
+      16.5
+     ],
+     "p1": [
+      288.8888888888889,
+      400.0,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      277.77777777777777,
+      385.0,
+      16.5
+     ],
+     "p1": [
+      277.77777777777777,
+      400.0,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      266.66666666666663,
+      385.0,
+      16.5
+     ],
+     "p1": [
+      266.66666666666663,
+      400.0,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      255.55555555555554,
+      385.0,
+      16.5
+     ],
+     "p1": [
+      255.55555555555554,
+      400.0,
+      16.5
+     ],
+     "length": 15.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    }
+   ]
+  },
+  {
+   "index": 11,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:0",
+   "label": "point",
+   "reason": "9 of 9 rulings blocked on both sides",
+   "max_ruling": 3.0,
+   "rulings": [
+    {
+     "p0": [
+      350.0,
+      399.1666666666667,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      399.1666666666667,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      350.0,
+      397.5,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      397.5,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      350.0,
+      395.8333333333333,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      395.8333333333333,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      350.0,
+      394.1666666666667,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      394.1666666666667,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      350.0,
+      392.5,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      392.5,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      350.0,
+      390.8333333333333,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      390.8333333333333,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      350.0,
+      389.1666666666667,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      389.1666666666667,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      350.0,
+      387.5,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      387.5,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      350.0,
+      385.8333333333333,
+      13.5
+     ],
+     "p1": [
+      350.0,
+      385.8333333333333,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -1.0,
+      -0.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    }
+   ]
+  },
+  {
+   "index": 12,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:90",
+   "label": "point",
+   "reason": "9 of 9 rulings blocked on both sides",
+   "max_ruling": 15.0,
+   "rulings": [
+    {
+     "p0": [
+      344.44444444444446,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      344.44444444444446,
+      400.0,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      333.33333333333337,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      333.33333333333337,
+      400.0,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      322.22222222222223,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      322.22222222222223,
+      400.0,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      311.1111111111111,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      311.1111111111111,
+      400.0,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      300.0,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      300.0,
+      400.0,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      288.8888888888889,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      288.8888888888889,
+      400.0,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      277.77777777777777,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      277.77777777777777,
+      400.0,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      266.66666666666663,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      266.66666666666663,
+      400.0,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      255.55555555555554,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      255.55555555555554,
+      400.0,
+      13.5
+     ],
+     "length": 15.0,
+     "normal": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    }
+   ]
+  },
+  {
+   "index": 13,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:0",
+   "label": "point",
+   "reason": "9 of 9 rulings blocked on both sides",
+   "max_ruling": 3.0,
+   "rulings": [
+    {
+     "p0": [
+      250.0,
+      399.1666666666667,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      399.1666666666667,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      250.0,
+      397.5,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      397.5,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      250.0,
+      395.8333333333333,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      395.8333333333333,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      250.0,
+      394.1666666666667,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      394.1666666666667,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      250.0,
+      392.5,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      392.5,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      250.0,
+      390.8333333333333,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      390.8333333333333,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      250.0,
+      389.1666666666667,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      389.1666666666667,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      250.0,
+      387.5,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      387.5,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      250.0,
+      385.8333333333333,
+      13.5
+     ],
+     "p1": [
+      250.0,
+      385.8333333333333,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    }
+   ]
+  },
+  {
+   "index": 14,
+   "surface": "cylinder",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "v",
+   "label": "flank",
+   "reason": "every ruling is free on one side at the tool radius",
+   "max_ruling": 20.0,
+   "rulings": [
+    {
+     "p0": [
+      104.6984631039295,
+      81.71010071662845,
+      0.0
+     ],
+     "p1": [
+      104.6984631039295,
+      81.71010071662845,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      -0.9396926207859005,
+      -0.3420201433256903,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      102.4999999999997,
+      84.33012701892237,
+      0.0
+     ],
+     "p1": [
+      102.4999999999997,
+      84.33012701892237,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      -0.4999999999999403,
+      -0.8660254037844732,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      99.13175911166478,
+      84.92403876506094,
+      0.0
+     ],
+     "p1": [
+      99.13175911166478,
+      84.92403876506094,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      0.17364817766704357,
+      -0.984807753012188,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      96.16977778440459,
+      83.21393804843208,
+      0.0
+     ],
+     "p1": [
+      96.16977778440459,
+      83.21393804843208,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      0.7660444431190815,
+      -0.642787609686416,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      95.0,
+      79.99999999999896,
+      0.0
+     ],
+     "p1": [
+      95.0,
+      79.99999999999896,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      1.0,
+      2.0682310711021447e-13,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      96.16977778440592,
+      76.78606195156634,
+      0.0
+     ],
+     "p1": [
+      96.16977778440592,
+      76.78606195156634,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      0.7660444431188154,
+      0.6427876096867332,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      99.13175911166682,
+      75.0759612349387,
+      0.0
+     ],
+     "p1": [
+      99.13175911166682,
+      75.0759612349387,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      0.17364817766663643,
+      0.9848077530122599,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      102.50000000000149,
+      75.66987298107867,
+      0.0
+     ],
+     "p1": [
+      102.50000000000149,
+      75.66987298107867,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      -0.5000000000002985,
+      0.8660254037842663,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      104.69846310393021,
+      78.28989928337349,
+      0.0
+     ],
+     "p1": [
+      104.69846310393021,
+      78.28989928337349,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      -0.9396926207860418,
+      0.3420201433253022,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    }
+   ]
+  },
+  {
+   "index": 15,
+   "surface": "cylinder",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "v",
+   "label": "flank",
+   "reason": "every ruling is free on one side at the tool radius",
+   "max_ruling": 20.0,
+   "rulings": [
+    {
+     "p0": [
+      504.6984631039295,
+      81.71010071662845,
+      0.0
+     ],
+     "p1": [
+      504.6984631039295,
+      81.71010071662845,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      -0.9396926207859005,
+      -0.3420201433256903,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      502.4999999999997,
+      84.33012701892237,
+      0.0
+     ],
+     "p1": [
+      502.4999999999997,
+      84.33012701892237,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      -0.4999999999999403,
+      -0.8660254037844732,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      499.1317591116648,
+      84.92403876506094,
+      0.0
+     ],
+     "p1": [
+      499.1317591116648,
+      84.92403876506094,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      0.17364817766704357,
+      -0.984807753012188,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      496.1697777844046,
+      83.21393804843208,
+      0.0
+     ],
+     "p1": [
+      496.1697777844046,
+      83.21393804843208,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      0.7660444431190815,
+      -0.642787609686416,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      495.0,
+      79.99999999999896,
+      0.0
+     ],
+     "p1": [
+      495.0,
+      79.99999999999896,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      1.0,
+      2.0682310711021447e-13,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      496.16977778440594,
+      76.78606195156634,
+      0.0
+     ],
+     "p1": [
+      496.16977778440594,
+      76.78606195156634,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      0.7660444431188154,
+      0.6427876096867332,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      499.13175911166684,
+      75.0759612349387,
+      0.0
+     ],
+     "p1": [
+      499.13175911166684,
+      75.0759612349387,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      0.17364817766663643,
+      0.9848077530122599,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      502.5000000000015,
+      75.66987298107867,
+      0.0
+     ],
+     "p1": [
+      502.5000000000015,
+      75.66987298107867,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      -0.5000000000002985,
+      0.8660254037842663,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      504.6984631039302,
+      78.28989928337349,
+      0.0
+     ],
+     "p1": [
+      504.6984631039302,
+      78.28989928337349,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      -0.9396926207860418,
+      0.3420201433253022,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    }
+   ]
+  },
+  {
+   "index": 16,
+   "surface": "cylinder",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "v",
+   "label": "flank",
+   "reason": "every ruling is free on one side at the tool radius",
+   "max_ruling": 20.0,
+   "rulings": [
+    {
+     "p0": [
+      104.6984631039295,
+      321.71010071662846,
+      0.0
+     ],
+     "p1": [
+      104.6984631039295,
+      321.71010071662846,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      -0.9396926207859005,
+      -0.3420201433256903,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      102.4999999999997,
+      324.3301270189224,
+      0.0
+     ],
+     "p1": [
+      102.4999999999997,
+      324.3301270189224,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      -0.4999999999999403,
+      -0.8660254037844732,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      99.13175911166478,
+      324.9240387650609,
+      0.0
+     ],
+     "p1": [
+      99.13175911166478,
+      324.9240387650609,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      0.17364817766704357,
+      -0.984807753012188,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      96.16977778440459,
+      323.21393804843206,
+      0.0
+     ],
+     "p1": [
+      96.16977778440459,
+      323.21393804843206,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      0.7660444431190815,
+      -0.642787609686416,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      95.0,
+      319.999999999999,
+      0.0
+     ],
+     "p1": [
+      95.0,
+      319.999999999999,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      1.0,
+      2.0682310711021447e-13,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      96.16977778440592,
+      316.78606195156635,
+      0.0
+     ],
+     "p1": [
+      96.16977778440592,
+      316.78606195156635,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      0.7660444431188154,
+      0.6427876096867332,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      99.13175911166682,
+      315.0759612349387,
+      0.0
+     ],
+     "p1": [
+      99.13175911166682,
+      315.0759612349387,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      0.17364817766663643,
+      0.9848077530122599,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      102.50000000000149,
+      315.6698729810787,
+      0.0
+     ],
+     "p1": [
+      102.50000000000149,
+      315.6698729810787,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      -0.5000000000002985,
+      0.8660254037842663,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      104.69846310393021,
+      318.2898992833735,
+      0.0
+     ],
+     "p1": [
+      104.69846310393021,
+      318.2898992833735,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      -0.9396926207860418,
+      0.3420201433253022,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    }
+   ]
+  },
+  {
+   "index": 17,
+   "surface": "cylinder",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "v",
+   "label": "flank",
+   "reason": "every ruling is free on one side at the tool radius",
+   "max_ruling": 20.0,
+   "rulings": [
+    {
+     "p0": [
+      504.6984631039295,
+      321.71010071662846,
+      0.0
+     ],
+     "p1": [
+      504.6984631039295,
+      321.71010071662846,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      -0.9396926207859005,
+      -0.3420201433256903,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      502.4999999999997,
+      324.3301270189224,
+      0.0
+     ],
+     "p1": [
+      502.4999999999997,
+      324.3301270189224,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      -0.4999999999999403,
+      -0.8660254037844732,
+      0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      499.1317591116648,
+      324.9240387650609,
+      0.0
+     ],
+     "p1": [
+      499.1317591116648,
+      324.9240387650609,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      0.17364817766704357,
+      -0.984807753012188,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      496.1697777844046,
+      323.21393804843206,
+      0.0
+     ],
+     "p1": [
+      496.1697777844046,
+      323.21393804843206,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      0.7660444431190815,
+      -0.642787609686416,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      495.0,
+      319.999999999999,
+      0.0
+     ],
+     "p1": [
+      495.0,
+      319.999999999999,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      1.0,
+      2.0682310711021447e-13,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      496.16977778440594,
+      316.78606195156635,
+      0.0
+     ],
+     "p1": [
+      496.16977778440594,
+      316.78606195156635,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      0.7660444431188154,
+      0.6427876096867332,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      499.13175911166684,
+      315.0759612349387,
+      0.0
+     ],
+     "p1": [
+      499.13175911166684,
+      315.0759612349387,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      0.17364817766663643,
+      0.9848077530122599,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      502.5000000000015,
+      315.6698729810787,
+      0.0
+     ],
+     "p1": [
+      502.5000000000015,
+      315.6698729810787,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      -0.5000000000002985,
+      0.8660254037842663,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    },
+    {
+     "p0": [
+      504.6984631039302,
+      318.2898992833735,
+      0.0
+     ],
+     "p1": [
+      504.6984631039302,
+      318.2898992833735,
+      20.0
+     ],
+     "length": 20.0,
+     "normal": [
+      -0.9396926207860418,
+      0.3420201433253022,
+      -0.0
+     ],
+     "wire_free": [
+      true,
+      false
+     ],
+     "tool_free": [
+      true,
+      false
+     ],
+     "wire_room": [
+      true,
+      false
+     ],
+     "tool_room": [
+      true,
+      false
+     ]
+    }
+   ]
+  },
+  {
+   "index": 18,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:0",
+   "label": "point",
+   "reason": "9 of 9 rulings blocked on both sides",
+   "max_ruling": 3.0,
+   "rulings": [
+    {
+     "p0": [
+      255.55555555555554,
+      15.0,
+      13.5
+     ],
+     "p1": [
+      255.55555555555554,
+      15.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      266.6666666666667,
+      15.0,
+      13.5
+     ],
+     "p1": [
+      266.6666666666667,
+      15.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      277.77777777777777,
+      15.0,
+      13.5
+     ],
+     "p1": [
+      277.77777777777777,
+      15.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      288.8888888888889,
+      15.0,
+      13.5
+     ],
+     "p1": [
+      288.8888888888889,
+      15.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      300.0,
+      15.0,
+      13.5
+     ],
+     "p1": [
+      300.0,
+      15.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      311.1111111111111,
+      15.0,
+      13.5
+     ],
+     "p1": [
+      311.1111111111111,
+      15.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      322.22222222222223,
+      15.0,
+      13.5
+     ],
+     "p1": [
+      322.22222222222223,
+      15.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      333.33333333333337,
+      15.0,
+      13.5
+     ],
+     "p1": [
+      333.33333333333337,
+      15.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      344.44444444444446,
+      15.0,
+      13.5
+     ],
+     "p1": [
+      344.44444444444446,
+      15.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    }
+   ]
+  },
+  {
+   "index": 19,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:0",
+   "label": "point",
+   "reason": "9 of 9 rulings blocked on both sides",
+   "max_ruling": 3.0,
+   "rulings": [
+    {
+     "p0": [
+      255.55555555555554,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      255.55555555555554,
+      385.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      266.6666666666667,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      266.6666666666667,
+      385.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      277.77777777777777,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      277.77777777777777,
+      385.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      288.8888888888889,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      288.8888888888889,
+      385.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      300.0,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      300.0,
+      385.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      311.1111111111111,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      311.1111111111111,
+      385.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      322.22222222222223,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      322.22222222222223,
+      385.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      333.33333333333337,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      333.33333333333337,
+      385.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      344.44444444444446,
+      385.0,
+      13.5
+     ],
+     "p1": [
+      344.44444444444446,
+      385.0,
+      16.5
+     ],
+     "length": 3.0,
+     "normal": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    }
+   ]
+  },
+  {
+   "index": 20,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:0",
+   "label": "point",
+   "reason": "9 of 9 rulings blocked on both sides",
+   "max_ruling": 10.0,
+   "rulings": [
+    {
+     "p0": [
+      97.70922822630072,
+      75.55555555555556,
+      20.0
+     ],
+     "p1": [
+      102.29077177369928,
+      75.55555555555556,
+      20.0
+     ],
+     "length": 4.581543547398553,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      96.27312320730391,
+      76.66666666666667,
+      20.0
+     ],
+     "p1": [
+      103.72687679269609,
+      76.66666666666667,
+      20.0
+     ],
+     "length": 7.453753585392178,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      95.52088734961333,
+      77.77777777777777,
+      20.0
+     ],
+     "p1": [
+      104.47911265038667,
+      77.77777777777777,
+      20.0
+     ],
+     "length": 8.958225300773336,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      95.12494576054605,
+      78.88888888888889,
+      20.0
+     ],
+     "p1": [
+      104.87505423945395,
+      78.88888888888889,
+      20.0
+     ],
+     "length": 9.75010847890789,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      95.0,
+      80.0,
+      20.0
+     ],
+     "p1": [
+      105.0,
+      80.0,
+      20.0
+     ],
+     "length": 10.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      95.12494576054605,
+      81.11111111111111,
+      20.0
+     ],
+     "p1": [
+      104.87505423945395,
+      81.11111111111111,
+      20.0
+     ],
+     "length": 9.75010847890789,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      95.52088734961333,
+      82.22222222222223,
+      20.0
+     ],
+     "p1": [
+      104.47911265038667,
+      82.22222222222223,
+      20.0
+     ],
+     "length": 8.958225300773336,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      96.27312320730391,
+      83.33333333333333,
+      20.0
+     ],
+     "p1": [
+      103.72687679269609,
+      83.33333333333333,
+      20.0
+     ],
+     "length": 7.453753585392178,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      97.70922822630072,
+      84.44444444444444,
+      20.0
+     ],
+     "p1": [
+      102.29077177369928,
+      84.44444444444444,
+      20.0
+     ],
+     "length": 4.581543547398553,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    }
+   ]
+  },
+  {
+   "index": 21,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:0",
+   "label": "point",
+   "reason": "9 of 9 rulings blocked on both sides",
+   "max_ruling": 10.0,
+   "rulings": [
+    {
+     "p0": [
+      497.70922822630075,
+      75.55555555555556,
+      20.0
+     ],
+     "p1": [
+      502.29077177369925,
+      75.55555555555556,
+      20.0
+     ],
+     "length": 4.581543547398496,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      496.2731232073039,
+      76.66666666666667,
+      20.0
+     ],
+     "p1": [
+      503.7268767926961,
+      76.66666666666667,
+      20.0
+     ],
+     "length": 7.453753585392178,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      495.5208873496133,
+      77.77777777777777,
+      20.0
+     ],
+     "p1": [
+      504.4791126503867,
+      77.77777777777777,
+      20.0
+     ],
+     "length": 8.958225300773393,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      495.12494576054604,
+      78.88888888888889,
+      20.0
+     ],
+     "p1": [
+      504.87505423945396,
+      78.88888888888889,
+      20.0
+     ],
+     "length": 9.750108478907919,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      495.0,
+      80.0,
+      20.0
+     ],
+     "p1": [
+      505.0,
+      80.0,
+      20.0
+     ],
+     "length": 10.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      495.12494576054604,
+      81.11111111111111,
+      20.0
+     ],
+     "p1": [
+      504.87505423945396,
+      81.11111111111111,
+      20.0
+     ],
+     "length": 9.750108478907919,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      495.5208873496133,
+      82.22222222222223,
+      20.0
+     ],
+     "p1": [
+      504.4791126503867,
+      82.22222222222223,
+      20.0
+     ],
+     "length": 8.958225300773393,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      496.2731232073039,
+      83.33333333333333,
+      20.0
+     ],
+     "p1": [
+      503.7268767926961,
+      83.33333333333333,
+      20.0
+     ],
+     "length": 7.453753585392178,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      497.70922822630075,
+      84.44444444444444,
+      20.0
+     ],
+     "p1": [
+      502.29077177369925,
+      84.44444444444444,
+      20.0
+     ],
+     "length": 4.581543547398496,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    }
+   ]
+  },
+  {
+   "index": 22,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:0",
+   "label": "point",
+   "reason": "9 of 9 rulings blocked on both sides",
+   "max_ruling": 10.0,
+   "rulings": [
+    {
+     "p0": [
+      97.70922822630072,
+      315.55555555555554,
+      20.0
+     ],
+     "p1": [
+      102.29077177369928,
+      315.55555555555554,
+      20.0
+     ],
+     "length": 4.581543547398553,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      96.27312320730391,
+      316.6666666666667,
+      20.0
+     ],
+     "p1": [
+      103.72687679269609,
+      316.6666666666667,
+      20.0
+     ],
+     "length": 7.453753585392178,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      95.52088734961333,
+      317.77777777777777,
+      20.0
+     ],
+     "p1": [
+      104.47911265038667,
+      317.77777777777777,
+      20.0
+     ],
+     "length": 8.958225300773336,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      95.12494576054605,
+      318.8888888888889,
+      20.0
+     ],
+     "p1": [
+      104.87505423945395,
+      318.8888888888889,
+      20.0
+     ],
+     "length": 9.75010847890789,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      95.0,
+      320.0,
+      20.0
+     ],
+     "p1": [
+      105.0,
+      320.0,
+      20.0
+     ],
+     "length": 10.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      95.12494576054605,
+      321.1111111111111,
+      20.0
+     ],
+     "p1": [
+      104.87505423945395,
+      321.1111111111111,
+      20.0
+     ],
+     "length": 9.75010847890789,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      95.52088734961333,
+      322.22222222222223,
+      20.0
+     ],
+     "p1": [
+      104.47911265038667,
+      322.22222222222223,
+      20.0
+     ],
+     "length": 8.958225300773336,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      96.27312320730391,
+      323.3333333333333,
+      20.0
+     ],
+     "p1": [
+      103.72687679269609,
+      323.3333333333333,
+      20.0
+     ],
+     "length": 7.453753585392178,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      97.70922822630072,
+      324.44444444444446,
+      20.0
+     ],
+     "p1": [
+      102.29077177369928,
+      324.44444444444446,
+      20.0
+     ],
+     "length": 4.581543547398553,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    }
+   ]
+  },
+  {
+   "index": 23,
+   "surface": "plane",
+   "ruled": "exact",
+   "deviation": 0.0,
+   "family": "plane:0",
+   "label": "point",
+   "reason": "9 of 9 rulings blocked on both sides",
+   "max_ruling": 10.0,
+   "rulings": [
+    {
+     "p0": [
+      497.70922822630075,
+      315.55555555555554,
+      20.0
+     ],
+     "p1": [
+      502.29077177369925,
+      315.55555555555554,
+      20.0
+     ],
+     "length": 4.581543547398496,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      496.2731232073039,
+      316.6666666666667,
+      20.0
+     ],
+     "p1": [
+      503.7268767926961,
+      316.6666666666667,
+      20.0
+     ],
+     "length": 7.453753585392178,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      495.5208873496133,
+      317.77777777777777,
+      20.0
+     ],
+     "p1": [
+      504.4791126503867,
+      317.77777777777777,
+      20.0
+     ],
+     "length": 8.958225300773393,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      495.12494576054604,
+      318.8888888888889,
+      20.0
+     ],
+     "p1": [
+      504.87505423945396,
+      318.8888888888889,
+      20.0
+     ],
+     "length": 9.750108478907919,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      495.0,
+      320.0,
+      20.0
+     ],
+     "p1": [
+      505.0,
+      320.0,
+      20.0
+     ],
+     "length": 10.0,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      495.12494576054604,
+      321.1111111111111,
+      20.0
+     ],
+     "p1": [
+      504.87505423945396,
+      321.1111111111111,
+      20.0
+     ],
+     "length": 9.750108478907919,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      495.5208873496133,
+      322.22222222222223,
+      20.0
+     ],
+     "p1": [
+      504.4791126503867,
+      322.22222222222223,
+      20.0
+     ],
+     "length": 8.958225300773393,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      496.2731232073039,
+      323.3333333333333,
+      20.0
+     ],
+     "p1": [
+      503.7268767926961,
+      323.3333333333333,
+      20.0
+     ],
+     "length": 7.453753585392178,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    },
+    {
+     "p0": [
+      497.70922822630075,
+      324.44444444444446,
+      20.0
+     ],
+     "p1": [
+      502.29077177369925,
+      324.44444444444446,
+      20.0
+     ],
+     "length": 4.581543547398496,
+     "normal": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "wire_free": [
+      false,
+      false
+     ],
+     "tool_free": [
+      false,
+      false
+     ],
+     "wire_room": [
+      false,
+      false
+     ],
+     "tool_room": [
+      false,
+      false
+     ]
+    }
+   ]
+  }
+ ],
+ "rules": {
+  "wire_diameter": 7.0,
+  "tool_radius": 5.0,
+  "wire_length_max": null,
+  "ruled_tol": 0.01,
+  "n_rulings": 9,
+  "n_samples": 48,
+  "plane_angles": 8,
+  "trim_step": 1.0
+ },
+ "scale": 721.7340233160689
+}

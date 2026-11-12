@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<robot name="kr120">
+  <group name="manipulator"><chain base_link="base_link" tip_link="tool0"/></group>
+  <kinematics_plugin_config filename="package://cells/kr120_plugins.yaml"/>
+  <contact_managers_plugin_config filename="package://cells/contact_manager_plugins.yaml"/>
+  <disable_collisions link1="base_link" link2="link_1" reason="Adjacent"/>
+  <disable_collisions link1="base_link" link2="link_2" reason="Adjacent"/>
+  <disable_collisions link1="link_1" link2="link_2" reason="Adjacent"/>
+  <disable_collisions link1="link_1" link2="link_3" reason="Adjacent"/>
+  <disable_collisions link1="link_2" link2="link_3" reason="Adjacent"/>
+  <disable_collisions link1="link_2" link2="link_4" reason="Adjacent"/>
+  <disable_collisions link1="link_3" link2="link_4" reason="Adjacent"/>
+  <disable_collisions link1="link_3" link2="link_5" reason="Adjacent"/>
+  <disable_collisions link1="link_4" link2="link_5" reason="Adjacent"/>
+  <disable_collisions link1="link_4" link2="link_6" reason="Adjacent"/>
+  <disable_collisions link1="link_5" link2="link_6" reason="Adjacent"/>
+</robot>

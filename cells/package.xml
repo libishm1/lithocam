@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<!-- Tesseract's GeneralResourceLocator resolves package://cells/... when TESSERACT_RESOURCE_PATH is the repository root. -->
+<package format="3">
+  <name>cells</name>
+  <version>0.0.1</version>
+  <description>Robot cells for lithocam simulation: UR10e, KUKA KR120 R2500 PRO (fixed, on a linear track, with a turntable).</description>
+  <maintainer email="noreply@example.com">The lithocam authors</maintainer>
+  <license>Apache-2.0</license>
+</package>

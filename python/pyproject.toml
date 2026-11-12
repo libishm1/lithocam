@@ -17,6 +17,8 @@ features = ["quiddity>=0.4.9; python_version >= '3.11'"]
 test = ["pytest>=7"]
 # lithocam.ruled reads B-reps with OpenCascade (OCP bindings, Apache-2.0; OCCT is LGPL-2.1 with exception).
 ruled = ["cadquery-ocp>=7.7"]
+# lithocam.robot: robot cells (cells/) in Tesseract.
+robot = ["tesseract-robotics>=0.35", "numpy"]
 
 [project.scripts]
 lithocam-features = "lithocam.features:main"
