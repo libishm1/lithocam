@@ -130,33 +130,91 @@ for i, st in enumerate(w["stages"]):
 frames += [frames[-1]] * 4
 save(frames, "wire_cuts.gif", 650)
 
-# ---------------------------------------------------------------- 4) robot wire sweep
-r = json.loads((DATA / "robot_ur10e_column.json").read_text())
+# ---------------------------------------------------------------- 4) robot wire sweep, official robot meshes
+import importlib.util  # noqa: E402
+from matplotlib.colors import LightSource  # noqa: E402
+
+CELLS = Path(__file__).resolve().parents[2] / "cells"
+spec = importlib.util.spec_from_file_location("make_cells", CELLS / "make_cells.py")
+mc = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mc)
+
+
+def read_stl(path):
+    data = Path(path).read_bytes()
+    if data[:5].lower() == b"solid" and b"facet" in data[:400]:
+        v = [list(map(float, l.split()[1:4])) for l in data.decode(errors="ignore").splitlines()
+             if l.strip().startswith("vertex")]
+        return np.asarray(v).reshape(-1, 3, 3)
+    n = int.from_bytes(data[80:84], "little")
+    rec = np.frombuffer(data[84:84 + 50 * n], dtype=np.dtype([("n", "<f4", 3), ("v", "<f4", (3, 3)), ("a", "<u2")]))
+    return rec["v"].astype(np.float64)
+
+
+def rpy_matrix(xyz, rpy):
+    x, y, z = (float(s) for s in xyz.split())
+    r, p, w = (float(s) for s in rpy.split())
+    cr, sr, cp, sp, cw, sw = math.cos(r), math.sin(r), math.cos(p), math.sin(p), math.cos(w), math.sin(w)
+    R = np.array([[cw * cp, cw * sp * sr - sw * cr, cw * sp * cr + sw * sr],
+                  [sw * cp, sw * sp * sr + cw * cr, sw * sp * cr - cw * sr],
+                  [-sp, cp * sr, cp * cr]])
+    T = np.eye(4)
+    T[:3, :3], T[:3, 3] = R, (x, y, z)
+    return T
+
+
+import math  # noqa: E402
+
+LIGHT = LightSource(azdeg=225, altdeg=45)
+LDIR = np.array([-0.4, -0.5, 0.77])
+LDIR /= np.linalg.norm(LDIR)
+
+
+def shaded(tris, hex_colour, alpha=1.0):
+    """Lambert shading per triangle (two-sided), as an RGBA array."""
+    base = np.array(matplotlib.colors.to_rgb(hex_colour))
+    n = np.cross(tris[:, 1] - tris[:, 0], tris[:, 2] - tris[:, 0])
+    ln = np.linalg.norm(n, axis=1)
+    ln[ln == 0] = 1
+    k = 0.35 + 0.65 * np.abs((n / ln[:, None]) @ LDIR)
+    rgb = np.clip(base[None, :] * k[:, None], 0, 1)
+    return np.hstack([rgb, np.full((len(tris), 1), alpha)])
+ROBOTS = {"ur10e": (mc.UR_MESH, "#5f87b6", "UR10e"), "kr120": (mc.KR_MESH, "#f08c00", "KUKA KR120 R2500 PRO")}
 col = json.loads((DATA / "ruled_twisted_column.json").read_text())
-off = np.asarray(r["placement"])
-tris = np.vstack([np.asarray(f["tris"]) for f in col if f["tris"]]) * 1e-3 + off
-pts = np.vstack([tris.reshape(-1, 3)] + [np.asarray(fr["links"]) for fr in r["frames"]] + [[[0, 0, 0]]])
-frames = []
-for k, fr in enumerate(r["frames"]):
-    fig = plt.figure(figsize=(6.8, 5.6))
-    ax = fig.add_subplot(projection="3d")
-    ax.add_collection3d(Poly3DCollection(tris, facecolor="#c9b9a0", edgecolor="#8a7a62", linewidths=0.1,
-                                         alpha=0.35))
-    L = np.asarray(fr["links"])
-    ax.plot(L[:, 0], L[:, 1], L[:, 2], color="#2d3748", lw=4, solid_capstyle="round")
-    ax.scatter(L[:, 0], L[:, 1], L[:, 2], color="#e8913a", s=18, depthshade=False)
-    a, b = np.asarray(fr["wire"])
-    t0 = np.asarray(fr["tool0"])
-    for e in (a, b):
-        ax.plot(*zip(t0, e), color="#4a5568", lw=1.6)
-    ax.plot(*zip(a, b), color="#d9534f", lw=2.4)
-    equal_box(ax, pts, pad=0.0, zoom=1.35, min_frac=0.3)
-    ax.view_init(elev=18, azim=-150)
-    clean(ax)
-    fig.subplots_adjust(left=0, right=1, top=0.93, bottom=0.07)
-    ax.set_title("UR10e wire sweep over the twisted column (face {}), verified IK".format(fr["face"]), fontsize=9)
-    fig.text(0.5, 0.04, "lithocam.robot.wire_face_path: kerf-offset rulings, roll redundancy, nearest configuration",
-             ha="center", fontsize=8)
-    frames.append(grab(fig))
-    plt.close(fig)
-save(frames, "robot_wire_sweep.gif", 220)
+for rname, (meshdef, colour, label) in ROBOTS.items():
+    r = json.loads((DATA / "robot_{}_column.json".format(rname)).read_text())
+    off = np.asarray(r["placement"])
+    part = np.vstack([np.asarray(f["tris"]) for f in col if f["tris"]]) * 1e-3 + off
+    meshes = {ln: (read_stl(CELLS / "meshes" / m[0]), rpy_matrix(m[1], m[2])) for ln, m in meshdef.items()}
+    world = []
+    for fr in r["frames"][::6]:
+        for ln, (tri, To) in meshes.items():
+            T = np.asarray(fr["tf"][ln]) @ To
+            world.append((tri.reshape(-1, 3) @ T[:3, :3].T + T[:3, 3]))
+    pts = np.vstack([part.reshape(-1, 3)] + world)
+    frames = []
+    for k, fr in enumerate(r["frames"]):
+        fig = plt.figure(figsize=(6.8, 5.6))
+        ax = fig.add_subplot(projection="3d")
+        ax.add_collection3d(Poly3DCollection(part, facecolors=shaded(part, "#c9b9a0", 0.45), edgecolors="none"))
+        for ln, (tri, To) in meshes.items():
+            T = np.asarray(fr["tf"][ln]) @ To
+            w = tri @ T[:3, :3].T + T[:3, 3]
+            ax.add_collection3d(Poly3DCollection(w, facecolors=shaded(w, colour if ln != "base_link" else "#4a5568"),
+                                                 edgecolors="none"))
+        a, b = np.asarray(fr["wire"])
+        t0 = np.asarray(fr["tool0"])
+        for e in (a, b):
+            ax.plot(*zip(t0, e), color="#2d3748", lw=1.6)
+        ax.plot(*zip(a, b), color="#d9534f", lw=2.4)
+        equal_box(ax, pts, pad=0.0, zoom=1.1, min_frac=0.3)
+        ax.view_init(elev=18, azim=-150 if rname == "ur10e" else -120)
+        clean(ax)
+        fig.subplots_adjust(left=0, right=1, top=0.93, bottom=0.07)
+        ax.set_title("{} wire sweep over the twisted column (face {}), verified IK".format(label, fr["face"]),
+                     fontsize=9)
+        fig.text(0.5, 0.04, "official robot meshes; lithocam.robot.wire_face_path: kerf-offset rulings, roll "
+                 "redundancy, nearest configuration", ha="center", fontsize=7.5)
+        frames.append(grab(fig))
+        plt.close(fig)
+    save(frames, "robot_wire_sweep.gif" if rname == "ur10e" else "robot_wire_sweep_kr120.gif", 220)

@@ -41,6 +41,30 @@ def link(name, geom=""):
     return '  <link name="{}">{}</link>\n'.format(name, geom)
 
 
+def mesh(path, xyz="0 0 0", rpy="0 0 0"):
+    """Official mesh (cells/meshes/...) as both visual and collision geometry, at the official mesh offset."""
+    g = '<geometry><mesh filename="package://cells/meshes/{}"/></geometry>'.format(path)
+    o = '<origin xyz="{}" rpy="{}"/>'.format(xyz, rpy)
+    return "<visual>{0}{1}</visual><collision>{0}{1}</collision>".format(o, g)
+
+
+D90 = math.radians(90)
+# UR10e mesh offsets from Universal_Robots_ROS2_Description config/ur10e/visual_parameters.yaml, expressed in this
+# file's link frames (our base_link already includes the base_link_inertia yaw of pi, so the base mesh's own yaw of
+# pi cancels it).
+UR_MESH = {
+    "base_link": ("ur10e/base.stl", "0 0 0", "0 0 0"),
+    "shoulder_link": ("ur10e/shoulder.stl", "0 0 0", "0 0 {}".format(PI)),
+    "upper_arm_link": ("ur10e/upperarm.stl", "0 0 0.1762", "{} 0 {}".format(D90, -D90)),
+    "forearm_link": ("ur10e/forearm.stl", "0 0 0.0393", "{} 0 {}".format(D90, -D90)),
+    "wrist_1_link": ("ur10e/wrist1.stl", "0 0 -0.135", "{} 0 0".format(D90)),
+    "wrist_2_link": ("ur10e/wrist2.stl", "0 0 -0.12", "0 0 0"),
+    "wrist_3_link": ("ur10e/wrist3.stl", "0 -0.0005 -0.1168", "{} 0 0".format(D90)),
+}
+KR_MESH = {n: ("kr120/{}.stl".format(n), "0 0 0", "0 0 0")
+           for n in ("base_link", "link_1", "link_2", "link_3", "link_4", "link_5", "link_6")}
+
+
 def joint(name, typ, parent, child, xyz="0 0 0", rpy="0 0 0", axis=None, lo=None, hi=None, vel=None):
     s = '  <joint name="{}" type="{}"><parent link="{}"/><child link="{}"/><origin xyz="{}" rpy="{}"/>'.format(
         name, typ, parent, child, xyz, rpy)
@@ -59,13 +83,8 @@ def ur10e_body(prefix=""):
     p = prefix
     d1, a2, a3, d4, d5, d6 = (UR[k] for k in ("d1", "a2", "a3", "d4", "d5", "d6"))
     s = ""
-    s += link(p + "base_link", cyl(0.095, 0.16, "0 0 0.08"))
-    s += link(p + "shoulder_link", cyl(0.09, 0.20, "0 0 0"))
-    s += link(p + "upper_arm_link", cyl(0.075, abs(a2), "{} 0 0.176".format(a2 / 2), "0 {} 0".format(PI / 2)))
-    s += link(p + "forearm_link", cyl(0.06, abs(a3), "{} 0 0.04".format(a3 / 2), "0 {} 0".format(PI / 2)))
-    s += link(p + "wrist_1_link", cyl(0.05, 0.12, "0 0 0"))
-    s += link(p + "wrist_2_link", cyl(0.05, 0.12, "0 0 0"))
-    s += link(p + "wrist_3_link", cyl(0.045, 0.05, "0 0 -0.025"))
+    for n in UR_LINKS:
+        s += link(p + n, mesh(*UR_MESH[n]))
     s += link(p + "tool0")
     lim = math.radians(360)
     # base_link is turned 180 degrees about z from the DH base, as base_link -> base_link_inertia in the ROS 2
@@ -98,13 +117,8 @@ KR_LIMITS = [(-185, 185, 156), (-155, 35, 156), (-130, 154, 156), (-350, 350, 33
 def kr120_body(prefix=""):
     p = prefix
     s = ""
-    s += link(p + "base_link", box(0.9, 0.9, 0.3, "0 0 0.15"))
-    s += link(p + "link_1", cyl(0.35, 0.55, "0.1 0 0.38"))
-    s += link(p + "link_2", box(1.15, 0.30, 0.30, "0 0 0.575", "0 0 0"))
-    s += link(p + "link_3", box(0.45, 0.35, 0.35, "0.1 0 0"))
-    s += link(p + "link_4", cyl(0.13, 0.85, "0.5 0 0", "0 {} 0".format(PI / 2)))
-    s += link(p + "link_5", cyl(0.11, 0.25, "0 0 0", "{} 0 0".format(PI / 2)))
-    s += link(p + "link_6", cyl(0.08, 0.10, "0.165 0 0", "0 {} 0".format(PI / 2)))
+    for n in KR_LINKS:
+        s += link(p + n, mesh(*KR_MESH[n]))
     s += link(p + "flange") + link(p + "tool0")
     org = ["0 0 0.675", "0.35 0 0", "1.150 0 0", "1.0 0 -0.041", "0 0 0", "0 0 0"]
     axes = ["0 0 -1", "0 1 0", "0 1 0", "-1 0 0", "0 1 0", "-1 0 0"]

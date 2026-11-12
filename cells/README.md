@@ -17,11 +17,13 @@ python cells/make_cells.py
 
 With these files the analytic solvers agree with KDL on most poses, not all: about 83% of solutions for the UR10e and 54% for the KR120. The remaining frame-convention mismatch is an open item. Results are still correct, because every solution is checked.
 
-## Collision geometry
+## Geometry
 
-Collision geometry uses primitive shapes (cylinders and boxes) that roughly enclose each link. It is enough for reachability and gross collision checks. For clearance work near the robot, replace it with the vendor meshes.
+Visual and collision geometry are the official meshes (`meshes/`, from Universal Robots and ROS-Industrial), placed with the official mesh offsets. Tesseract uses their convex hulls for collision (`tesseract:make_convex="true"`).
 
-![UR10e wire sweep](../docs/media/robot_wire_sweep.gif)
+![UR10e wire sweep](../docs/media/robot_wire_sweep.gif) ![KR120 wire sweep](../docs/media/robot_wire_sweep_kr120.gif)
+
+Both robots are drawn with their official meshes (`meshes/`, licences there). The paths are verified for kinematics only: in the UR10e's face-2 sweep the arm passes through the column. Collision checking against the part is the next step; the cells already carry the official collision meshes.
 
 ## External axes
 
