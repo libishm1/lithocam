@@ -258,6 +258,80 @@ def wire_face_path(cell: Cell, face, wire_radius: float, placement: Sequence[flo
     return JointPath(joints, targets, rolls, max(steps) if steps else 0.0, missing)
 
 
+@dataclass
+class Positioners:
+    """External axes, sampled: a linear track under the robot along world x, and a turntable under the part.
+
+    track:        robot base x positions (metres) the track may take
+    table_deg:    turntable angles (degrees) the table may take
+    table_center: world point on the turntable's vertical axis; the part's `placement` is given relative to it
+    """
+    track: Sequence[float] = (0.0,)
+    table_deg: Sequence[float] = (0.0,)
+    table_center: Sequence[float] = (0.0, 0.0, 0.0)
+
+
+def _rz(deg: float) -> np.ndarray:
+    a = math.radians(deg)
+    c, s = math.cos(a), math.sin(a)
+    T = np.eye(4)
+    T[:2, :2] = [[c, -s], [s, c]]
+    return T
+
+
+@dataclass
+class ExtReach:
+    rulings: int
+    reachable: int
+    choices: List[Optional[tuple]]     # per ruling: (track x, table deg, roll deg) or None
+
+    @property
+    def fraction(self) -> float:
+        return self.reachable / self.rulings if self.rulings else 0.0
+
+
+def wire_reach_ext(cell: Cell, ruled_report, placement: Sequence[float], pos: Positioners, units: float = 1e-3,
+                   bow_depth: float = 0.25, roll_deg: Sequence[float] = (-60, -30, 0, 30, 60),
+                   labels: Sequence[str] = ("wire",)) -> ExtReach:
+    """Like wire_reach, with a sampled track and turntable. Choices are tried nearest-first to the previous ones."""
+    wr = ruled_report.rules.wire_diameter / 2 * units
+    Tc = np.eye(4)
+    Tc[:3, 3] = pos.table_center
+    Tp = np.eye(4)
+    Tp[:3, 3] = placement
+    rulings, choices = 0, []
+    prev = (pos.track[0], pos.table_deg[0], 0.0)
+    seed = None
+    for f in ruled_report.faces:
+        if f.label not in labels or not f.rulings:
+            continue
+        for r in f.rulings:
+            rulings += 1
+            found = None
+            for tdeg in sorted(pos.table_deg, key=lambda v: abs(v - prev[1])):
+                W = Tc @ _rz(tdeg) @ Tp                     # part model frame -> world
+                p0 = (W @ np.r_[np.asarray(r.p0) * units, 1.0])[:3]
+                p1 = (W @ np.r_[np.asarray(r.p1) * units, 1.0])[:3]
+                n = W[:3, :3] @ np.asarray(r.normal)
+                for tx in sorted(pos.track, key=lambda v: abs(v - prev[0])):
+                    shift = np.array([tx, 0.0, 0.0])
+                    for a in sorted(roll_deg, key=lambda v: abs(v - prev[2])):
+                        T = wire_target(p0 - shift, p1 - shift, n, wr, math.radians(a), bow_depth)
+                        sols = cell.ik(T, seed)
+                        if sols:
+                            found = (tx, tdeg, a)
+                            seed = sols[0]
+                            break
+                    if found:
+                        break
+                if found:
+                    break
+            choices.append(found)
+            if found:
+                prev = found
+    return ExtReach(rulings, sum(c is not None for c in choices), choices)
+
+
 def summary(rep: ReachReport) -> Dict[str, object]:
     return {"cell": rep.cell, "placement": rep.placement, "fraction": round(rep.fraction, 4),
             "faces": {f.index: "{}/{}".format(f.reachable, f.rulings) for f in rep.faces}}

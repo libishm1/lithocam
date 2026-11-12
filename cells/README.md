@@ -21,10 +21,20 @@ With these files the analytic solvers agree with KDL on most poses, not all: abo
 
 Collision geometry uses primitive shapes (cylinders and boxes) that roughly enclose each link. It is enough for reachability and gross collision checks. For clearance work near the robot, replace it with the vendor meshes.
 
+## External axes
+
+The linear track and the turntable are handled by sampling in `lithocam.robot.wire_reach_ext` (`Positioners`). For each target it tries track positions and table angles nearest-first to the previous choice, then solves the arm's verified IK.
+
+Measured results:
+
+| Robot and part | Fixed | With external axes | Positions used |
+|---|---|---|---|
+| UR10e, cladding panel | 85% of wire rulings | 100% with the turntable | 0° and 90° |
+| KR120, twisted column 3.6 m out | 0% | 100% on a 0 to 3 m track | 0.5, 1.5 and 2.0 m |
+
 ## Planned
 
-- `kr120_track`: the KR120 on a 4 m linear track.
-- `kr120_turntable`: the KR120 plus a turntable carrying the part.
+- Track and turntable as URDF joints, for collision checking and visualisation.
 - The wire bow and spindle as tool links.
 - The table and the part as collision objects.
 

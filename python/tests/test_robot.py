@@ -97,6 +97,28 @@ def test_exporters_write_every_configuration():
     assert "A1 17.1887" in k                                 # 0.3 rad on the fourth point
 
 
+def test_turntable_brings_the_far_side_into_reach(ur):
+    """On a fixed table the panel's far side is out of the UR10e's reach; a turntable (0/90/180/270) brings every
+    wire ruling of the panel into reach."""
+    rep = robot.load_ruled_json(str(DATA / "ruled_json" / "cladding_panel.json"))
+    fixed = robot.wire_reach_ext(ur, rep, (0.0, 0.0, 0.0), robot.Positioners(table_center=(0.5, -0.3, 0.0)))
+    turn = robot.wire_reach_ext(ur, rep, (-0.3, -0.2, 0.0),
+                                robot.Positioners(table_deg=(0, 90, 180, 270), table_center=(0.8, -0.1, 0.0)))
+    assert fixed.fraction < 0.9          # 0.85 at the time of writing
+    assert turn.fraction == 1.0
+
+
+def test_track_extends_the_kr120(kr):
+    """A part 3.6 m out is beyond the fixed KR120; on a 0..3 m track it is reachable."""
+    rep = robot.load_ruled_json(str(DATA / "ruled_json" / "twisted_column.json"))
+    far = robot.Positioners(table_center=(3.6, -0.15, 0.0))
+    assert robot.wire_reach_ext(kr, rep, (0.0, 0.0, 0.0), far, bow_depth=0.6).fraction == 0.0
+    track = robot.Positioners(track=(0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0), table_center=(3.6, -0.15, 0.0))
+    got = robot.wire_reach_ext(kr, rep, (0.0, 0.0, 0.0), track, bow_depth=0.6)
+    assert got.fraction == 1.0
+    assert all(c[0] > 0 for c in got.choices)
+
+
 def test_far_side_face_is_out_of_reach(ur):
     """The panel spans x = 0.5 .. 1.1 m. On its far side (normal +x) the bow's flange would sit at x = 1.35 m,
     beyond the UR10e's 1.3 m reach; the near side (normal -x) is fully reachable. (No collision check yet, so the
