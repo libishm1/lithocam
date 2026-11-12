@@ -36,6 +36,8 @@ Where the cutter first meets a sharp edge, the CL height rises like a square roo
 
 ## Stock simulation (`zmap.hpp`)
 
+![Z-map milling simulation](media/milling_sim.gif)
+
 The stock is a height field. Each linear cutter move lowers every cell to the swept lower envelope: the minimum over the move of tip height + f(distance). The tip height is linear and f(distance) is convex, so a golden-section search finds the envelope.
 
 `target_heights` casts a vertical ray per cell, so stock - target gives leftover (+) or gouge (-).

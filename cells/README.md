@@ -21,6 +21,8 @@ With these files the analytic solvers agree with KDL on most poses, not all: abo
 
 Collision geometry uses primitive shapes (cylinders and boxes) that roughly enclose each link. It is enough for reachability and gross collision checks. For clearance work near the robot, replace it with the vendor meshes.
 
+![UR10e wire sweep](../docs/media/robot_wire_sweep.gif)
+
 ## External axes
 
 The linear track and the turntable are handled by sampling in `lithocam.robot.wire_reach_ext` (`Positioners`). For each target it tries track positions and table angles nearest-first to the previous choice, then solves the arm's verified IK.

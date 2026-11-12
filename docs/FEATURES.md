@@ -2,6 +2,10 @@
 
 `lithocam.features` turns a STEP B-rep into a list of stone operations. Recognition is done by [quiddity](https://github.com/pzfreo/quiddity) 0.4.9 (Apache-2.0, deterministic, Rust). lithocam adds the stone layer on top of it.
 
+`lithocam.ruled` complements it with a per-face process label (wire, flank, point) from the face's rulings, and `lithocam.wiresim` simulates the planar wire cuts:
+
+![ruled labels](media/ruled_labels.gif) ![wire cuts](media/wire_cuts.gif)
+
 ## Pipeline
 
 1. **Canonicalise straight edges** (`lithocam.step_canon`, on by default).

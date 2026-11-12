@@ -86,7 +86,10 @@ class WireSimReport:
         return self.stock_volume - (self.blank_volume + self.kerf_volume + self.waste_volume)
 
 
-def simulate(target, rules: Optional[R.Rules] = None, margin: float = 20.0, stock=None) -> WireSimReport:
+def simulate(target, rules: Optional[R.Rules] = None, margin: float = 20.0, stock=None,
+             record: bool = False) -> WireSimReport:
+    """record=True keeps every intermediate stock shape (and the waste piece of each cut) in report.stages,
+    as (label, stock, waste) tuples, for display."""
     rules = rules or R.Rules()
     rep = R.analyse_shape(target, rules)
     x0, y0, z0, x1, y1, z1 = _bbox(target)
@@ -98,7 +101,7 @@ def simulate(target, rules: Optional[R.Rules] = None, margin: float = 20.0, stoc
     tol = 1e-6 * rep.scale
     v_stock = volume(stock)
     out = WireSimReport(v_stock, volume(target), 0, 0, 0)
-    faces = R.faces_of(target)
+    out.stages = [("stock", stock, None)] if record else []
     done_planes = []
     for f in rep.faces:
         if f.label != "wire":
@@ -128,6 +131,9 @@ def simulate(target, rules: Optional[R.Rules] = None, margin: float = 20.0, stoc
         vk = volume(kerf)
         v_before, v_after = volume(stock), volume(new_stock)
         out.cuts.append(Cut(f.index, tuple(n), vk, max(0.0, v_before - v_after - vk)))
+        if record:
+            out.stages.append(("cut {} (face {})".format(len(out.cuts), f.index), new_stock,
+                               BRepAlgoAPI_Cut(stock, slab_and_keep).Shape()))
         stock = new_stock
     out.blank_volume = volume(stock)
     out.to_mill_volume = volume(BRepAlgoAPI_Cut(stock, target).Shape())

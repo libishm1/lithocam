@@ -7,7 +7,19 @@ An open, verified CAM layer for stone. lithocam generates the parts of stone too
 
 Its output is 5-axis cutter-location data with a tool-spin tolerance and per-point process attributes. Robot motion planners consume that output, for example Tesseract, including arms on a linear track or turntable.
 
-Status: **0.0.1, early.** Two verified modules so far, plus stone feature input from STEP.
+Status: **0.0.1, early.** Main pieces so far:
+- verified stepover and kerf, and a Lean-proved wire against a planar face;
+- a milling kernel (drop-cutter for four cutter shapes, adaptive zig-zag, Z-map stock simulation), checked against OpenCAMLib;
+- ruled-surface extraction for wire saw and flank milling, and a diamond-wire cutting simulation;
+- UR10e and KUKA KR120 cells in Tesseract, with a track and turntable;
+- Python bindings generated with C++26 reflection.
+
+| | |
+|---|---|
+| ![ruled labels](docs/media/ruled_labels.gif) | ![wire cuts](docs/media/wire_cuts.gif) |
+| Faces labelled wire, flank or point, with their rulings (`lithocam.ruled`) | Squaring a blank with diamond-wire cuts: kerf, waste and what is left for milling (`lithocam.wiresim`) |
+| ![milling simulation](docs/media/milling_sim.gif) | ![robot wire sweep](docs/media/robot_wire_sweep.gif) |
+| Finishing in the Z-map simulation at a scallop-verified stepover | UR10e wire sweep along a verified joint path (`lithocam.robot`) |
 
 ## Contract: every algorithm has a proof and a test
 
