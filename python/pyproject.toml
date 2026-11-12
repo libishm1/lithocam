@@ -21,9 +21,14 @@ ruled = ["cadquery-ocp>=7.7"]
 robot = ["tesseract-robotics>=0.35", "numpy"]
 # lithocam.meshsim: mesh stock removal with Manifold (Apache-2.0); needs `ruled` too.
 mesh = ["manifold3d>=3.0", "numpy"]
+# lithocam studio (Qt for Python, LGPL-3.0). Needs the _lithocam core from bindings/.
+studio = ["PySide6>=6.6", "numpy"]
 
 [project.scripts]
 lithocam-features = "lithocam.features:main"
+
+[project.gui-scripts]
+lithocam-studio = "lithocam.studio.app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

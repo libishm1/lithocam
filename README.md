@@ -11,8 +11,14 @@ Status: **0.0.1, early.** Main pieces so far:
 - verified stepover and kerf, and a Lean-proved wire against a planar face;
 - a milling kernel (drop-cutter for four cutter shapes, adaptive zig-zag, Z-map stock simulation), checked against OpenCAMLib;
 - ruled-surface extraction for wire saw and flank milling, and a diamond-wire cutting simulation;
-- UR10e and KUKA KR120 cells in Tesseract, with a track and turntable;
+- UR10e and KUKA KR120 cells in Tesseract, with a track and turntable, diamond-wire bow saws and collision checks against the official meshes;
+- 5-axis flank milling with stepped roughing, and stock removal simulated on meshes (Manifold);
+- a tool library of 38 kinds and 63 stone and wood tools, from a sourced survey (`docs/TOOLING.md`);
+- post-processing to URScript, KRL, RAPID and a neutral CL text, with a read-back check (`docs/POSTPROCESSORS.md`);
+- **lithocam studio**, a Qt program for laying out, simulating and posting stone CAM programs on a robot (below);
 - Python bindings generated with C++26 reflection.
+
+Planned and partial operations are listed in `docs/OPERATIONS.md`. The stock-simulation libraries are compared in `docs/STOCK_SIMULATION.md`.
 
 | | |
 |---|---|
@@ -20,6 +26,37 @@ Status: **0.0.1, early.** Main pieces so far:
 | Faces labelled wire, flank or point, with their rulings (`lithocam.ruled`) | Squaring a blank with diamond-wire cuts: kerf, waste and what is left for milling (`lithocam.wiresim`) |
 | ![milling simulation](docs/media/milling_sim.gif) | ![robot wire sweep](docs/media/robot_wire_sweep.gif) |
 | Finishing in the Z-map simulation at a scallop-verified stepover | UR10e wire sweep along a verified joint path (`lithocam.robot`) |
+| ![flank roughing](docs/media/flank_roughing.gif) | ![KR120 wire sweep](docs/media/robot_wire_sweep_kr120.gif) |
+| 5-axis flank milling: stepped roughing layers, then the finishing pass (`lithocam.flank`, `examples/flank_5axis.py`) | KUKA KR120 with a diamond-wire bow saw on a turntable, collision-checked |
+
+## lithocam studio
+
+![lithocam studio](docs/media/studio.jpg)
+
+One window for stone CAM and robot programming. It combines RoboDK's station tree and robot panel with RhinoCAM's machining browser and operation toolbars:
+
+- **Work tree.** Station, then robot and tools, then work frame, part and stock, then programs and their steps. Drag steps to reorder them, or drop operations from the palette to insert them.
+- **Objects.** An operations palette with stone operations first, then 2.5-axis, 3-axis, 5-axis, holes and finishing. Each icon shows whether the operation is done, partial or planned. Next to it, the tool library, filtered by domain, kind and operation.
+- **Robot panel.** Joint sliders, TCP pose entry, Cartesian jog in the base, tool or work frame, the manipulability measure, and buttons to teach MoveJ and MoveL.
+- **Properties.** Parameters of the selected step. Its tool drop-down lists only the tools that fit the operation.
+- **Simulate and post.** The program expands to verified joint solutions in the background, plays on a simulation bar, and posts to URScript, KRL, RAPID or CL. Each post is checked by reading its joint targets back.
+
+```sh
+pip install PySide6 numpy manifold3d
+python -m lithocam.studio            # needs the _lithocam module from bindings/
+python -m lithocam.studio --smoke out.png   # simulate the demo, capture the window, exit (used for these docs)
+```
+
+Toolpaths the studio generates today: face, plane (z-level) roughing and raster finishing, on any tool with a drop-cutter model. Wire, flank and pocket run from their own modules and examples.
+
+Studio jogging does not check collisions. `lithocam.robot` (Tesseract) checks programs against the cell meshes. Robot programs are for simulators (URSim, KUKA.OfficeLite, RobotStudio) until a hardware gate is passed.
+
+## Examples
+
+| Example | What it shows |
+|---|---|
+| `examples/pocket_2p5d.py` | 2.5D pocket with an island: z-level roughing, raster and contour finish, checked in the Z-map |
+| `examples/flank_5axis.py` | 5-axis flank milling of a twisted column on the KR120 with a turntable |
 
 ## Contract: every algorithm has a proof and a test
 

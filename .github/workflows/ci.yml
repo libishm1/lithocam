@@ -44,6 +44,12 @@ jobs:
       - name: test (the module lands in build_py/Release on Windows, build_py elsewhere)
         shell: bash
         run: python bindings/test_bindings.py "$(dirname "$(find build_py -name '_lithocam*' \( -name '*.pyd' -o -name '*.so' \) | head -1)")"
+      - name: studio tests (kinematics, CAM generators, program expansion, posts) on the built core
+        shell: bash
+        run: |
+          pip install numpy pytest
+          LITHOCAM_CORE="$(dirname "$(find build_py -name '_lithocam*' \( -name '*.pyd' -o -name '*.so' \) | head -1)")" \
+            PYTHONPATH=python/src pytest -rs python/tests/test_studio_kinematics.py python/tests/test_studio_program.py
   lean:
     runs-on: ubuntu-latest
     defaults:
