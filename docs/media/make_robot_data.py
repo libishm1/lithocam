@@ -52,7 +52,7 @@ for name, c in CELLS.items():
             tf = {n: np.asarray(st.link_transforms[n].matrix()).tolist() for n in c["links"]}
             x, z = T[:3, 0], T[:3, 2]
             mid = T[:3, 3] + z * c["bow"]
-            frames.append({"face": f.index, "yaw": yaw, "tf": tf, "tool0": T[:3, 3].tolist(),
+            frames.append({"face": f.index, "yaw": yaw, "tf": tf, "tool0": T[:3, 3].tolist(), "T": T.tolist(),
                            "wire": [(mid - x * c["half"]).tolist(), (mid + x * c["half"]).tolist()]})
         if jp.joints:
             seed = jp.joints[-1]

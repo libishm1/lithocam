@@ -44,27 +44,47 @@ def order_rulings(rulings):
     return P0, P1, N
 
 
-def flank_frames(rulings, tool_radius: float, flute: float, overlap: float = 0.1, shank_at_p1: bool = True
-                 ) -> List[FlankFrame]:
-    """CL frames band by band: the tool axis on the offset ruling, the tip inside each band, zig-zag across."""
+def flank_frames(rulings, tool_radius: float, flute: float, overlap: float = 0.1, shank_at_p1: bool = True,
+                 layers: Sequence[float] = (0.0,)) -> List[FlankFrame]:
+    """CL frames layer by layer (extra radial offsets, outermost first; 0 is the finishing pass), band by band
+    along the rulings, zig-zag across the face. Outer layers extend past the ruling ends by their offset so the
+    corners of a box blank are cleared too."""
     P0, P1, N = order_rulings(rulings)
-    L = float(np.mean(np.linalg.norm(P1 - P0, axis=1)))
-    nb = max(1, int(np.ceil((L - overlap * flute) / ((1 - overlap) * flute))))
     frames = []
-    for b in range(nb):
-        s0 = min(b * (1 - overlap) * flute, max(0.0, L - flute)) / L       # band start along the ruling (0..1)
-        idx = range(len(P0)) if b % 2 == 0 else range(len(P0) - 1, -1, -1)
-        for k, i in enumerate(idx):
-            a, c, n = P0[i], P1[i], N[i]
-            d = (c - a) / np.linalg.norm(c - a)
-            off = n * tool_radius
-            start = a + (c - a) * s0 + off
-            if shank_at_p1:
-                tip, axis = start, d                      # tip at the band start, shank towards p1
-            else:
-                tip, axis = start + d * flute, -d
-            frames.append(FlankFrame(tip, axis, b, k))
+    band_id = 0
+    for layer in sorted(layers, reverse=True):
+        A = P0 - (P1 - P0) / np.linalg.norm(P1 - P0, axis=1)[:, None] * layer
+        B = P1 + (P1 - P0) / np.linalg.norm(P1 - P0, axis=1)[:, None] * layer
+        L = float(np.mean(np.linalg.norm(B - A, axis=1)))
+        nb = max(1, int(np.ceil((L - overlap * flute) / ((1 - overlap) * flute))))
+        for b in range(nb):
+            s0 = min(b * (1 - overlap) * flute, max(0.0, L - flute)) / L   # band start along the ruling (0..1)
+            idx = range(len(A)) if b % 2 == 0 else range(len(A) - 1, -1, -1)
+            for k, i in enumerate(idx):
+                a, c, n = A[i], B[i], N[i]
+                d = (c - a) / np.linalg.norm(c - a)
+                start = a + (c - a) * s0 + n * (tool_radius + layer)
+                if shank_at_p1:
+                    tip, axis = start, d                  # tip at the band start, shank towards the far end
+                else:
+                    tip, axis = start + d * flute, -d
+                frames.append(FlankFrame(tip, axis, band_id, k))
+            band_id += 1
     return frames
+
+
+def stock_depth(rulings, lo, hi) -> float:
+    """Largest distance from the face to the stock box boundary along the outward normals (model units)."""
+    best = 0.0
+    for r in rulings:
+        for p in (np.asarray(r.p0, float), np.asarray(r.p1, float), (np.asarray(r.p0) + np.asarray(r.p1)) / 2):
+            n = np.asarray(r.normal, float)
+            t = np.inf
+            for k in range(3):
+                if abs(n[k]) > 1e-12:
+                    t = min(t, ((hi[k] if n[k] > 0 else lo[k]) - p[k]) / n[k])
+            best = max(best, t if np.isfinite(t) else 0.0)
+    return best
 
 
 def simulate(stock, target, frames: Sequence[FlankFrame], tool_radius: float, flute: float, segments: int = 40):

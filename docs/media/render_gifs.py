@@ -171,13 +171,49 @@ def visual_parts(meshdef, cell_mm=4.0):
     return out
 
 
+def prim_tris(kind, size, xyz, rpy, segs=18):
+    """Triangles of a URDF box or cylinder primitive in its parent frame."""
+    if kind == "box":
+        sx, sy, sz = (s / 2 for s in size)
+        c = np.array([[x, y, z] for x in (-sx, sx) for y in (-sy, sy) for z in (-sz, sz)])
+        f = [(0, 1, 3), (0, 3, 2), (4, 6, 7), (4, 7, 5), (0, 4, 5), (0, 5, 1), (2, 3, 7), (2, 7, 6), (0, 2, 6),
+             (0, 6, 4), (1, 5, 7), (1, 7, 3)]
+        t = c[np.array(f)]
+    else:
+        r, L = size
+        a = np.linspace(0, 2 * np.pi, segs + 1)[:-1]
+        ring = np.stack([r * np.cos(a), r * np.sin(a)], 1)
+        top = np.c_[ring, np.full(segs, L / 2)]
+        bot = np.c_[ring, np.full(segs, -L / 2)]
+        t = []
+        for i in range(segs):
+            j = (i + 1) % segs
+            t += [(bot[i], bot[j], top[j]), (bot[i], top[j], top[i]), ((0, 0, L / 2), top[i], top[j]),
+                  ((0, 0, -L / 2), bot[j], bot[i])]
+        t = np.array(t, dtype=float)
+    T = rpy_matrix("{} {} {}".format(*xyz), "{} {} {}".format(*rpy))
+    return t.reshape(-1, 3) @ T[:3, :3].T + T[:3, 3]
+
+
+TOOL_RGB = {"plate": (0.35, 0.35, 0.38), "beam": (0.72, 0.74, 0.78), "arm_a": (0.72, 0.74, 0.78),
+            "arm_b": (0.72, 0.74, 0.78), "pulley_a": (0.15, 0.15, 0.17), "pulley_b": (0.15, 0.15, 0.17),
+            "motor": (0.25, 0.42, 0.65)}
+
+
+def bow_parts(rname):
+    return [(prim_tris(k, s, x, r).reshape(-1, 3, 3), TOOL_RGB[n]) for n, k, s, x, r in
+            mc.wire_tool_parts(mc.WIRE_TOOLS[rname])]
+
+
 ROBOTS = {"ur10e": (mc.UR_MESH, "UR10e"), "kr120": (mc.KR_MESH, "KUKA KR120 R2500 PRO")}
 col = json.loads((DATA / "ruled_twisted_column.json").read_text())
 part_mm = np.vstack([np.asarray(f["tris"]) for f in col if f["tris"]])
 for rname, (meshdef, label) in ROBOTS.items():
     r = json.loads((DATA / "robot_{}_column.json".format(rname)).read_text())
+    stock_frames = json.loads((DATA / "stock_{}_column.json".format(rname)).read_text())
     off = np.asarray(r["placement"])
     vis = visual_parts(meshdef)
+    bow = bow_parts(rname)
     hits = sum(s["colliding"] for s in r["summary"])
     solved = sum(s["solved"] for s in r["summary"])
     total = sum(s["rulings"] for s in r["summary"])
@@ -196,32 +232,63 @@ for rname, (meshdef, label) in ROBOTS.items():
             pts += [p.reshape(-1, 3) @ T[:3, :3].T + T[:3, 3] for p, _ in parts]
     pts = np.vstack(pts)
     frames = []
-    for fr in r["frames"]:
+    for k, fr in enumerate(r["frames"]):
         fig = plt.figure(figsize=(6.8, 5.6))
         ax = fig.add_subplot(projection="3d")
         ax.add_collection3d(Poly3DCollection(table, facecolors=viz.shaded(table, (0.55, 0.55, 0.55), 0.5),
                                              edgecolors="none"))
-        part = part_at(fr["yaw"]).reshape(-1, 3, 3)
-        ax.add_collection3d(Poly3DCollection(part, facecolors=viz.shaded(part, (0.79, 0.73, 0.63), 0.5),
+        c, s = math.cos(fr["yaw"]), math.sin(fr["yaw"])
+        Rz = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1.0]])
+        st = ((np.asarray(stock_frames[k]).reshape(-1, 3) * 1e-3) @ Rz.T + off).reshape(-1, 3, 3)
+        ax.add_collection3d(Poly3DCollection(st, facecolors=viz.shaded(st, (0.79, 0.73, 0.63), 0.85),
                                              edgecolors="none"))
         for ln, parts in vis.items():
             T = np.asarray(fr["tf"][ln])
             for p, rgb in parts:
                 w = p @ T[:3, :3].T + T[:3, 3]
                 ax.add_collection3d(Poly3DCollection(w, facecolors=viz.shaded(w, rgb), edgecolors="none"))
-        a, b = np.asarray(fr["wire"])
-        t0 = np.asarray(fr["tool0"])
-        for e in (a, b):
-            ax.plot(*zip(t0, e), color="#2d3748", lw=1.6)
-        ax.plot(*zip(a, b), color="#d9534f", lw=2.4)
+        Tt = np.asarray(fr["T"])
+        for p, rgb in bow:
+            w = p @ Tt[:3, :3].T + Tt[:3, 3]
+            ax.add_collection3d(Poly3DCollection(w, facecolors=viz.shaded(w, rgb), edgecolors="none"))
+        hw, dep = mc.WIRE_TOOLS[rname]["half"], mc.WIRE_TOOLS[rname]["depth"]
+        mid = Tt[:3, 3] + Tt[:3, 2] * dep
+        ax.plot(*zip(mid - Tt[:3, 0] * hw, mid + Tt[:3, 0] * hw), color="#d9534f", lw=2.4)
         equal_box(ax, pts, pad=0.0, zoom=1.1, min_frac=0.3)
         ax.view_init(elev=18, azim=-150 if rname == "ur10e" else -120)
         clean(ax)
         fig.subplots_adjust(left=0, right=1, top=0.93, bottom=0.07)
-        ax.set_title("{} wire sweep, face {}, turntable {:.0f} deg".format(label, fr["face"],
-                                                                           math.degrees(fr["yaw"]) % 360), fontsize=9)
-        fig.text(0.5, 0.04, "collision-checked with the official collision meshes: {} of {} rulings solved, {} "
-                 "colliding configurations".format(solved, total, hits), ha="center", fontsize=7.5)
+        ax.set_title("{} diamond-wire bow saw, face {}, turntable {:.0f} deg".format(
+            label, fr["face"], math.degrees(fr["yaw"]) % 360), fontsize=9)
+        fig.text(0.5, 0.04, "stock removal shown (Manifold); robot + bow collision-checked: {} of {} rulings, {} "
+                 "colliding".format(solved, total, hits), ha="center", fontsize=7.5)
         frames.append(grab(fig))
         plt.close(fig)
     save(frames, "robot_wire_sweep.gif" if rname == "ur10e" else "robot_wire_sweep_kr120.gif", 220)
+
+# ---------------------------------------------------------------- 5) flank roughing layers, stock removal
+fl = DATA / "flank_stock_layers.json"
+if fl.exists():
+    snaps = json.loads(fl.read_text())
+    allp = np.asarray(snaps[0]).reshape(-1, 3)
+    frames = []
+    for k, sn in enumerate(snaps + [snaps[-1]] * 5):
+        fig = plt.figure(figsize=(6.4, 5.4))
+        ax = fig.add_subplot(projection="3d")
+        st = np.asarray(sn)
+        ax.add_collection3d(Poly3DCollection(st, facecolors=viz.shaded(st, (0.79, 0.73, 0.63), 1.0),
+                                             edgecolors="none"))
+        equal_box(ax, allp, zoom=1.0)
+        ax.view_init(elev=26, azim=-60 + 4 * k)
+        clean(ax)
+        n = min(k, len(snaps) - 1)
+        face, layer = (n - 1) // 9, (n - 1) % 9
+        title = "blank" if n == 0 else "face {} of 4, {} {}".format(
+            face + 1, "finishing pass" if layer == 8 else "roughing layer", "" if layer == 8 else layer + 1)
+        ax.set_title("5-axis flank milling, R10 x 120 mm cutter: " + title, fontsize=9)
+        fig.text(0.5, 0.03, "stepped roughing at 16 mm radial depth, then the finishing pass on the rulings "
+                 "(Manifold stock removal)", ha="center", fontsize=7.5)
+        fig.subplots_adjust(left=0, right=1, top=0.93, bottom=0.07)
+        frames.append(grab(fig))
+        plt.close(fig)
+    save(frames, "flank_roughing.gif", 260)

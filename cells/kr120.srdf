@@ -14,4 +14,39 @@
   <disable_collisions link1="link_4" link2="link_5" reason="Adjacent"/>
   <disable_collisions link1="link_4" link2="link_6" reason="Adjacent"/>
   <disable_collisions link1="link_5" link2="link_6" reason="Adjacent"/>
+  <disable_collisions link1="link_5" link2="wiresaw_arm_a" reason="Adjacent"/>
+  <disable_collisions link1="link_5" link2="wiresaw_arm_b" reason="Adjacent"/>
+  <disable_collisions link1="link_5" link2="wiresaw_beam" reason="Adjacent"/>
+  <disable_collisions link1="link_5" link2="wiresaw_motor" reason="Adjacent"/>
+  <disable_collisions link1="link_5" link2="wiresaw_plate" reason="Adjacent"/>
+  <disable_collisions link1="link_5" link2="wiresaw_pulley_a" reason="Adjacent"/>
+  <disable_collisions link1="link_5" link2="wiresaw_pulley_b" reason="Adjacent"/>
+  <disable_collisions link1="link_6" link2="wiresaw_arm_a" reason="Adjacent"/>
+  <disable_collisions link1="link_6" link2="wiresaw_arm_b" reason="Adjacent"/>
+  <disable_collisions link1="link_6" link2="wiresaw_beam" reason="Adjacent"/>
+  <disable_collisions link1="link_6" link2="wiresaw_motor" reason="Adjacent"/>
+  <disable_collisions link1="link_6" link2="wiresaw_plate" reason="Adjacent"/>
+  <disable_collisions link1="link_6" link2="wiresaw_pulley_a" reason="Adjacent"/>
+  <disable_collisions link1="link_6" link2="wiresaw_pulley_b" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_arm_a" link2="wiresaw_arm_b" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_arm_a" link2="wiresaw_beam" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_arm_a" link2="wiresaw_motor" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_arm_a" link2="wiresaw_plate" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_arm_a" link2="wiresaw_pulley_a" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_arm_a" link2="wiresaw_pulley_b" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_arm_b" link2="wiresaw_beam" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_arm_b" link2="wiresaw_motor" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_arm_b" link2="wiresaw_plate" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_arm_b" link2="wiresaw_pulley_a" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_arm_b" link2="wiresaw_pulley_b" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_beam" link2="wiresaw_motor" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_beam" link2="wiresaw_plate" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_beam" link2="wiresaw_pulley_a" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_beam" link2="wiresaw_pulley_b" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_motor" link2="wiresaw_plate" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_motor" link2="wiresaw_pulley_a" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_motor" link2="wiresaw_pulley_b" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_plate" link2="wiresaw_pulley_a" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_plate" link2="wiresaw_pulley_b" reason="Adjacent"/>
+  <disable_collisions link1="wiresaw_pulley_a" link2="wiresaw_pulley_b" reason="Adjacent"/>
 </robot>

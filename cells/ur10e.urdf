@@ -17,4 +17,18 @@
   <joint name="wrist_2_joint" type="revolute"><parent link="wrist_1_link"/><child link="wrist_2_link"/><origin xyz="0 -0.11985 0" rpy="1.5707963267948966 0 0"/><axis xyz="0 0 1"/><limit effort="0" lower="-6.283185" upper="6.283185" velocity="3.141593"/></joint>
   <joint name="wrist_3_joint" type="revolute"><parent link="wrist_2_link"/><child link="wrist_3_link"/><origin xyz="0 0.11655 0" rpy="1.5707963267948966 3.141592653589793 3.141592653589793"/><axis xyz="0 0 1"/><limit effort="0" lower="-6.283185" upper="6.283185" velocity="3.141593"/></joint>
   <joint name="wrist_3-tool0" type="fixed"><parent link="wrist_3_link"/><child link="tool0"/><origin xyz="0 0 0" rpy="0 0 0"/></joint>
+  <link name="wiresaw_plate"><visual><origin xyz="0 0 0.0075" rpy="0 0 0"/><geometry><box size="0.1 0.1 0.015"/></geometry></visual><collision><origin xyz="0 0 0.0075" rpy="0 0 0"/><geometry><box size="0.1 0.1 0.015"/></geometry></collision></link>
+  <joint name="tool0-wiresaw_plate" type="fixed"><parent link="tool0"/><child link="wiresaw_plate"/><origin xyz="0 0 0" rpy="0 0 0"/></joint>
+  <link name="wiresaw_beam"><visual><origin xyz="0 0 0.0325" rpy="0 0 0"/><geometry><box size="0.52 0.035 0.035"/></geometry></visual><collision><origin xyz="0 0 0.0325" rpy="0 0 0"/><geometry><box size="0.52 0.035 0.035"/></geometry></collision></link>
+  <joint name="tool0-wiresaw_beam" type="fixed"><parent link="tool0"/><child link="wiresaw_beam"/><origin xyz="0 0 0" rpy="0 0 0"/></joint>
+  <link name="wiresaw_arm_a"><visual><origin xyz="-0.22 0 0.12125" rpy="0 0 0"/><geometry><box size="0.035 0.035 0.1775"/></geometry></visual><collision><origin xyz="-0.22 0 0.12125" rpy="0 0 0"/><geometry><box size="0.035 0.035 0.1775"/></geometry></collision></link>
+  <joint name="tool0-wiresaw_arm_a" type="fixed"><parent link="tool0"/><child link="wiresaw_arm_a"/><origin xyz="0 0 0" rpy="0 0 0"/></joint>
+  <link name="wiresaw_arm_b"><visual><origin xyz="0.22 0 0.12125" rpy="0 0 0"/><geometry><box size="0.035 0.035 0.1775"/></geometry></visual><collision><origin xyz="0.22 0 0.12125" rpy="0 0 0"/><geometry><box size="0.035 0.035 0.1775"/></geometry></collision></link>
+  <joint name="tool0-wiresaw_arm_b" type="fixed"><parent link="tool0"/><child link="wiresaw_arm_b"/><origin xyz="0 0 0" rpy="0 0 0"/></joint>
+  <link name="wiresaw_pulley_a"><visual><origin xyz="-0.22 0 0.21" rpy="1.5707963267948966 0 0"/><geometry><cylinder radius="0.04" length="0.028000000000000004"/></geometry></visual><collision><origin xyz="-0.22 0 0.21" rpy="1.5707963267948966 0 0"/><geometry><cylinder radius="0.04" length="0.028000000000000004"/></geometry></collision></link>
+  <joint name="tool0-wiresaw_pulley_a" type="fixed"><parent link="tool0"/><child link="wiresaw_pulley_a"/><origin xyz="0 0 0" rpy="0 0 0"/></joint>
+  <link name="wiresaw_pulley_b"><visual><origin xyz="0.22 0 0.21" rpy="1.5707963267948966 0 0"/><geometry><cylinder radius="0.04" length="0.028000000000000004"/></geometry></visual><collision><origin xyz="0.22 0 0.21" rpy="1.5707963267948966 0 0"/><geometry><cylinder radius="0.04" length="0.028000000000000004"/></geometry></collision></link>
+  <joint name="tool0-wiresaw_pulley_b" type="fixed"><parent link="tool0"/><child link="wiresaw_pulley_b"/><origin xyz="0 0 0" rpy="0 0 0"/></joint>
+  <link name="wiresaw_motor"><visual><origin xyz="-0.11 0 0.095" rpy="0 0 0"/><geometry><box size="0.07 0.07 0.09"/></geometry></visual><collision><origin xyz="-0.11 0 0.095" rpy="0 0 0"/><geometry><box size="0.07 0.07 0.09"/></geometry></collision></link>
+  <joint name="tool0-wiresaw_motor" type="fixed"><parent link="tool0"/><child link="wiresaw_motor"/><origin xyz="0 0 0" rpy="0 0 0"/></joint>
 </robot>

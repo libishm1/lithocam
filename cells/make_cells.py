@@ -145,6 +145,53 @@ KR_LINKS = ["base_link", "link_1", "link_2", "link_3", "link_4", "link_5", "link
 
 # ---------------------------------------------------------------- files
 
+# ---------------------------------------------------------------- wire-saw tools
+# A U-shaped diamond-wire bow saw on tool0 (tool x = wire direction, tool z = out of the flange). The wire runs
+# along x at z = depth between the bottoms of two pulleys at x = -half and +half; its return run goes back over
+# the beam. Frame, pulleys and drive motor are collision geometry; the cutting wire is not (it is meant to pass
+# through the stone).
+WIRE_TOOLS = {
+    # UR10e (payload 12.5 kg): light aluminium bow, 440 mm wire span, 80 mm pulleys
+    "ur10e": dict(half=0.22, depth=0.25, rp=0.04, beam=0.035, plate=(0.10, 0.10, 0.015), motor=(0.07, 0.07, 0.09)),
+    # KR120 (payload 120 kg): steel bow, 800 mm span, 180 mm pulleys, larger drive
+    "kr120": dict(half=0.40, depth=0.60, rp=0.09, beam=0.07, plate=(0.22, 0.22, 0.03), motor=(0.16, 0.16, 0.20)),
+}
+
+
+def wire_tool_parts(t):
+    """[(name, kind, size, xyz, rpy)] in tool0 coordinates; kind box (size = x y z) or cylinder (radius, length)."""
+    h, d, rp, w = t["half"], t["depth"], t["rp"], t["beam"]
+    px, py, pz = t["plate"]
+    zb = pz + w / 2                                   # beam centre height
+    arm_len = (d - rp) - zb
+    parts = [
+        ("plate", "box", (px, py, pz), (0, 0, pz / 2), (0, 0, 0)),
+        ("beam", "box", (2 * h + 2 * rp, w, w), (0, 0, zb), (0, 0, 0)),
+        ("arm_a", "box", (w, w, arm_len), (-h, 0, zb + arm_len / 2), (0, 0, 0)),
+        ("arm_b", "box", (w, w, arm_len), (h, 0, zb + arm_len / 2), (0, 0, 0)),
+        ("pulley_a", "cylinder", (rp, w * 0.8), (-h, 0, d - rp), (PI / 2, 0, 0)),
+        ("pulley_b", "cylinder", (rp, w * 0.8), (h, 0, d - rp), (PI / 2, 0, 0)),
+        ("motor", "box", t["motor"], (-h * 0.5, 0, zb + w / 2 + t["motor"][2] / 2), (0, 0, 0)),
+    ]
+    return parts
+
+
+def wire_tool_xml(robot_name, parent="tool0"):
+    s = ""
+    t = WIRE_TOOLS[robot_name]
+    for name, kind, size, xyz, rpy in wire_tool_parts(t):
+        o = '<origin xyz="{} {} {}" rpy="{} {} {}"/>'.format(*xyz, *rpy)
+        g = ('<box size="{} {} {}"/>'.format(*size) if kind == "box"
+             else '<cylinder radius="{}" length="{}"/>'.format(*size))
+        s += link("wiresaw_" + name, "<visual>{0}<geometry>{1}</geometry></visual>"
+                                     "<collision>{0}<geometry>{1}</geometry></collision>".format(o, g))
+        s += joint("tool0-wiresaw_" + name, "fixed", parent, "wiresaw_" + name)
+    return s
+
+
+WIRE_TOOL_LINKS = ["wiresaw_" + p[0] for p in wire_tool_parts(WIRE_TOOLS["ur10e"])]
+
+
 def urdf(name, body):
     return ('<?xml version="1.0"?>\n<robot name="{}" xmlns:tesseract="https://github.com/tesseract-robotics/tesseract"'
             ' tesseract:make_convex="true">\n  <link name="world"/>\n{}</robot>\n').format(name, body)
@@ -250,22 +297,35 @@ CONTACT = """contact_manager_plugins:
 """
 
 
+def tool_disable(last_link, wrist_links):
+    """The bow is bolted to the last link: no checks between its parts, nor between it and the wrist links it is
+    mounted on. Every other robot link, and every obstacle, is checked against it."""
+    pairs = set()
+    for a in WIRE_TOOL_LINKS:
+        for w in wrist_links + [last_link]:
+            pairs.add((w, a))
+        for b in WIRE_TOOL_LINKS:
+            if a < b:
+                pairs.add((a, b))
+    return pairs
+
+
 def main():
     (HERE / "contact_manager_plugins.yaml").write_text(CONTACT, encoding="utf-8")
-    # UR10e
+    # UR10e with its wire-saw bow
     (HERE / "ur10e.urdf").write_text(urdf("ur10e", joint("world-base", "fixed", "world", "base_link") +
-                                          ur10e_body()), encoding="utf-8")
+                                          ur10e_body() + wire_tool_xml("ur10e")), encoding="utf-8")
     (HERE / "ur10e_plugins.yaml").write_text(UR_PLUGINS, encoding="utf-8")
     (HERE / "ur10e.srdf").write_text(srdf("ur10e", '  <group name="manipulator"><chain base_link="base_link" '
-                                          'tip_link="tool0"/></group>\n', "ur10e_plugins.yaml", UR_LINKS),
-                                     encoding="utf-8")
-    # KR120 fixed
+                                          'tip_link="tool0"/></group>\n', "ur10e_plugins.yaml", UR_LINKS,
+                                          tool_disable("wrist_3_link", ["wrist_2_link"])), encoding="utf-8")
+    # KR120 with its wire-saw bow
     (HERE / "kr120.urdf").write_text(urdf("kr120", joint("world-base", "fixed", "world", "base_link") +
-                                          kr120_body()), encoding="utf-8")
+                                          kr120_body() + wire_tool_xml("kr120")), encoding="utf-8")
     (HERE / "kr120_plugins.yaml").write_text(KR_PLUGINS, encoding="utf-8")
     (HERE / "kr120.srdf").write_text(srdf("kr120", '  <group name="manipulator"><chain base_link="base_link" '
-                                          'tip_link="tool0"/></group>\n', "kr120_plugins.yaml", KR_LINKS),
-                                     encoding="utf-8")
+                                          'tip_link="tool0"/></group>\n', "kr120_plugins.yaml", KR_LINKS,
+                                          tool_disable("link_6", ["link_5"])), encoding="utf-8")
     print("wrote", sorted(p.name for p in HERE.iterdir() if p.suffix in (".urdf", ".srdf", ".yaml")))
 
 

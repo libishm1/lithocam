@@ -100,10 +100,10 @@ class Cell:
         meshes = createMeshFromPath(str(stl_path), np.array([scale, scale, scale], dtype=np.float64))
         self._add_static(name, [meshes[i] for i in range(len(meshes))], xyz, yaw)
 
-    def add_box_obstacle(self, name: str, size, center):
-        """A static box (a table, a wall) in metres."""
+    def add_box_obstacle(self, name: str, size, center, yaw: float = 0.0):
+        """A static box (a table, a wall, a blank) in metres, turned by yaw about z through its centre."""
         from tesseract_robotics.tesseract_geometry import Box
-        self._add_static(name, [Box(*[float(v) for v in size])], center)
+        self._add_static(name, [Box(*[float(v) for v in size])], center, yaw)
 
     def in_collision(self, q, margin: float = 0.0) -> bool:
         """True when any robot link touches an obstacle (or another link not excluded in the SRDF) at q."""
