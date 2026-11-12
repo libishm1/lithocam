@@ -35,6 +35,19 @@ pip install -e "python[features,test]"      # quiddity needs Python 3.11+
 python -m lithocam.features part.step --diff part_revB.step
 ```
 
+### Ruled surfaces: wire, flank or point (`lithocam.ruled`)
+
+`lithocam.ruled` finds, for each face, whether it is swept by straight lines (a ruled surface) and along which direction. Those lines are where a diamond wire or the side of a flank-milling tool can lie. It then checks access along each line with exact line-solid intersection and labels the face:
+- `wire`: the wire passes through waste only;
+- `flank`: the tool can enter from one side;
+- `point`: point milling.
+
+Inside corners keep the wire or tool radius, as on a real machine. The extractor needs OpenCascade (`pip install -e "python[ruled]"`).
+
+```sh
+python -m lithocam.ruled part.step --wire-diameter 7 --tool-radius 5 --json faces.json
+```
+
 Rhino 8: run `rhino/lithocam_features.py` with RunPythonScript. It marks each operation with a dot coloured by route. Rhino's Python 3.9 calls the `quiddity` executable through `LITHOCAM_QUIDDITY`. See `docs/FEATURES.md` for the rule table, the Rhino findings and the known limits.
 
 ## Build

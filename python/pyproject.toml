@@ -15,6 +15,8 @@ classifiers = ["License :: OSI Approved :: Apache Software License", "Programmin
 # quiddity's wheel needs Python 3.11+. On older Pythons (Rhino 8) point LITHOCAM_QUIDDITY at the quiddity executable.
 features = ["quiddity>=0.4.9; python_version >= '3.11'"]
 test = ["pytest>=7"]
+# lithocam.ruled reads B-reps with OpenCascade (OCP bindings, Apache-2.0; OCCT is LGPL-2.1 with exception).
+ruled = ["cadquery-ocp>=7.7"]
 
 [project.scripts]
 lithocam-features = "lithocam.features:main"

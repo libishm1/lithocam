@@ -17,8 +17,8 @@ jobs:
       matrix:
         include:
           - {os: ubuntu-22.04, python: "3.9", extras: "test"}              # Rhino 8's Python: mapping only (no 3.9 build on newer runners)
-          - {os: ubuntu-latest, python: "3.12", extras: "test,features"}   # with quiddity: end to end
-          - {os: windows-latest, python: "3.12", extras: "test,features"}
+          - {os: ubuntu-latest, python: "3.12", extras: "test,features,ruled"}   # with quiddity and OCP: end to end
+          - {os: windows-latest, python: "3.12", extras: "test,features,ruled"}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
