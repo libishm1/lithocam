@@ -335,6 +335,20 @@ class CellView:
         e2, _ = lines_entity(self.root, fs, fc)
         self._replace("part", [e, e2])
 
+    def set_table(self, turntable: Optional[dict], work: np.ndarray):
+        """A rotary table under the work frame origin (disc with a radial mark that turns with it)."""
+        if not turntable:
+            self._replace("table", [])
+            return
+        d, h = float(turntable.get("diameter", 0.8)), float(turntable.get("height", 0.04))
+        disc = cylinder_tris(d / 2, h, 48, z0=-h - 0.002)
+        e, tf = mesh_entity(self.root, disc, (0.42, 0.44, 0.48))
+        tf.setMatrix(qmatrix(work))
+        mark = np.array([[[0, 0, 0.001], [d / 2, 0, 0.001]]])
+        mark = (mark.reshape(-1, 3) @ work[:3, :3].T + work[:3, 3]).reshape(-1, 2, 3)
+        e2, _ = lines_entity(self.root, mark, np.array([[1.0, 0.85, 0.2]]))
+        self._replace("table", [e, e2])
+
     def set_stock(self, stock: Optional[dict], work: np.ndarray):
         if not stock:
             self._replace("stock", [])

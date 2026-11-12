@@ -564,14 +564,20 @@ class Expander(QObject):
     done = Signal(object, object)   # expansion, error text
     progress = Signal(str)
 
-    def __init__(self, station, robot, prog, tools, part, q0):
+    def __init__(self, station, robot, prog, tools, part, q0, collisions=False):
         super().__init__()
         self.args = (station, robot, prog, tools, part, q0)
+        self.collisions = collisions
 
     def run(self):
         try:
             st, robot, prog, tools, part, q0 = self.args
-            ex = program.expand(st, robot, prog, tools, part, q0,
+            backend = None
+            if self.collisions:   # Tesseract objects are created and used in this worker thread only
+                from .planner import make_backend
+                self.progress.emit("Loading the Tesseract cell (collision meshes) ...")
+                backend = make_backend(st, program.CELLS)
+            ex = program.expand(st, robot, prog, tools, part, q0, backend=backend,
                                 progress=lambda i, n, t: self.progress.emit("{}/{} {}".format(i + 1, n, t)))
             self.done.emit(ex, None)
         except Exception:   # noqa: BLE001
@@ -652,9 +658,14 @@ class Studio(QMainWindow):
         self.output = QPlainTextEdit()
         self.output.setReadOnly(True)
         self.output.setFont(QFont("Consolas", 9))
+        from .trajplot import TrajectoryPlot
+        self.traj = TrajectoryPlot()
+        self.traj.seek.connect(lambda i: self.sim.setValue(i))
         bottom = QTabWidget()
+        bottom.addTab(self.traj, "Joint trajectory")
         bottom.addTab(self.log, "Log")
         bottom.addTab(self.output, "Posted program")
+        self.bottom_tabs = bottom
         self._dock("Work tree", self.tree, Qt.LeftDockWidgetArea)
         self._dock("Objects", objects, Qt.LeftDockWidgetArea)
         self._dock("Robot panel", self.robot_panel, Qt.RightDockWidgetArea, scroll=True)
@@ -740,6 +751,18 @@ class Studio(QMainWindow):
         self._act(mt, "Generate", glyph_icon("G", "#ef6c00", 22), self._simulate, "Generate all toolpaths")
         self._act(mt, "Stock check", glyph_icon("Z", "#ad1457", 22), self._stock_check,
                   "Cut the stock in a Z-map along every 3-axis toolpath and report the leftover and gouge")
+        self.collisions = QCheckBox("Collisions (Tesseract)")
+        try:
+            import tesseract_robotics  # noqa: F401
+            self.collisions.setChecked(True)
+            self.collisions.setToolTip("Plan with Tesseract IK branches and check collisions on the cell meshes")
+        except ImportError:
+            self.collisions.setEnabled(False)
+            self.collisions.setToolTip("pip install tesseract-robotics to plan with collision checks")
+        mt.addWidget(self.collisions)
+        self.table_box = QCheckBox("Turntable")
+        self.table_box.toggled.connect(self._toggle_table)
+        mt.addWidget(self.table_box)
         post_box = QComboBox()
         for d in ("urscript", "krl", "rapid", "cl"):
             post_box.addItem(d, d)
@@ -1099,11 +1122,21 @@ class Studio(QMainWindow):
         self._refresh_scene()
 
     def _refresh_scene(self):
-        W = self.station.work_frame()
+        W0 = self.station.work_frame()
+        yaw = getattr(self, "_yaw", 0.0)
+        W = W0.copy()
+        W[:3, :3] = W0[:3, :3] @ np.array([[math.cos(yaw), -math.sin(yaw), 0], [math.sin(yaw), math.cos(yaw), 0],
+                                           [0, 0, 1.0]])
         self.view.set_part(self.part_tris, W)
         self.view.set_stock(self.station.stock, W)
+        self.view.set_table(self.station.turntable, W)
         self.robot_panel.work = W
         self._robot_moved(self.robot_panel.q)
+
+    def _toggle_table(self, on):
+        self.station.turntable = {"diameter": 0.8, "height": 0.04} if on else None
+        self._yaw = 0.0
+        self._refresh_scene()
 
     def _view(self, which):
         tf = self.robot.link_transforms(self.robot_panel.q)
@@ -1120,7 +1153,7 @@ class Studio(QMainWindow):
         self.say("Expanding '{}' on the {} ...".format(prog.name, program.ROBOTS[self.station.robot][0]))
         th = QThread(self)
         wk = Expander(self.station, program.load_robot(self.station.robot), prog, self._tools(), self.part,
-                      self.robot_panel.q)
+                      self.robot_panel.q, self.collisions.isChecked())
         wk.moveToThread(th)
         th.started.connect(wk.run)
         wk.progress.connect(self._progress)   # a bound slot runs queued in the GUI thread; a lambda would not
@@ -1150,6 +1183,7 @@ class Studio(QMainWindow):
         feed = np.concatenate([s.feed for s in ex.segments])
         ok = np.concatenate([s.ok for s in ex.segments])
         self.view.set_path(pts, feed, ok)
+        self.traj.set_data(q, self.robot.lower, self.robot.upper, list(self.sim_seg_end[:-1]), feed)
         self.sim.blockSignals(True)
         self.sim.setRange(0, len(q) - 1)
         self.sim.setValue(0)
@@ -1207,9 +1241,13 @@ class Studio(QMainWindow):
             self._mount(self._tools().get(seg.tool))
             robot.tcp_offset = seg.tcp_offset
             self.sim_label.setToolTip(seg.label)
+            if abs(seg.yaw - getattr(self, "_yaw", 0.0)) > 1e-9:   # the turntable turns the part
+                self._yaw = seg.yaw
+                self._refresh_scene()
         self.robot_panel.set_q(q, emit=False)
         self.view.update_robot(robot.link_transforms(q), robot.tcp(q))
         self.sim_label.setText("{}/{}".format(i + 1, len(self.sim_q)))
+        self.traj.set_cursor(i)
 
     def _stop(self):
         self.btn_play.setChecked(False)
@@ -1220,7 +1258,7 @@ class Studio(QMainWindow):
             self.say("Simulate first: the post uses the verified joint solutions")
             return
         dialect = self.post_box.currentData()
-        text = post.write(self.expansion.records, dialect)
+        text = post.write(self.expansion.records, dialect, **program.post_options(self.station.robot, dialect))
         self.output.setPlainText(text)
         back = post.joint_targets(text, dialect)
         rec_q = [r.data["q"] for r in self.expansion.records if r.kind in ("movej", "movel")]
@@ -1265,18 +1303,30 @@ class Studio(QMainWindow):
 
     def _open(self):
         fn, _ = QFileDialog.getOpenFileName(self, "Open station", "", "lithocam station (*.lcs.json *.json)")
-        if not fn:
-            return
+        if fn:
+            self.open_station(fn)
+
+    def open_station(self, fn):
         try:
-            st = program.Station.from_json(Path(fn).read_text())
+            st = program.Station.load(fn)
             self.station = st
             if st.tool_library:
                 self.tool_lib = list(lc.read_tool_library(st.tool_library).tools)
                 self._tools_changed()
+            self.part_tris, self.part = None, None
             if st.part_path and Path(st.part_path).exists():
                 tris = cam.load_stl(st.part_path)
                 self.part_tris, self.part = tris, (tris, cam.trimesh(tris))
+                if st.stock is None:
+                    st.stock = cam.stock_box(tris, 0.0)
+            self._yaw = 0.0
+            self.expansion = None
+            self.view.set_path(None, None)
+            self.table_box.blockSignals(True)
+            self.table_box.setChecked(st.turntable is not None)
+            self.table_box.blockSignals(False)
             self._set_robot(st.robot, first=True)
+            self._view("iso")
             self.say("Opened {}".format(fn))
         except Exception as e:   # noqa: BLE001
             QMessageBox.warning(self, "Open", str(e))
@@ -1301,6 +1351,9 @@ def main(argv=None) -> int:
     if "--robot" in argv:
         w._set_robot(argv[argv.index("--robot") + 1])
         w._demo()
+    stations = [a for a in argv[1:] if a.endswith(".json")]
+    if stations:
+        w.open_station(stations[0])
     w.show()
     w.showMaximized()
     if "--smoke" in argv:

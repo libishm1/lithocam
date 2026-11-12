@@ -1,0 +1,25 @@
+{
+ "robot": "kr120",
+ "work_xyz": [1.4, -0.5, 0.0],
+ "work_rpy": [0.0, 0.0, 0.0],
+ "part_path": "../../python/tests/data/stl/twisted_column.stl",
+ "stock": null,
+ "tool_library": "",
+ "tool_length": 0.0,
+ "spindle": null,
+ "ruled_path": "../../python/tests/data/ruled_json/twisted_column.json",
+ "turntable": {"diameter": 0.8, "height": 0.04},
+ "programs": [
+  {
+   "name": "WireColumn",
+   "steps": [
+    {"kind": "comment", "params": {"text": "Diamond-wire profiling of a twisted column on a turntable (KR120, 800 mm bow saw)"}, "label": ""},
+    {"kind": "set_tool", "params": {"tool": "S17"}, "label": ""},
+    {"kind": "movej", "params": {"joints": [0.0, -90.0, 90.0, 0.0, 28.6, 0.0], "speed": 50.0}, "label": "Home"},
+    {"kind": "setup", "params": {"stock_margin": 0.0, "yaw": 0.0}, "label": "Turntable setup"},
+    {"kind": "wire_ruled", "params": {"faces": "all", "max_step_deg": 30.0}, "label": "Wire: twisted faces and top"},
+    {"kind": "movej", "params": {"joints": [0.0, -90.0, 90.0, 0.0, 28.6, 0.0], "speed": 50.0}, "label": "Home"}
+   ]
+  }
+ ]
+}

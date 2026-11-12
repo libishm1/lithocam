@@ -84,8 +84,20 @@ def stickout(tool, default: float = 40.0) -> float:
 
 
 PRESETS: Dict[str, Spindle] = {
-    # Placeholders sized for each cell until the spindle inventory gives datasheet models.
-    "ur10e_example": Spindle("ur10e_example", "Light electrospindle, ER11 (example size, UR10e)",
+    # Datasheet values where the source states them; body geometry is estimated (sources give no dimensions).
+    "cm_pds": Spindle("cm_pds", "Compact Modul CM-PDS, ER20 (UR URCap spindle)",
+                      plate_thickness=12, plate_diameter=80, body_diameter=70, body_length=190, nose_diameter=35,
+                      nose_length=28, collet="ER20", max_collet_mm=13.0, max_rpm=12000, power_w=1250,
+                      control="URCap program node (speed, start/stop); ISO 9409-1-50-4-M6 flange; 230 VAC drive",
+                      source="UR marketplace listing CM-PDS (power, speed, ER20 2-13 mm, flange); body size "
+                             "estimated"),
+    "hx3c": Spindle("hx3c", "Hiteco Robotech HX 3C, HSK63F (robot electrospindle)",
+                    plate_thickness=30, plate_diameter=220, body_diameter=160, body_length=360, nose_diameter=63,
+                    nose_length=60, collet="HSK63F", max_collet_mm=25.0, max_rpm=24000, power_w=20000, mass_kg=25.0,
+                    control="VFD and EtherCAT; automatic pneumatic tool change; sensors S1/S2/S3",
+                    source="EtherCAT product listing Hiteco HX 3C (20 kW S1, 24,000 rpm, HSK63F, 25 kg, liquid "
+                           "cooled); body size estimated"),
+    "ur10e_example":Spindle("ur10e_example", "Light electrospindle, ER11 (example size, UR10e)",
                              plate_thickness=12, plate_diameter=80, body_diameter=62, body_length=170,
                              nose_diameter=22, nose_length=20, collet="ER11", max_collet_mm=7.0,
                              control="digital out on / analog speed (set per cell)"),
@@ -94,7 +106,7 @@ PRESETS: Dict[str, Spindle] = {
                              nose_diameter=50, nose_length=45, collet="ER32", max_collet_mm=20.0,
                              control="VFD: $OUT start, $ANOUT speed (set per cell)"),
 }
-DEFAULT_FOR_ROBOT = {"ur10e": "ur10e_example", "kr120": "kr120_example"}
+DEFAULT_FOR_ROBOT = {"ur10e": "cm_pds", "kr120": "hx3c"}
 
 
 def to_dict(s: Spindle) -> Dict:

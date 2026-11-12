@@ -75,6 +75,23 @@ def quat(R: np.ndarray):
     return q if q[0] >= 0 else -q
 
 
+def blend_radii(recs: List[Rec], blend: float) -> List[float]:
+    """Blend radius (m) per record. Only between two moves with known TCP positions (data "pose"), and at most
+    40% of the shorter neighbouring segment, so neighbouring blends never overlap (UR's rule for blended moves).
+    0 at the first and last move, next to non-motion records and where a move has no pose."""
+    out = [0.0] * len(recs)
+    if blend <= 0:
+        return out
+    moves = [k for k, r in enumerate(recs) if r.kind in ("movej", "movel")]
+    for a, k, b in zip(moves, moves[1:], moves[2:]):
+        if b - a != 2 or not all(recs[i].data.get("pose") is not None for i in (a, k, b)):
+            continue   # something happens between the moves (I/O, tool change): stop exactly
+        p = [np.asarray(recs[i].data["pose"], dtype=float)[:3, 3] for i in (a, k, b)]
+        seg = min(np.linalg.norm(p[1] - p[0]), np.linalg.norm(p[2] - p[1]))
+        out[k] = float(min(blend, 0.4 * seg))
+    return out
+
+
 # ---------------------------------------------------------------- writers
 def _urscript(recs: List[Rec], opt: Dict) -> str:
     name = "lithocam"
@@ -84,7 +101,15 @@ def _urscript(recs: List[Rec], opt: Dict) -> str:
     vl = 0.1                                        # m/s
     blend = opt.get("blend", 0.0)
     fmt = lambda q: "[" + ", ".join("{:.6f}".format(float(v)) for v in q) + "]"   # noqa: E731
-    for r in recs:
+    B_inv = np.linalg.inv(np.asarray(opt.get("base_frame", np.eye(4)), dtype=float))
+    cut_motion = opt.get("cut_motion", "movel")
+    radii = blend_radii(recs, blend)
+
+    def pose_p(T):
+        T = B_inv @ np.asarray(T, dtype=float)
+        return "p[{:.6f}, {:.6f}, {:.6f}, {:.6f}, {:.6f}, {:.6f}]".format(*T[:3, 3], *rotvec(T[:3, :3]))
+
+    for k, r in enumerate(recs):
         d = r.data
         if r.kind == "start":
             name = str(d.get("name", name))
@@ -99,15 +124,22 @@ def _urscript(recs: List[Rec], opt: Dict) -> str:
             out.append("  set_tcp({})  # tool {}".format(p, d.get("id", "")))
             if d.get("mass"):
                 out.append("  set_payload({:.3f})".format(float(d["mass"])))
+            else:
+                out.append("  # payload not set: enter the spindle and cutter mass before running")
         elif r.kind == "speed":
             if d.get("linear"):
                 vl = float(d["linear"]) / 1000
             if d.get("joint"):
                 vj = opt.get("joint_speed_max", 1.0) * float(d["joint"])
         elif r.kind == "movej":
-            out.append("  movej({}, a={}, v={:.4f}, r={})".format(fmt(d["q"]), acc_j, vj, d.get("blend", blend)))
-        elif r.kind == "movel":   # movel with joint targets: linear in tool space, ends in the verified configuration
-            out.append("  movel({}, a={}, v={:.4f}, r={})".format(fmt(d["q"]), acc_l, vl, d.get("blend", blend)))
+            out.append("  movej({}, a={}, v={:.4f}, r={:.4f})".format(fmt(d["q"]), acc_j, vj, radii[k]))
+        elif r.kind == "movel":
+            if cut_motion == "movep" and d.get("cut") and d.get("pose") is not None:
+                # constant tool speed through the cut; target pose in the controller base frame
+                out.append("  movep({}, a={}, v={:.4f}, r={:.4f})  # q {}".format(pose_p(d["pose"]), acc_l, vl,
+                                                                               radii[k], fmt(d["q"])))
+            else:   # joint target: linear in tool space, ends in the verified configuration
+                out.append("  movel({}, a={}, v={:.4f}, r={:.4f})".format(fmt(d["q"]), acc_l, vl, radii[k]))
         elif r.kind == "pause":
             s = float(d.get("seconds", -1))
             out.append("  sleep({:.3f})".format(s) if s >= 0 else '  popup("lithocam: paused, press Continue", '
@@ -119,6 +151,9 @@ def _urscript(recs: List[Rec], opt: Dict) -> str:
             out += ["  while {}get_standard_digital_in({}):".format(neg, int(d["port"])), "    sync()", "  end"]
         elif r.kind == "spindle":
             out.append("  # spindle {} rev/min: map to the cell's spindle I/O".format(d.get("rpm", 0)))
+        elif r.kind == "table":   # the UR has no table axis: the operator (or a PLC) turns it
+            out.append('  popup("lithocam: turn the table to {:.1f} deg, then Continue", blocking=True)'.format(
+                float(d.get("deg", 0.0))))
         elif r.kind == "gripper":
             out.append(opt.get("gripper_call", "  # gripper width {width} mm force {force} N: set the cell's gripper "
                                                "call").format(**{"width": d.get("width", 0), "force": d.get("force", 0)}))
@@ -165,6 +200,10 @@ def _krl(recs: List[Rec], opt: Dict) -> str:
             out.append("  WAIT FOR $IN[{}] == {}".format(int(d["port"]), "TRUE" if d.get("value", True) else "FALSE"))
         elif r.kind == "spindle":
             out.append("  ; spindle {} rev/min: map to the cell's spindle I/O".format(d.get("rpm", 0)))
+        elif r.kind == "table":
+            out.append("  ; turntable to {:.3f} deg (external axis E1 once the cell defines it)".format(
+                float(d.get("deg", 0.0))))
+            out.append("  HALT")
         elif r.kind == "gripper":
             out.append("  ; gripper width {} mm force {} N".format(d.get("width", 0), d.get("force", 0)))
         elif r.kind == "call":
@@ -211,6 +250,10 @@ def _rapid(recs: List[Rec], opt: Dict) -> str:
             body.append("    WaitDI DI_{}, {};".format(int(d["port"]), 1 if d.get("value", True) else 0))
         elif r.kind == "spindle":
             body.append("    ! spindle {} rev/min: map to the cell's spindle I/O".format(d.get("rpm", 0)))
+        elif r.kind == "table":
+            body.append("    ! turntable to {:.3f} deg (external axis once the cell defines it)".format(
+                float(d.get("deg", 0.0))))
+            body.append("    Stop;")
         elif r.kind == "gripper":
             body.append("    ! gripper width {} mm force {} N".format(d.get("width", 0), d.get("force", 0)))
         elif r.kind == "call":
@@ -257,9 +300,9 @@ def joint_targets(text: str, dialect: str) -> List[List[float]]:
     """Joint targets (radians) read back from a posted program, for the static verification gate."""
     import re
     out = []
-    if dialect == "urscript":
-        for m in re.finditer(r"move[jl]\(\[([^\]]*)\]", text):
-            out.append([float(v) for v in m.group(1).split(",")])
+    if dialect == "urscript":   # movej/movel joint targets, and the verified joints noted on each movep
+        for m in re.finditer(r"move[jl]\(\[([^\]]*)\]|movep\(p\[[^\]]*\][^#\n]*# q \[([^\]]*)\]", text):
+            out.append([float(v) for v in (m.group(1) or m.group(2)).split(",")])
     elif dialect == "krl":
         for m in re.finditer(r"PTP \{AXIS: ([^}]*)\}", text):
             out.append([math.radians(float(p.split()[1])) for p in m.group(1).split(",")])

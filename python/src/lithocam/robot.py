@@ -105,6 +105,47 @@ class Cell:
         from tesseract_robotics.tesseract_geometry import Box
         self._add_static(name, [Box(*[float(v) for v in size])], center, yaw)
 
+    def attach_tool(self, name: str, cylinders, allow_with=("tool0", "flange", "wrist_3_link", "link_6")):
+        """A tool on tool0 as collision geometry: cylinders [(diameter m, z0 m, length m, x m, y m)] along tool0 z
+        (a spindle stack). Contact with the wrist and flange links it is mounted on is allowed."""
+        from tesseract_robotics.tesseract_common import AllowedCollisionMatrix, Translation3d
+        from tesseract_robotics.tesseract_environment import (AddLinkCommand, ModifyAllowedCollisionsCommand,
+                                                              ModifyAllowedCollisionsType_ADD)
+        from tesseract_robotics.tesseract_geometry import Cylinder
+        from tesseract_robotics.tesseract_scene_graph import Collision, Joint, JointType_FIXED, Link, Visual
+
+        link = Link(name)
+        for d, z0, length, x, y in cylinders:
+            c, v = Collision(), Visual()
+            g = Cylinder(float(d) / 2, float(length))
+            c.geometry, v.geometry = g, g
+            c.origin = Isometry3d.Identity() * Translation3d(float(x), float(y), float(z0) + float(length) / 2)
+            v.origin = c.origin
+            link.collision.push_back(c)
+            link.visual.push_back(v)
+        j = Joint(name + "_joint")
+        j.parent_link_name = TIP
+        j.child_link_name = name
+        j.type = JointType_FIXED
+        j.parent_to_joint_origin_transform = Isometry3d.Identity()
+        if not self.env.applyCommand(AddLinkCommand(link, j)):
+            raise RuntimeError("could not attach tool " + name)
+        acm = AllowedCollisionMatrix()
+        links = set(self.env.getLinkNames())
+        for other in allow_with:
+            if other in links:
+                acm.addAllowedCollision(name, other, "mounted")
+        self.env.applyCommand(ModifyAllowedCollisionsCommand(acm, ModifyAllowedCollisionsType_ADD))
+        self._mgr = None
+
+    def set_wire_tool(self, enabled: bool):
+        """Turn the diamond-wire bow's collision geometry (links named wiresaw*) on or off."""
+        from tesseract_robotics.tesseract_environment import ChangeLinkCollisionEnabledCommand
+        for n in self.env.getLinkNames():
+            if str(n).startswith("wiresaw"):
+                self.env.applyCommand(ChangeLinkCollisionEnabledCommand(str(n), bool(enabled)))
+        self._mgr = None
+
     def in_collision(self, q, margin: float = 0.0) -> bool:
         """True when any robot link touches an obstacle (or another link not excluded in the SRDF) at q."""
         from tesseract_robotics.tesseract_collision import (ContactRequest, ContactResultMap,
@@ -185,29 +226,7 @@ class Cell:
 
 # ---------------------------------------------------------------- wire-saw targets
 
-def rot_x(a: float) -> np.ndarray:
-    c, s = math.cos(a), math.sin(a)
-    return np.array([[1, 0, 0], [0, c, -s], [0, s, c]], dtype=np.float64)
-
-
-def wire_target(p0, p1, normal, wire_radius: float, roll: float, bow_depth: float) -> np.ndarray:
-    """tool0 pose (4x4) that puts the wire (tool x axis, at bow_depth along tool z) on the kerf-offset ruling.
-
-    Units are metres. The tool z axis points against the face normal (the bow reaches over the cut), turned by
-    `roll` about the wire.
-    """
-    p0, p1, n = (np.asarray(v, dtype=np.float64) for v in (p0, p1, normal))
-    x = p1 - p0
-    x /= np.linalg.norm(x)
-    z = -(n - np.dot(n, x) * x)
-    z /= np.linalg.norm(z)
-    y = np.cross(z, x)
-    R = np.column_stack([x, y, z]) @ rot_x(roll)
-    mid = 0.5 * (p0 + p1) + n * wire_radius
-    T = np.eye(4)
-    T[:3, :3] = R
-    T[:3, 3] = mid - R[:, 2] * bow_depth          # tool0 sits bow_depth behind the wire along tool z
-    return T
+from .wirepath import facing_yaw, load_ruled_json, rot_x, turned_face, wire_target  # noqa: E402,F401 (re-exported)
 
 
 @dataclass
@@ -468,39 +487,9 @@ def wire_reach_ext(cell: Cell, ruled_report, placement: Sequence[float], pos: Po
     return ExtReach(rulings, sum(c is not None for c in choices), choices)
 
 
-def turned_face(face, yaw: float):
-    """The face's rulings turned by yaw (radians) about the part's z axis (a turntable under the part)."""
-    from types import SimpleNamespace as NS
-    c, s = math.cos(yaw), math.sin(yaw)
-    Rz = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1.0]])
-    rs = [NS(p0=(Rz @ np.asarray(r.p0)).tolist(), p1=(Rz @ np.asarray(r.p1)).tolist(),
-             normal=(Rz @ np.asarray(r.normal)).tolist()) for r in face.rulings]
-    return NS(index=face.index, label=face.label, rulings=rs)
-
-
-def facing_yaw(face, placement: Sequence[float]) -> float:
-    """Turntable angle that points the face's mean outward normal at the robot base (horizontal component)."""
-    n = np.mean([np.asarray(r.normal) for r in face.rulings], axis=0)
-    want = -np.asarray(placement, float)[:2]
-    return math.atan2(want[1], want[0]) - math.atan2(n[1], n[0])
-
-
 def summary(rep: ReachReport) -> Dict[str, object]:
     return {"cell": rep.cell, "placement": rep.placement, "fraction": round(rep.fraction, 4),
             "faces": {f.index: "{}/{}".format(f.reachable, f.rulings) for f in rep.faces}}
-
-
-def load_ruled_json(path: str):
-    """Read `python -m lithocam.ruled ... --json` output into objects with the attributes wire_reach uses.
-
-    This keeps the OCP environment (ruled) and the Tesseract environment (robot) separate.
-    """
-    import json  # noqa: PLC0415
-    from types import SimpleNamespace as NS  # noqa: PLC0415
-
-    d = json.loads(Path(path).read_text(encoding="utf-8"))
-    faces = [NS(index=f["index"], label=f["label"], rulings=[NS(**r) for r in f["rulings"]]) for f in d["faces"]]
-    return NS(faces=faces, rules=NS(**d["rules"]), scale=d["scale"])
 
 
 def main(argv=None) -> int:

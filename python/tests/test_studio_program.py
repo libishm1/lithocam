@@ -82,6 +82,37 @@ def test_raster_program_expands_and_posts(robot_name, work, part, tools):
     assert any("polish" in m.lower() or "Polish" in m for m in ex.messages)
 
 
+def test_ur_movep_poses_match_the_verified_joints_and_blends_stay_apart(part, tools):
+    import re
+    st = program.Station(robot="ur10e", work_xyz=[0.55, 0.15, 0.05], stock=cam.stock_box(part[0], 3.0))
+    robot = program.load_robot("ur10e")
+    ex = program.expand(st, robot, raster_program(), tools, part)
+    opts = program.post_options("ur10e", "urscript")
+    text = post.write(ex.records, "urscript", **opts)
+    rec_q = [r.data["q"] for r in ex.records if r.kind in ("movej", "movel")]
+    back = post.joint_targets(text, "urscript")
+    assert len(back) == len(rec_q) and np.max(np.abs(np.asarray(back) - np.asarray(rec_q))) < 1e-6
+    lines = [l for l in text.splitlines() if l.strip().startswith("movep(")]
+    assert len(lines) > 100
+    tcp = [np.asarray(r.data["tcp"]) for r in ex.records if r.kind == "tool"][-1]
+    robot.tcp_offset = tcp
+    B = opts["base_frame"]
+    for line in lines[::40]:
+        p = [float(v) for v in re.search(r"movep\(p\[([^\]]*)\]", line).group(1).split(",")]
+        q = [float(v) for v in re.search(r"# q \[([^\]]*)\]", line).group(1).split(",")]
+        T = np.linalg.inv(B) @ robot.tcp(q)   # FK in the controller base frame
+        assert np.allclose(T[:3, 3], p[:3], atol=2e-6)
+        assert np.allclose(post.rotvec(T[:3, :3]), p[3:], atol=2e-6) or \
+            abs(np.linalg.norm(p[3:]) - math.pi) < 1e-3   # rotation vectors near pi may flip sign
+    # blends: never more than 40% of the shorter neighbouring segment
+    radii = post.blend_radii(ex.records, opts["blend"])
+    moves = [k for k, r in enumerate(ex.records) if r.kind in ("movej", "movel")]
+    for a, k, b in zip(moves, moves[1:], moves[2:]):
+        if radii[k] > 0:
+            P = [np.asarray(ex.records[i].data["pose"])[:3, 3] for i in (a, k, b)]
+            assert radii[k] <= 0.4 * min(np.linalg.norm(P[1] - P[0]), np.linalg.norm(P[2] - P[1])) + 1e-12
+
+
 def test_cl_round_trip_and_tool_frames():
     T = np.eye(4)
     T[:3, :3] = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1.0]])
@@ -120,17 +151,17 @@ def test_spindle_stack_sets_the_tcp_and_checks_the_collet(part, tools):
     from lithocam.studio import spindles
     st = program.Station(robot="ur10e", work_xyz=[0.55, 0.15, 0.05], stock=cam.stock_box(part[0], 3.0))
     sp = st.spindle_model()
-    assert sp.id == "ur10e_example"
+    assert sp.id == "cm_pds" and sp.collet == "ER20" and sp.max_collet_mm == 13.0
     t = tools["W7"]
     T = st.tool_tcp(t)
     assert abs(T[2, 3] * 1000 - (sp.gauge() + spindles.stickout(t))) < 1e-9
     # the cutter parts end exactly at the tip (collet face + stickout)
     parts = spindles.cutter_parts(t, spindles.stickout(t))
     assert abs(parts[-1][2] + parts[-1][3] - spindles.stickout(t)) < 1e-9
-    # a 20 mm shank does not fit the UR example's ER11 collet: the expansion says so
+    # a 20 mm shank does not fit the CM-PDS ER20 collet (13 mm max): the expansion says so
     prog = program.Program("big", [program.Step("set_tool", {"tool": "S14"})])
     ex = program.expand(st, program.load_robot("ur10e"), prog, tools, part)
-    assert any("exceeds the ER11 collet" in m for m in ex.messages), ex.messages
+    assert any("exceeds the ER20 collet" in m for m in ex.messages), ex.messages
     rec = [r for r in ex.records if r.kind == "tool"][0]
     assert np.allclose(np.asarray(rec.data["tcp"]), st.tool_tcp(tools["S14"]))
     # the robot's TCP during machining is the cutter tip of that stack
