@@ -53,6 +53,7 @@ int main() {
         for (int j = 0; j < s.ny; ++j)
             for (int i = 0; i < s.nx; ++i) {
                 double d = std::hypot(s.cx(i), s.cy(j));
+                if (std::fabs(d - 4.0) < 1e-9) continue;   // on the rim: inside/outside depends on rounding
                 double expect = d <= 4.0 ? std::min(10.0, 2.0 + profile(c, d)) : 10.0;
                 worst = std::max(worst, std::fabs(s.at(i, j) - expect));
             }
