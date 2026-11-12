@@ -31,12 +31,24 @@ struct Tri {
     P3 a, b, c;
 };
 
-enum class CutterKind { Flat, Ball };
+enum class CutterKind { Flat, Ball, Bull, Cone };
 
+// Lower-surface profiles f(d), 0 <= d <= radius:
+//   Flat  0
+//   Ball  R - sqrt(R^2 - d^2)
+//   Bull  0 for d <= R - r;  r - sqrt(r^2 - (d - (R - r))^2) beyond (corner radius r = `corner`)
+//   Cone  d / tan(half_angle)  (the tip is the cone's apex; `half_angle` in radians, 0 < half_angle < pi/2)
+// Every profile is convex and nondecreasing in d, so along a triangle edge the contact height is a concave
+// function of the edge parameter (edge contacts for Bull and Cone use a golden-section search on it).
 struct Cutter {
     CutterKind kind;
     double radius;
+    double corner = 0.0;       // Bull: corner radius, 0 < corner <= radius
+    double half_angle = 0.0;   // Cone: half of the included angle
 };
+
+// Height of the cutter's lower surface above its tip at horizontal distance d from the axis (d <= radius).
+double profile(const Cutter& cutter, double d);
 
 // Tip height for one triangle (or -infinity when the triangle is outside the cutter's disc).
 double drop_triangle(const Cutter& cutter, const Tri& tri, double x, double y);

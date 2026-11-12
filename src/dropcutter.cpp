@@ -80,7 +80,89 @@ double flat_edge(double R, const P3& a, const P3& b, double x, double y) {
     return std::max(a.z + t0 * (b.z - a.z), a.z + t1 * (b.z - a.z));
 }
 
+// Any cutter on a vertex: tip at v.z - f(d).
+double gen_vertex(const Cutter& c, const P3& v, double x, double y) {
+    double d = std::hypot(v.x - x, v.y - y);
+    if (d > c.radius) return NEG;
+    return v.z - profile(c, d);
+}
+
+// Any cutter on an edge: maximise the concave g(t) = e_z(t) - f(d(t)) over the part of the edge within the disc
+// (golden-section search). Endpoints inside the disc are vertex contacts and are covered there too.
+double gen_edge(const Cutter& c, const P3& a, const P3& b, double x, double y) {
+    const double R = c.radius;
+    double dx = b.x - a.x, dy = b.y - a.y;
+    double fx = a.x - x, fy = a.y - y;
+    double qa = dx * dx + dy * dy, qb = 2 * (fx * dx + fy * dy), qc = fx * fx + fy * fy - R * R;
+    if (qa <= 0) return NEG;
+    double disc = qb * qb - 4 * qa * qc;
+    if (disc < 0) return NEG;
+    double r = std::sqrt(disc);
+    double lo = std::max(0.0, (-qb - r) / (2 * qa)), hi = std::min(1.0, (-qb + r) / (2 * qa));
+    if (lo > hi) return NEG;
+    auto g = [&](double t) {
+        double px = a.x + t * dx, py = a.y + t * dy, pz = a.z + t * (b.z - a.z);
+        double d = std::min(R, std::hypot(px - x, py - y));
+        return pz - profile(c, d);
+    };
+    const double phi = 0.5 * (std::sqrt(5.0) - 1.0);
+    double x1 = hi - phi * (hi - lo), x2 = lo + phi * (hi - lo), g1 = g(x1), g2 = g(x2);
+    for (int i = 0; i < 200 && hi - lo > 1e-16; ++i) {
+        if (g1 < g2) { lo = x1; x1 = x2; g1 = g2; x2 = lo + phi * (hi - lo); g2 = g(x2); }
+        else         { hi = x2; x2 = x1; g2 = g1; x1 = hi - phi * (hi - lo); g1 = g(x1); }
+    }
+    return std::max({g(lo), g(hi), g1, g2});
+}
+
+// Facet contact by the support point of the cutter's lower surface in the direction -n (n = upward unit normal).
+// Returns the tip height, or NEG when the contact point is outside the triangle.
+double gen_facet(const Cutter& c, const Tri& t, const P3& n, double x, double y) {
+    const double R = c.radius;
+    double hl = std::hypot(n.x, n.y);
+    double ux = hl > 1e-15 ? -n.x / hl : 0.0, uy = hl > 1e-15 ? -n.y / hl : 0.0;   // horizontal, down-slope side
+    // candidate support points as (horizontal offset along u, height above the tip)
+    double off = 0.0, hgt = 0.0;
+    switch (c.kind) {
+        case CutterKind::Flat: off = R; hgt = 0.0; break;
+        case CutterKind::Ball: off = R * hl; hgt = R - R * n.z; break;   // centre - R n, centre at tip + R
+        case CutterKind::Bull: {
+            double a = R - c.corner, rr = c.corner;
+            off = a + rr * hl;
+            hgt = rr - rr * n.z;
+            break;
+        }
+        case CutterKind::Cone: {
+            // apex (0, 0) or rim point (R, R / tan): whichever is further along -n
+            double h = R / std::tan(c.half_angle);
+            double s_apex = 0.0, s_rim = -(n.x * ux * R + n.y * uy * R) - n.z * h;
+            if (s_rim > s_apex + 1e-15) { off = R; hgt = h; }
+            else { off = 0.0; hgt = 0.0; }
+            break;
+        }
+    }
+    if (hl <= 1e-15) off = 0.0;                      // horizontal facet: the tip's own (x, y) represents the flat
+    double px = x + off * ux, py = y + off * uy;
+    if (!in_tri_xy(t, px, py)) return NEG;
+    return plane_z(t, n, px, py) - hgt;
+}
+
 }  // namespace
+
+double profile(const Cutter& c, double d) {
+    const double R = c.radius;
+    switch (c.kind) {
+        case CutterKind::Flat: return 0.0;
+        case CutterKind::Ball: return R - std::sqrt(std::max(0.0, R * R - d * d));
+        case CutterKind::Bull: {
+            double a = R - c.corner;
+            if (d <= a) return 0.0;
+            double e = d - a;
+            return c.corner - std::sqrt(std::max(0.0, c.corner * c.corner - e * e));
+        }
+        case CutterKind::Cone: return d / std::tan(c.half_angle);
+    }
+    return 0.0;
+}
 
 double drop_triangle(const Cutter& cutter, const Tri& t, double x, double y) {
     const double R = cutter.radius;
@@ -90,6 +172,13 @@ double drop_triangle(const Cutter& cutter, const Tri& t, double x, double y) {
     if (nl > 0) {
         n = {n.x / nl, n.y / nl, n.z / nl};
         if (n.z < 0) n = {-n.x, -n.y, -n.z};         // upward normal
+    }
+    if (cutter.kind == CutterKind::Bull || cutter.kind == CutterKind::Cone) {
+        best = std::max({gen_vertex(cutter, t.a, x, y), gen_vertex(cutter, t.b, x, y), gen_vertex(cutter, t.c, x, y),
+                         gen_edge(cutter, t.a, t.b, x, y), gen_edge(cutter, t.b, t.c, x, y),
+                         gen_edge(cutter, t.c, t.a, x, y)});
+        if (nl > 0 && n.z > 1e-12) best = std::max(best, gen_facet(cutter, t, n, x, y));
+        return best;
     }
     if (cutter.kind == CutterKind::Ball) {
         best = std::max({ball_vertex(R, t.a, x, y), ball_vertex(R, t.b, x, y), ball_vertex(R, t.c, x, y),

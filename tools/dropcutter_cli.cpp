@@ -14,8 +14,8 @@
 #include "lithocam/dropcutter.hpp"
 
 int main(int argc, char** argv) {
-    if (argc != 5) {
-        std::fprintf(stderr, "usage: dropcutter_cli triangles.txt points.txt ball|flat radius\n");
+    if (argc != 5 && argc != 6) {
+        std::fprintf(stderr, "usage: dropcutter_cli triangles.txt points.txt flat|ball|bull|cone radius [corner|half_angle]\n");
         return 2;
     }
     std::vector<lithocam::Tri> tris;
@@ -24,8 +24,10 @@ int main(int argc, char** argv) {
         lithocam::Tri t{};
         while (f >> t.a.x >> t.a.y >> t.a.z >> t.b.x >> t.b.y >> t.b.z >> t.c.x >> t.c.y >> t.c.z) tris.push_back(t);
     }
-    lithocam::Cutter c{std::strcmp(argv[3], "ball") == 0 ? lithocam::CutterKind::Ball : lithocam::CutterKind::Flat,
-                       std::stod(argv[4])};
+    lithocam::Cutter c{lithocam::CutterKind::Flat, std::stod(argv[4])};
+    if (std::strcmp(argv[3], "ball") == 0) c.kind = lithocam::CutterKind::Ball;
+    if (std::strcmp(argv[3], "bull") == 0) { c.kind = lithocam::CutterKind::Bull; c.corner = std::stod(argv[5]); }
+    if (std::strcmp(argv[3], "cone") == 0) { c.kind = lithocam::CutterKind::Cone; c.half_angle = std::stod(argv[5]); }
     lithocam::TriMesh mesh(tris);
     std::ifstream q(argv[2]);
     double x, y;

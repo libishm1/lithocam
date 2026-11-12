@@ -17,9 +17,16 @@ using namespace lithocam;
 
 namespace {
 
-double surf(const Cutter& c, double d) {
-    if (c.kind == CutterKind::Flat) return 0.0;
-    return c.radius - std::sqrt(std::max(0.0, c.radius * c.radius - d * d));
+double surf(const Cutter& c, double d) { return profile(c, d); }
+
+Cutter rand_cutter(lcheck::Gen& g, int k) {
+    double R = g.uniform(0.5, 15);
+    switch (k % 4) {
+        case 0: return {CutterKind::Flat, R};
+        case 1: return {CutterKind::Ball, R};
+        case 2: return {CutterKind::Bull, R, g.uniform(0.05, 1.0) * R};
+        default: return {CutterKind::Cone, R, 0.0, g.uniform(0.25, 1.4)};
+    }
 }
 
 // Maximum of p.z - f(d(p)) over a dense sampling of the triangle's points within the disc.
@@ -78,7 +85,7 @@ int main() {
     int contact_fail = 0;
     for (int it = 0; it < N; ++it) {
         Tri t = rand_tri(g, 20);
-        Cutter c{it % 2 ? CutterKind::Ball : CutterKind::Flat, g.uniform(0.5, 15)};
+        Cutter c = rand_cutter(g, it);
         double x = g.uniform(-25, 25), y = g.uniform(-25, 25);
         double z = drop_triangle(c, t, x, y);
         double zs = sampled(c, t, x, y, S);
@@ -94,7 +101,10 @@ int main() {
         double step = std::max({std::hypot(t.b.x - t.a.x, t.b.y - t.a.y), std::hypot(t.c.x - t.a.x, t.c.y - t.a.y),
                                 std::hypot(t.c.x - t.b.x, t.c.y - t.b.y)}) / S;
         double zrange = std::max({std::fabs(t.a.z - t.b.z), std::fabs(t.b.z - t.c.z), std::fabs(t.a.z - t.c.z)});
-        double slack = 1e-6 + step * (2 + zrange) * 2 + (c.kind == CutterKind::Ball ? std::sqrt(2 * c.radius * step) : 0);
+        double slack = 1e-6 + step * (2 + zrange) * 2;
+        if (c.kind == CutterKind::Ball) slack += std::sqrt(2 * c.radius * step);
+        if (c.kind == CutterKind::Bull) slack += std::sqrt(2 * c.corner * step);
+        if (c.kind == CutterKind::Cone) slack += 2 * step / std::tan(c.half_angle);
         if (z - zs > slack) ++contact_fail;
         ++cases;
     }
@@ -114,7 +124,7 @@ int main() {
             }
         TriMesh mesh(tris);
         for (int q = 0; q < 200; ++q) {
-            Cutter c{q % 2 ? CutterKind::Ball : CutterKind::Flat, g.uniform(0.3, 6)};
+            Cutter c = rand_cutter(g, q);
             double x = g.uniform(-3, G + 3), y = g.uniform(-3, G + 3);
             double a = drop_cutter(c, mesh, x, y), b = drop_cutter_brute(c, tris, x, y);
             lcheck::expect((std::isinf(a) && std::isinf(b)) || std::fabs(a - b) < 1e-12, "index equals brute force");

@@ -9,6 +9,7 @@ import sys
 import opencamlib as ocl
 
 tris_path, pts_path, kind, radius = sys.argv[1], sys.argv[2], sys.argv[3], float(sys.argv[4])
+extra = float(sys.argv[5]) if len(sys.argv) > 5 else 0.0
 surf = ocl.STLSurf()
 zmin = 1e9
 with open(tris_path) as f:
@@ -18,7 +19,14 @@ with open(tris_path) as f:
             continue
         surf.addTriangle(ocl.Triangle(ocl.Point(*v[0:3]), ocl.Point(*v[3:6]), ocl.Point(*v[6:9])))
         zmin = min(zmin, v[2], v[5], v[8])
-cutter = ocl.BallCutter(2 * radius, 10 * radius) if kind == "ball" else ocl.CylCutter(2 * radius, 10 * radius)
+if kind == "ball":
+    cutter = ocl.BallCutter(2 * radius, 10 * radius)
+elif kind == "bull":
+    cutter = ocl.BullCutter(2 * radius, extra, 10 * radius)          # diameter, corner radius, length
+elif kind == "cone":
+    cutter = ocl.ConeCutter(2 * radius, extra, 10 * radius)          # diameter, half-angle (radians), length
+else:
+    cutter = ocl.CylCutter(2 * radius, 10 * radius)
 bdc = ocl.BatchDropCutter()
 bdc.setSTL(surf)
 bdc.setCutter(cutter)
