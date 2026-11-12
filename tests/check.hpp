@@ -24,6 +24,8 @@ inline void expect(bool ok, const std::string& property, const std::string& deta
     ++failures;
 }
 
+inline void expect(bool ok, const std::string& property) { expect(ok, property, ""); }
+
 inline int finish(const char* suite, long cases) {
     std::printf("%s: %ld cases, %d failures\n", suite, cases, failures);
     return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;

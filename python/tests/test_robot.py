@@ -3,9 +3,9 @@
 import math
 from pathlib import Path
 
-import numpy as np
 import pytest
 
+np = pytest.importorskip("numpy")
 robot = pytest.importorskip("lithocam.robot", reason="tesseract-robotics not installed", exc_type=ImportError)
 
 DATA = Path(__file__).resolve().parent / "data"
