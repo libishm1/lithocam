@@ -42,6 +42,11 @@
     { "name": "lithocam::tool_kind_name", "header": "lithocam/tools.hpp", "doc": "Kind name as written in library files" },
     { "name": "lithocam::tool_kind_from_name", "header": "lithocam/tools.hpp", "doc": "Kind from its library name" },
     { "name": "lithocam::all_tool_kinds", "header": "lithocam/tools.hpp", "doc": "Every tool kind, for dropdowns" },
+    { "name": "lithocam::tool_kind_label", "header": "lithocam/tools.hpp", "doc": "Human-readable kind label" },
+    { "name": "lithocam::tool_kind_domain", "header": "lithocam/tools.hpp", "doc": "stone, wood or both" },
+    { "name": "lithocam::tool_kind_envelope", "header": "lithocam/tools.hpp", "doc": "Cutting-envelope class (docs/TOOLING.md)" },
+    { "name": "lithocam::tool_operation_names", "header": "lithocam/tools.hpp", "doc": "Every operation family any kind fits" },
+    { "name": "lithocam::wood_tool_library", "header": "lithocam/tools.hpp", "doc": "Wood tools from the tooling survey" },
     { "name": "lithocam::validate_tool", "header": "lithocam/tools.hpp", "doc": "Empty string when the tool is consistent, else the first problem" },
     { "name": "lithocam::has_cutter", "header": "lithocam/tools.hpp", "doc": "True when the tool has a drop-cutter model" },
     { "name": "lithocam::cutter_of", "header": "lithocam/tools.hpp", "doc": "Drop-cutter model of a tool (exact or conservative)" },
@@ -54,6 +59,6 @@
     { "name": "lithocam::format_tool_library", "header": "lithocam/tools.hpp", "doc": "Tool library as CSV text" },
     { "name": "lithocam::read_tool_library", "header": "lithocam/tools.hpp", "doc": "Read a CSV tool library file" },
     { "name": "lithocam::write_tool_library", "header": "lithocam/tools.hpp", "doc": "Write a CSV tool library file" },
-    { "name": "lithocam::stone_tool_library", "header": "lithocam/tools.hpp", "doc": "Starter library of common stone tool sizes" }
+    { "name": "lithocam::stone_tool_library", "header": "lithocam/tools.hpp", "doc": "Stone tools from the tooling survey" }
   ]
 }

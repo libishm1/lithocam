@@ -64,17 +64,18 @@ if len(sys.argv) > 2:
 
 # tool library: starter set, drop-cutter mapping, CSV round trip, errors as Python exceptions
 lib = lc.stone_tool_library()
-assert all(lc.validate_tool(t) == "" for t in lib.tools)
-bull = lc.find_tool(lib, "R25")
-c = lc.cutter_of(bull)
-assert c.kind == lc.CutterKind.Bull and c.radius == 12.5 and c.corner == 5.0
+wood = lc.wood_tool_library()
+lib.tools = list(lib.tools) + list(wood.tools)
+assert len(lib.tools) == 63 and all(lc.validate_tool(t) == "" for t in lib.tools)
+c = lc.cutter_of(lc.find_tool(lib, "W7"))
+assert c.kind == lc.CutterKind.Ball and abs(c.radius - 3.175) < 1e-12
 assert lc.tool_kind_from_name(lc.tool_kind_name(lc.ToolKind.Engraver)) == lc.ToolKind.Engraver
-assert len(lc.all_tool_kinds()) >= 13
-assert [t.id for t in lc.tools_for_operation(lib, "wire_cut")] == ["WIRE7"]
+assert len(lc.all_tool_kinds()) == 38 and lc.tool_kind_envelope(lc.ToolKind.CupWheel) == "R-ANNULUS"
+assert [t.id for t in lc.tools_for_operation(lib, "wire_cut")] == ["S17", "S18"]
 back = lc.parse_tool_library(lc.format_tool_library(lib))
 assert [t.id for t in back.tools] == [t.id for t in lib.tools]
-assert not lc.has_cutter(lc.find_tool(lib, "S400"))
-for bad in (lambda: lc.cutter_of(lc.find_tool(lib, "S400")), lambda: lc.tool_kind_from_name("spoon")):
+assert not lc.has_cutter(lc.find_tool(lib, "S15"))
+for bad in (lambda: lc.cutter_of(lc.find_tool(lib, "S15")), lambda: lc.tool_kind_from_name("spoon")):
     try:
         bad()
         raise AssertionError("expected an exception")

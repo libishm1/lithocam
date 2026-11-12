@@ -41,16 +41,41 @@ NB_MODULE(_lithocam, m) {
         .value("FlatEndMill", lithocam::ToolKind::FlatEndMill)
         .value("BallEndMill", lithocam::ToolKind::BallEndMill)
         .value("BullNoseMill", lithocam::ToolKind::BullNoseMill)
+        .value("TaperedBallMill", lithocam::ToolKind::TaperedBallMill)
         .value("FaceMill", lithocam::ToolKind::FaceMill)
+        .value("GrindingDisc", lithocam::ToolKind::GrindingDisc)
+        .value("CupWheel", lithocam::ToolKind::CupWheel)
+        .value("PolishingPad", lithocam::ToolKind::PolishingPad)
+        .value("AbrasiveBrush", lithocam::ToolKind::AbrasiveBrush)
         .value("ChamferMill", lithocam::ToolKind::ChamferMill)
         .value("Engraver", lithocam::ToolKind::Engraver)
+        .value("CarvingBurr", lithocam::ToolKind::CarvingBurr)
+        .value("DovetailMill", lithocam::ToolKind::DovetailMill)
+        .value("TSlotMill", lithocam::ToolKind::TSlotMill)
+        .value("KeyholeMill", lithocam::ToolKind::KeyholeMill)
+        .value("EdgeProfileBit", lithocam::ToolKind::EdgeProfileBit)
+        .value("ProfileWheel", lithocam::ToolKind::ProfileWheel)
         .value("Drill", lithocam::ToolKind::Drill)
+        .value("FlatBottomDrill", lithocam::ToolKind::FlatBottomDrill)
+        .value("StepDrill", lithocam::ToolKind::StepDrill)
         .value("CoreDrill", lithocam::ToolKind::CoreDrill)
         .value("Tap", lithocam::ToolKind::Tap)
         .value("ThreadMill", lithocam::ToolKind::ThreadMill)
-        .value("ProfileWheel", lithocam::ToolKind::ProfileWheel)
         .value("DiscSaw", lithocam::ToolKind::DiscSaw)
-        .value("DiamondWire", lithocam::ToolKind::DiamondWire);
+        .value("DiamondWire", lithocam::ToolKind::DiamondWire)
+        .value("MultiWireSaw", lithocam::ToolKind::MultiWireSaw)
+        .value("GangSaw", lithocam::ToolKind::GangSaw)
+        .value("ChainSaw", lithocam::ToolKind::ChainSaw)
+        .value("ChainMortiser", lithocam::ToolKind::ChainMortiser)
+        .value("BandSaw", lithocam::ToolKind::BandSaw)
+        .value("PlanerHead", lithocam::ToolKind::PlanerHead)
+        .value("Waterjet", lithocam::ToolKind::Waterjet)
+        .value("Knife", lithocam::ToolKind::Knife)
+        .value("BushHammer", lithocam::ToolKind::BushHammer)
+        .value("Chisel", lithocam::ToolKind::Chisel)
+        .value("Splitter", lithocam::ToolKind::Splitter)
+        .value("FlameTorch", lithocam::ToolKind::FlameTorch)
+        .value("AggregateHead", lithocam::ToolKind::AggregateHead);
     nb::class_<lithocam::P3>(m, "P3")
         .def(nb::init<>())
         .def_rw("x", &lithocam::P3::x)
@@ -115,17 +140,40 @@ NB_MODULE(_lithocam, m) {
         .def_rw("name", &lithocam::Tool::name)
         .def_rw("kind", &lithocam::Tool::kind)
         .def_rw("material", &lithocam::Tool::material)
+        .def_rw("bond", &lithocam::Tool::bond)
+        .def_rw("grit", &lithocam::Tool::grit)
+        .def_rw("profile", &lithocam::Tool::profile)
+        .def_rw("helix", &lithocam::Tool::helix)
+        .def_rw("point", &lithocam::Tool::point)
+        .def_rw("rotation", &lithocam::Tool::rotation)
+        .def_rw("thread", &lithocam::Tool::thread)
+        .def_rw("source", &lithocam::Tool::source)
         .def_rw("diameter", &lithocam::Tool::diameter)
         .def_rw("corner_radius", &lithocam::Tool::corner_radius)
         .def_rw("tip_angle", &lithocam::Tool::tip_angle)
         .def_rw("tip_diameter", &lithocam::Tool::tip_diameter)
+        .def_rw("taper_angle", &lithocam::Tool::taper_angle)
         .def_rw("flute_length", &lithocam::Tool::flute_length)
+        .def_rw("neck_diameter", &lithocam::Tool::neck_diameter)
+        .def_rw("pilot_diameter", &lithocam::Tool::pilot_diameter)
+        .def_rw("spur_length", &lithocam::Tool::spur_length)
         .def_rw("shank_diameter", &lithocam::Tool::shank_diameter)
         .def_rw("stickout", &lithocam::Tool::stickout)
         .def_rw("holder_diameter", &lithocam::Tool::holder_diameter)
         .def_rw("holder_length", &lithocam::Tool::holder_length)
         .def_rw("thread_pitch", &lithocam::Tool::thread_pitch)
         .def_rw("bore_diameter", &lithocam::Tool::bore_diameter)
+        .def_rw("segment_height", &lithocam::Tool::segment_height)
+        .def_rw("kerf", &lithocam::Tool::kerf)
+        .def_rw("length", &lithocam::Tool::length)
+        .def_rw("rake_angle", &lithocam::Tool::rake_angle)
+        .def_rw("stroke", &lithocam::Tool::stroke)
+        .def_rw("impact_rate", &lithocam::Tool::impact_rate)
+        .def_rw("standoff", &lithocam::Tool::standoff)
+        .def_rw("orifice_diameter", &lithocam::Tool::orifice_diameter)
+        .def_rw("pressure", &lithocam::Tool::pressure)
+        .def_rw("abrasive_flow", &lithocam::Tool::abrasive_flow)
+        .def_rw("output_angle", &lithocam::Tool::output_angle)
         .def_rw("flutes", &lithocam::Tool::flutes)
         .def_rw("spindle_rpm", &lithocam::Tool::spindle_rpm)
         .def_rw("surface_speed", &lithocam::Tool::surface_speed)
@@ -157,6 +205,11 @@ NB_MODULE(_lithocam, m) {
     m.def("tool_kind_name", &lithocam::tool_kind_name, "Kind name as written in library files", nb::arg("kind"));
     m.def("tool_kind_from_name", &lithocam::tool_kind_from_name, "Kind from its library name", nb::arg("name"));
     m.def("all_tool_kinds", &lithocam::all_tool_kinds, "Every tool kind, for dropdowns");
+    m.def("tool_kind_label", &lithocam::tool_kind_label, "Human-readable kind label", nb::arg("kind"));
+    m.def("tool_kind_domain", &lithocam::tool_kind_domain, "stone, wood or both", nb::arg("kind"));
+    m.def("tool_kind_envelope", &lithocam::tool_kind_envelope, "Cutting-envelope class (docs/TOOLING.md)", nb::arg("kind"));
+    m.def("tool_operation_names", &lithocam::tool_operation_names, "Every operation family any kind fits");
+    m.def("wood_tool_library", &lithocam::wood_tool_library, "Wood tools from the tooling survey");
     m.def("validate_tool", &lithocam::validate_tool, "Empty string when the tool is consistent, else the first problem", nb::arg("tool"));
     m.def("has_cutter", &lithocam::has_cutter, "True when the tool has a drop-cutter model", nb::arg("tool"));
     m.def("cutter_of", &lithocam::cutter_of, "Drop-cutter model of a tool (exact or conservative)", nb::arg("tool"));
@@ -169,5 +222,5 @@ NB_MODULE(_lithocam, m) {
     m.def("format_tool_library", &lithocam::format_tool_library, "Tool library as CSV text", nb::arg("lib"));
     m.def("read_tool_library", &lithocam::read_tool_library, "Read a CSV tool library file", nb::arg("path"));
     m.def("write_tool_library", &lithocam::write_tool_library, "Write a CSV tool library file", nb::arg("lib"), nb::arg("path"));
-    m.def("stone_tool_library", &lithocam::stone_tool_library, "Starter library of common stone tool sizes");
+    m.def("stone_tool_library", &lithocam::stone_tool_library, "Stone tools from the tooling survey");
 }

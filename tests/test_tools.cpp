@@ -1,7 +1,9 @@
 // Copyright 2026 The lithocam authors. SPDX-License-Identifier: Apache-2.0
 // Property tests for the tool library: drop-cutter mapping matches each tool's own lower surface and never sits below
 // it, CSV round trips are exact, validation accepts generated valid tools and rejects broken ones.
+#include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <stdexcept>
 #include <string>
 
@@ -33,6 +35,7 @@ double tool_surface(const Tool& t, double d) {
             return d <= tip ? 0.0 : (d - tip) / std::tan(t.tip_angle / 2 * kPi / 180);
         }
         case ToolKind::CoreDrill:   // annulus: nothing under the bore
+        case ToolKind::CupWheel:
             return d < t.bore_diameter / 2 ? INFINITY : 0.0;
         default:
             return 0.0;
@@ -54,17 +57,47 @@ Tool random_tool(lcheck::Gen& g, int serial) {
     t.name = random_text(g);
     t.material = random_text(g);
     t.kind = kinds[static_cast<std::size_t>(g.integer(0, int(kinds.size()) - 1))];
+    using K = ToolKind;
+    const K k = t.kind;
+    t.bond = random_text(g);
+    t.grit = random_text(g);
+    t.profile = random_text(g);
+    t.helix = random_text(g);
+    t.point = random_text(g);
+    t.thread = random_text(g);
+    t.source = random_text(g);
+    t.rotation = g.integer(0, 2) == 0 ? "" : g.integer(0, 1) ? "left" : "right";
     t.diameter = g.uniform(0.2, 800.0);
     const double R = t.diameter / 2;
-    if (t.kind == ToolKind::BullNoseMill) t.corner_radius = g.uniform(1e-3, 1.0) * R;
-    if (t.kind == ToolKind::BallEndMill && g.integer(0, 1)) t.corner_radius = R;
-    if (t.kind == ToolKind::ProfileWheel) t.corner_radius = g.uniform(0.0, 1.0) * R;
-    if (t.kind == ToolKind::Drill || t.kind == ToolKind::Engraver || t.kind == ToolKind::ChamferMill) {
+    if (k == K::BullNoseMill) t.corner_radius = g.uniform(1e-3, 1.0) * R;
+    if (k == K::BallEndMill && g.integer(0, 1)) t.corner_radius = R;
+    if (k == K::TaperedBallMill) t.corner_radius = g.uniform(0.01, 0.99) * R;
+    if (k == K::ProfileWheel || k == K::EdgeProfileBit) t.corner_radius = g.uniform(0.0, 1.0) * R;
+    if (k == K::Drill || k == K::Engraver || k == K::ChamferMill || k == K::StepDrill) {
         t.tip_angle = g.uniform(1.0, 179.0);
-        if (t.kind != ToolKind::Drill && g.integer(0, 2) == 0) t.tip_diameter = g.uniform(0.0, 0.9) * t.diameter;
+        if ((k == K::Engraver || k == K::ChamferMill) && g.integer(0, 2) == 0)
+            t.tip_diameter = g.uniform(0.0, 0.9) * t.diameter;
     }
-    if (t.kind == ToolKind::Tap || t.kind == ToolKind::ThreadMill) t.thread_pitch = g.uniform(0.2, 6.0);
-    if (t.kind == ToolKind::CoreDrill || t.kind == ToolKind::DiscSaw) t.bore_diameter = g.uniform(0.0, 0.95) * t.diameter;
+    if (k == K::TaperedBallMill || k == K::DovetailMill) t.taper_angle = g.uniform(0.5, 89.0);
+    if (k == K::TSlotMill || k == K::KeyholeMill || k == K::DovetailMill)
+        t.neck_diameter = g.uniform(0.05, 0.95) * t.diameter;
+    if (k == K::EdgeProfileBit) t.pilot_diameter = g.uniform(0.0, 1.0) * t.diameter;
+    if (k == K::StepDrill) t.pilot_diameter = g.uniform(0.05, 0.95) * t.diameter;
+    if (k == K::FlatBottomDrill) t.spur_length = g.uniform(0.0, 5.0);
+    if (k == K::Tap || k == K::ThreadMill) t.thread_pitch = g.uniform(0.2, 6.0);
+    if (k == K::CoreDrill || k == K::DiscSaw || k == K::CupWheel || k == K::ProfileWheel)
+        t.bore_diameter = g.uniform(0.0, 0.95) * t.diameter;
+    t.segment_height = g.uniform(0.0, 30.0);
+    t.kerf = g.uniform(0.0, 50.0);
+    t.length = g.uniform(0.0, 5000.0);
+    t.rake_angle = g.uniform(-60.0, 60.0);
+    t.stroke = g.uniform(0.0, 50.0);
+    t.impact_rate = g.uniform(0.0, 200.0);
+    t.standoff = g.uniform(0.0, 300.0);
+    t.orifice_diameter = g.uniform(0.0, 1.0);
+    t.pressure = g.uniform(0.0, 600.0);
+    t.abrasive_flow = g.uniform(0.0, 20.0);
+    t.output_angle = g.uniform(0.0, 180.0);
     t.flute_length = g.uniform(0.0, 200.0);
     t.stickout = g.integer(0, 1) ? t.flute_length + g.uniform(0.0, 100.0) : 0.0;
     t.shank_diameter = g.uniform(0.0, 50.0);
@@ -81,16 +114,14 @@ Tool random_tool(lcheck::Gen& g, int serial) {
     return t;
 }
 
+// format_tool_library is injective (numbers at 17 significant digits, text quoted reversibly), so equal formats
+// mean equal tools in every field; a few fields are also compared directly.
 bool same(const Tool& a, const Tool& b) {
-    return a.id == b.id && a.name == b.name && a.kind == b.kind && a.material == b.material &&
-           a.diameter == b.diameter && a.corner_radius == b.corner_radius && a.tip_angle == b.tip_angle &&
-           a.tip_diameter == b.tip_diameter && a.flute_length == b.flute_length &&
-           a.shank_diameter == b.shank_diameter && a.stickout == b.stickout &&
-           a.holder_diameter == b.holder_diameter && a.holder_length == b.holder_length &&
-           a.thread_pitch == b.thread_pitch && a.bore_diameter == b.bore_diameter && a.flutes == b.flutes &&
-           a.spindle_rpm == b.spindle_rpm && a.surface_speed == b.surface_speed && a.feed == b.feed &&
-           a.plunge_feed == b.plunge_feed && a.max_stepdown == b.max_stepdown &&
-           a.max_stepover == b.max_stepover && a.coolant_flow == b.coolant_flow;
+    ToolLibrary la, lb;
+    la.tools.push_back(a);
+    lb.tools.push_back(b);
+    return format_tool_library(la) == format_tool_library(lb) && a.id == b.id && a.name == b.name &&
+           a.kind == b.kind && a.diameter == b.diameter && a.rake_angle == b.rake_angle && a.flutes == b.flutes;
 }
 
 template <class E, class F>
@@ -130,7 +161,7 @@ int main() {
         }
         const Cutter c = cutter_of(t);
         lcheck::expect(std::fabs(c.radius - t.diameter / 2) <= 1e-12 * t.diameter, "cutter_radius", t.id);
-        const bool exact = t.kind != ToolKind::CoreDrill;
+        const bool exact = t.kind != ToolKind::CoreDrill && t.kind != ToolKind::CupWheel;
         for (int j = 0; j < 16; ++j) {
             const double d = g.uniform(0.0, 1.0) * c.radius;
             const double model = profile(c, d), real = tool_surface(t, d);
@@ -229,22 +260,54 @@ int main() {
         cases += 6;
     }
 
-    // The starter library is valid, ids are unique, and lookups agree.
+    // Kind metadata is complete; every operation family is reachable from some kind.
     {
-        const ToolLibrary lib = stone_tool_library();
-        for (const auto& t : lib.tools) {
-            lcheck::expect(validate_tool(t).empty(), "starter_valid", t.id + ": " + validate_tool(t));
-            lcheck::expect(find_tool(lib, t.id).id == t.id, "find_tool", t.id);
+        const auto ops = tool_operation_names();
+        for (ToolKind k : all_tool_kinds()) {
+            lcheck::expect(!tool_kind_label(k).empty() && !tool_kind_envelope(k).empty(), "kind_metadata",
+                           tool_kind_name(k));
+            const std::string d = tool_kind_domain(k);
+            lcheck::expect(d == "stone" || d == "wood" || d == "both", "kind_domain", tool_kind_name(k));
+            for (const auto& op : tool_operations(k))
+                lcheck::expect(std::find(ops.begin(), ops.end(), op) != ops.end(), "op_listed", op);
             ++cases;
         }
-        lcheck::expect(throws<std::out_of_range>([&] { find_tool(lib, "nope"); }), "find_missing_throws");
-        for (const auto& t : tools_for_operation(lib, "drill")) {
-            bool listed = false;
-            for (const auto& op : tool_operations(t.kind)) listed = listed || op == "drill";
-            lcheck::expect(listed, "for_operation_consistent", t.id);
+    }
+
+    // The survey libraries: every row S1..S25 and W1..W35 is present, every tool is valid, ids are unique across both,
+    // the source names the row, and lookups agree.
+    {
+        ToolLibrary all = stone_tool_library();
+        for (const auto& t : wood_tool_library().tools) all.tools.push_back(t);
+        for (int i = 1; i <= 25; ++i)
+            lcheck::expect(!throws<std::out_of_range>([&] { find_tool(all, "S" + std::to_string(i)); }), "row",
+                           "S" + std::to_string(i));
+        for (int i = 1; i <= 35; ++i)
+            lcheck::expect(!throws<std::out_of_range>([&] { find_tool(all, "W" + std::to_string(i)); }), "row",
+                           "W" + std::to_string(i));
+        for (std::size_t i = 0; i < all.tools.size(); ++i) {
+            const Tool& t = all.tools[i];
+            lcheck::expect(validate_tool(t).empty(), "survey_valid", t.id + ": " + validate_tool(t));
+            lcheck::expect(find_tool(all, t.id).name == t.name, "unique_id", t.id);
+            lcheck::expect(t.source.rfind("docs/TOOLING.md ", 0) == 0 && t.id.rfind(t.source.substr(16), 0) == 0,
+                           "source_names_row", t.id + " " + t.source);
+            ++cases;
         }
-        lcheck::expect(tools_of_kind(lib, ToolKind::BallEndMill).size() == 3, "of_kind_count");
-        lcheck::expect(tools_for_operation(lib, "wire_cut").size() == 1, "wire_tools");
+        lcheck::expect(throws<std::out_of_range>([&] { find_tool(all, "nope"); }), "find_missing_throws");
+        for (const auto& op : tool_operation_names())
+            for (const auto& t : tools_for_operation(all, op)) {
+                const auto tops = tool_operations(t.kind);
+                lcheck::expect(std::find(tops.begin(), tops.end(), op) != tops.end(), "for_operation_consistent",
+                               t.id + " " + op);
+            }
+        int with_cutter = 0;
+        for (const auto& t : all.tools) with_cutter += has_cutter(t) ? 1 : 0;
+        lcheck::expect(with_cutter >= 20, "survey_cutters", std::to_string(with_cutter));
+        const ToolLibrary back = parse_tool_library(format_tool_library(all));
+        bool ok = back.tools.size() == all.tools.size();
+        for (std::size_t j = 0; ok && j < all.tools.size(); ++j) ok = same(all.tools[j], back.tools[j]);
+        lcheck::expect(ok, "survey_csv_roundtrip");
+        std::printf("survey library: %zu tools, %d with a drop-cutter model\n", all.tools.size(), with_cutter);
     }
 
     return lcheck::finish("tools", cases);

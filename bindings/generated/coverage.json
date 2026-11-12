@@ -4,7 +4,7 @@
   "targets": [
     {
       "target": "nanobind",
-      "bound": 39,
+      "bound": 44,
       "skipped": 0,
       "classes": [
         {
@@ -48,6 +48,11 @@
           {"member": "tool_kind_name", "signature": "std::string (ToolKind)"},
           {"member": "tool_kind_from_name", "signature": "ToolKind (std::string)"},
           {"member": "all_tool_kinds", "signature": "vector<ToolKind, allocator<ToolKind>> ()"},
+          {"member": "tool_kind_label", "signature": "std::string (ToolKind)"},
+          {"member": "tool_kind_domain", "signature": "std::string (ToolKind)"},
+          {"member": "tool_kind_envelope", "signature": "std::string (ToolKind)"},
+          {"member": "tool_operation_names", "signature": "vector<std::string, allocator<std::string>> ()"},
+          {"member": "wood_tool_library", "signature": "ToolLibrary ()"},
           {"member": "validate_tool", "signature": "std::string (Tool)"},
           {"member": "has_cutter", "signature": "bool (Tool)"},
           {"member": "cutter_of", "signature": "Cutter (Tool)"},

@@ -84,7 +84,7 @@ Out of scope for lithocam: cladding, welding, knife cutting.
 
 | Capability | lithocam | Status | Builds on |
 |---|---|---|---|
-| Tool library (kinds, dimensions, holder, shank, feeds) | the four drop-cutter kinds (flat, ball, bull, cone) | partial | Library in the C++ core with bindings; selection in the Qt GUI |
+| Tool library (kinds, dimensions, holder, shank, feeds) | 38 kinds and 63 stone and wood tools from the survey (`docs/TOOLING.md`); CSV files; drop-cutter mapping for 20 of them; bound to Python | done (core) | Drop-cutter for the remaining envelopes (tapered ball, profile tip, undercut); selection in the Qt GUI |
 | Stock models | Z-map (3-axis), Manifold meshes (wire and flank) | partial | OpenVDB level set for undercuts (`docs/STOCK_SIMULATION.md`) |
 | Simulation and verification (gouge, leftover, scallop) | Z-map deviation maps; Manifold volume deltas; Lean bounds for scallop and wire tube | done | Per-operation reports |
 | Rest-material detection | – | planned | Z-map leftover above tolerance |

@@ -18,7 +18,7 @@ python bindings/test_bindings.py build_py/Release      # or build_py on single-c
 | Types | `CutterKind`, `P3`, `Tri`, `Cutter`, `TriMesh`, `Vec2`, `CLPoint`, `PathParams`, `ZMap`, `ZStats`, `StockMesh`, `ToolKind`, `Tool`, `ToolLibrary` |
 | Kernels | `scallop_height`, `max_stepover`, `signed_distance_convex`, `kerf_path_convex`, `profile`, `drop_triangle`, `drop_cutter`, `adaptive_line`, `zigzag` |
 | Stock | `make_stock`, `cut_move`, `cut_passes`, `target_heights`, `deviation`, `zmap_mesh`, `mesh_volume`, `write_stl` |
-| Tools | `tool_kind_name`, `tool_kind_from_name`, `all_tool_kinds`, `validate_tool`, `has_cutter`, `cutter_of`, `tool_operations`, `tools_for_operation`, `tools_of_kind`, `find_tool`, `holder_clearance`, `parse_tool_library`, `format_tool_library`, `read_tool_library`, `write_tool_library`, `stone_tool_library` |
+| Tools | `tool_kind_name`, `tool_kind_from_name`, `all_tool_kinds`, `tool_kind_label`, `tool_kind_domain`, `tool_kind_envelope`, `tool_operation_names`, `wood_tool_library`, `validate_tool`, `has_cutter`, `cutter_of`, `tool_operations`, `tools_for_operation`, `tools_of_kind`, `find_tool`, `holder_clearance`, `parse_tool_library`, `format_tool_library`, `read_tool_library`, `write_tool_library`, `stone_tool_library` |
 
 C++ exceptions reach Python as `ValueError` (`std::invalid_argument`), `IndexError` (`std::out_of_range`) and `RuntimeError` (`std::runtime_error`).
 
