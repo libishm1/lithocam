@@ -1,0 +1,33 @@
+{
+  "rosetta_coverage": 1,
+  "reflection": [],
+  "targets": [
+    {
+      "target": "nanobind",
+      "bound": 9,
+      "skipped": 0,
+      "classes": [
+        {
+          "class": "lithocam::TriMesh",
+          "bound": [
+            {"member": "triangles", "signature": "const vector<Tri, allocator<Tri>> & () const"},
+            {"member": "query", "signature": "void (double, double, double, vector<unsigned long, allocator<unsigned long>> &) const"}
+          ],
+          "skipped": []
+        }
+      ],
+      "functions": {
+        "bound": [
+          {"member": "scallop_height", "signature": "double (double, double)"},
+          {"member": "max_stepover", "signature": "double (double, double)"},
+          {"member": "signed_distance_convex", "signature": "double (vector<Vec2, allocator<Vec2>>, Vec2)"},
+          {"member": "kerf_path_convex", "signature": "vector<Vec2, allocator<Vec2>> (vector<Vec2, allocator<Vec2>>, double, double)"},
+          {"member": "profile", "signature": "double (Cutter, double)"},
+          {"member": "drop_triangle", "signature": "double (Cutter, Tri, double, double)"},
+          {"member": "drop_cutter", "signature": "double (Cutter, TriMesh, double, double)"}
+        ],
+        "skipped": []
+      }
+    }
+  ]
+}

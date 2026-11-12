@@ -27,6 +27,23 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: pip install -e "python[${{ matrix.extras }}]"
       - run: pytest -rs python
+  bindings:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install nanobind
+      - run: cmake -S bindings -B build_py -DCMAKE_BUILD_TYPE=Release -DPython_EXECUTABLE=${{ env.pythonLocation }}/${{ runner.os == 'Windows' && 'python.exe' || 'bin/python' }}
+      - run: cmake --build build_py --config Release
+      - name: test (the module lands in build_py/Release on Windows, build_py elsewhere)
+        shell: bash
+        run: python bindings/test_bindings.py "$(dirname "$(find build_py -name '_lithocam*' \( -name '*.pyd' -o -name '*.so' \) | head -1)")"
   lean:
     runs-on: ubuntu-latest
     defaults:

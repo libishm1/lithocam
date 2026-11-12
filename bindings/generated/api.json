@@ -1,0 +1,67 @@
+{
+  "rosetta_api": 1,
+  "version": "",
+  "classes": [
+    {"name": "lithocam::P3", "expose": "P3", "bases": [], "abstract": false, "final": false, "default_constructible": true,
+     "constructors": [
+       {"params": []}
+     ],
+     "fields": [
+       {"name": "x", "type": "double", "readonly": false},
+       {"name": "y", "type": "double", "readonly": false},
+       {"name": "z", "type": "double", "readonly": false}
+     ],
+     "methods": []},
+    {"name": "lithocam::Tri", "expose": "Tri", "bases": [], "abstract": false, "final": false, "default_constructible": true,
+     "constructors": [
+       {"params": []}
+     ],
+     "fields": [
+       {"name": "a", "type": "P3", "readonly": false},
+       {"name": "b", "type": "P3", "readonly": false},
+       {"name": "c", "type": "P3", "readonly": false}
+     ],
+     "methods": []},
+    {"name": "lithocam::Cutter", "expose": "Cutter", "bases": [], "abstract": false, "final": false, "default_constructible": true,
+     "constructors": [
+       {"params": []}
+     ],
+     "fields": [
+       {"name": "kind", "type": "CutterKind", "readonly": false},
+       {"name": "radius", "type": "double", "readonly": false},
+       {"name": "corner", "type": "double", "readonly": false},
+       {"name": "half_angle", "type": "double", "readonly": false}
+     ],
+     "methods": []},
+    {"name": "lithocam::TriMesh", "expose": "TriMesh", "bases": [], "abstract": false, "final": false, "default_constructible": false,
+     "constructors": [
+       {"params": [{"name": "tris", "type": "vector<Tri, allocator<Tri>>", "out": false}, {"name": "cell", "type": "double", "default": "", "out": false}]}
+     ],
+     "fields": [],
+     "methods": [
+       {"name": "triangles", "returns": "const vector<Tri, allocator<Tri>> &", "params": [], "static": false, "const": true, "virtual": false, "pure": false, "extension": false},
+       {"name": "query", "returns": "void", "params": [{"name": "x", "type": "double", "out": false}, {"name": "y", "type": "double", "out": false}, {"name": "r", "type": "double", "out": false}, {"name": "out", "type": "vector<unsigned long, allocator<unsigned long>> &", "out": false}], "static": false, "const": true, "virtual": false, "pure": false, "extension": false}
+     ]},
+    {"name": "lithocam::Vec2", "expose": "Vec2", "bases": [], "abstract": false, "final": false, "default_constructible": true,
+     "constructors": [
+       {"params": []}
+     ],
+     "fields": [
+       {"name": "x", "type": "double", "readonly": false},
+       {"name": "y", "type": "double", "readonly": false}
+     ],
+     "methods": []}
+  ],
+  "enums": [
+    {"name": "lithocam::CutterKind", "expose": "CutterKind", "underlying": "int", "values": [{"name": "Flat", "value": 0}, {"name": "Ball", "value": 1}, {"name": "Bull", "value": 2}, {"name": "Cone", "value": 3}]}
+  ],
+  "functions": [
+    {"name": "scallop_height", "qualified": "lithocam::scallop_height", "returns": "double", "params": [{"name": "tool_radius", "type": "double", "out": false}, {"name": "stepover", "type": "double", "out": false}]},
+    {"name": "max_stepover", "qualified": "lithocam::max_stepover", "returns": "double", "params": [{"name": "tool_radius", "type": "double", "out": false}, {"name": "scallop_limit", "type": "double", "out": false}]},
+    {"name": "signed_distance_convex", "qualified": "lithocam::signed_distance_convex", "returns": "double", "params": [{"name": "poly_ccw", "type": "vector<Vec2, allocator<Vec2>>", "out": false}, {"name": "p", "type": "Vec2", "out": false}]},
+    {"name": "kerf_path_convex", "qualified": "lithocam::kerf_path_convex", "returns": "vector<Vec2, allocator<Vec2>>", "params": [{"name": "part_ccw", "type": "vector<Vec2, allocator<Vec2>>", "out": false}, {"name": "kerf", "type": "double", "out": false}, {"name": "max_overcut", "type": "double", "out": false}]},
+    {"name": "profile", "qualified": "lithocam::profile", "returns": "double", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "d", "type": "double", "out": false}]},
+    {"name": "drop_triangle", "qualified": "lithocam::drop_triangle", "returns": "double", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "tri", "type": "Tri", "out": false}, {"name": "x", "type": "double", "out": false}, {"name": "y", "type": "double", "out": false}]},
+    {"name": "drop_cutter", "qualified": "lithocam::drop_cutter", "returns": "double", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "mesh", "type": "TriMesh", "out": false}, {"name": "x", "type": "double", "out": false}, {"name": "y", "type": "double", "out": false}]}
+  ]
+}

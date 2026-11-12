@@ -1,0 +1,25 @@
+{
+  "user_include": "../include",
+  "rosetta_include": "/mnt/d/robot_ws/oss/ref_rosetta/rosetta/include",
+  "generator_name": "lithocam_gen",
+  "targets": [
+    { "lang": "nanobind", "name": "_lithocam" }
+  ],
+  "classes": [
+    { "name": "lithocam::CutterKind", "header": "lithocam/dropcutter.hpp" },
+    { "name": "lithocam::P3", "header": "lithocam/dropcutter.hpp" },
+    { "name": "lithocam::Tri", "header": "lithocam/dropcutter.hpp" },
+    { "name": "lithocam::Cutter", "header": "lithocam/dropcutter.hpp" },
+    { "name": "lithocam::TriMesh", "header": "lithocam/dropcutter.hpp" },
+    { "name": "lithocam::Vec2", "header": "lithocam/kerf.hpp" }
+  ],
+  "functions": [
+    { "name": "lithocam::scallop_height", "header": "lithocam/scallop.hpp", "doc": "Scallop height of a ball (radius R) at stepover s" },
+    { "name": "lithocam::max_stepover", "header": "lithocam/scallop.hpp", "doc": "Largest stepover keeping the scallop at or below h" },
+    { "name": "lithocam::signed_distance_convex", "header": "lithocam/kerf.hpp", "doc": "Signed distance to a convex CCW polygon (positive outside)" },
+    { "name": "lithocam::kerf_path_convex", "header": "lithocam/kerf.hpp", "doc": "Wire or blade centre path around a convex part, never gouging, overcut bounded" },
+    { "name": "lithocam::profile", "header": "lithocam/dropcutter.hpp", "doc": "Cutter lower-surface height above the tip at distance d" },
+    { "name": "lithocam::drop_triangle", "header": "lithocam/dropcutter.hpp", "doc": "Drop-cutter tip height on one triangle" },
+    { "name": "lithocam::drop_cutter", "header": "lithocam/dropcutter.hpp", "doc": "Drop-cutter tip height on a mesh at (x, y)" }
+  ]
+}
