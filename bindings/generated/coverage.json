@@ -4,7 +4,7 @@
   "targets": [
     {
       "target": "nanobind",
-      "bound": 11,
+      "bound": 20,
       "skipped": 0,
       "classes": [
         {
@@ -12,6 +12,16 @@
           "bound": [
             {"member": "triangles", "signature": "const vector<Tri, allocator<Tri>> & () const"},
             {"member": "query", "signature": "void (double, double, double, vector<unsigned long, allocator<unsigned long>> &) const"}
+          ],
+          "skipped": []
+        },
+        {
+          "class": "lithocam::ZMap",
+          "bound": [
+            {"member": "at", "signature": "double & (int, int)"},
+            {"member": "at", "signature": "double (int, int) const"},
+            {"member": "cx", "signature": "double (int) const"},
+            {"member": "cy", "signature": "double (int) const"}
           ],
           "skipped": []
         }
@@ -26,7 +36,12 @@
           {"member": "drop_triangle", "signature": "double (Cutter, Tri, double, double)"},
           {"member": "drop_cutter", "signature": "double (Cutter, TriMesh, double, double)"},
           {"member": "adaptive_line", "signature": "vector<CLPoint, allocator<CLPoint>> (Cutter, TriMesh, double, double, double, double, PathParams)"},
-          {"member": "zigzag", "signature": "vector<vector<CLPoint, allocator<CLPoint>>, allocator<vector<CLPoint, allocator<CLPoint>>>> (Cutter, TriMesh, double, double, double, double, double, PathParams)"}
+          {"member": "zigzag", "signature": "vector<vector<CLPoint, allocator<CLPoint>>, allocator<vector<CLPoint, allocator<CLPoint>>>> (Cutter, TriMesh, double, double, double, double, double, PathParams)"},
+          {"member": "make_stock", "signature": "ZMap (double, double, double, double, double, double)"},
+          {"member": "cut_move", "signature": "void (ZMap, Cutter, CLPoint, CLPoint)"},
+          {"member": "cut_passes", "signature": "void (ZMap, Cutter, vector<vector<CLPoint, allocator<CLPoint>>, allocator<vector<CLPoint, allocator<CLPoint>>>>)"},
+          {"member": "target_heights", "signature": "ZMap (TriMesh, ZMap)"},
+          {"member": "deviation", "signature": "ZStats (ZMap, ZMap, double, double, double, double)"}
         ],
         "skipped": []
       }

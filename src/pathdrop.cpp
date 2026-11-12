@@ -17,7 +17,10 @@ CLPoint at(const Cutter& c, const TriMesh& m, double x, double y, double floor) 
 void refine(const Cutter& c, const TriMesh& m, const CLPoint& a, const CLPoint& b, const PathParams& p, int depth,
             std::vector<CLPoint>& out) {
     double len = std::hypot(b.x - a.x, b.y - a.y);
-    if (len <= p.min_step || depth > 40) {
+    // hard floor: min_step / 1000. Where the cutter first meets a sharp edge the CL height rises like a square
+    // root, and a chord over even min_step can sag well below it (a gouge of about 0.1 mm at 0.02 mm for a 3 mm
+    // ball), so deviation keeps refining below min_step; a contact change alone stops at min_step.
+    if (len <= p.min_step * 1e-3 || depth > 60) {
         out.push_back(b);
         return;
     }
@@ -28,8 +31,9 @@ void refine(const Cutter& c, const TriMesh& m, const CLPoint& a, const CLPoint& 
     CLPoint q3 = at(c, m, 0.25 * a.x + 0.75 * b.x, 0.25 * a.y + 0.75 * b.y, p.floor);
     double dev = std::max({std::fabs(mid.z - 0.5 * (a.z + b.z)), std::fabs(q1.z - (0.75 * a.z + 0.25 * b.z)),
                            std::fabs(q3.z - (0.25 * a.z + 0.75 * b.z))});
-    bool contact_change = a.contact != b.contact || a.contact != mid.contact;
-    if (dev <= p.tol && !contact_change) {
+    bool contact_change = a.contact != b.contact || a.contact != mid.contact || a.contact != q1.contact ||
+                          a.contact != q3.contact;
+    if (contact_change ? len <= p.min_step : dev <= p.tol) {
         out.push_back(b);
         return;
     }

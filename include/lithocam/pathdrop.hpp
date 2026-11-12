@@ -3,8 +3,10 @@
 // Path drop-cutter (milling kernel M3): cutter-location (CL) points along lines over a mesh.
 //
 // adaptive_line samples the drop-cutter height along a straight xy segment and keeps subdividing an interval while
-// the height at its midpoint differs from the straight-line interpolation of its ends by more than `tol` (and the
-// interval is longer than `min_step`). It starts from a uniform pass at `max_step`. Straight runs between kept
+// the height at its midpoint or quarter points differs from the straight-line interpolation of its ends by more
+// than `tol`. Deviation keeps refining down to min_step / 1000 (needed where the cutter first meets a sharp edge,
+// where the CL height rises like a square root); a change of contact alone refines down to `min_step`. It starts
+// from a uniform pass at `max_step`. Straight runs between kept
 // points then stay within about `tol` of the true CL surface, so a controller interpolating linearly between them
 // does not gouge by more than that.
 //

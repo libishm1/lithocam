@@ -7,9 +7,9 @@ lithocam's milling kernel covers the 3-axis surface operations that general CAM 
 | M0 Cutters | flat, ball, bull (torus corner), cone: **done** |
 | M1 Mesh index | uniform xy grid over triangle bounding boxes: **done** |
 | M2 Drop-cutter | flat, ball, bull, cone: **done** |
-| M3 Path drop-cutter, adaptive | next |
+| M3 Path drop-cutter, adaptive, zig-zag | **done** |
 | M4 Push-cutter, waterline | planned |
-| M5 Dexel stock simulation | planned |
+| M5 Stock simulation | Z-map (3-axis): **done**; tri-dexel for wire cuts and 5-axis: planned |
 | M6 Pocket clearing | planned |
 
 ## Drop-cutter (`include/lithocam/dropcutter.hpp`)
@@ -27,6 +27,28 @@ Per triangle the maximum lies at one of these:
 | Ball | a vertex; an edge contact (the ball centre at distance R from the edge's line: a quadratic in the centre height, highest root, foot point inside the edge); a facet contact (the centre offset by R along the facet normal, contact point inside the triangle) |
 | Flat | a vertex inside the disc; the higher end of an edge clipped to the disc; the disc's highest point on the facet plane (the disc edge in the up-slope direction) |
 | Bull, cone | a vertex; an edge contact found by a golden-section search (every profile is convex and nondecreasing, so p.z - f(d) is concave along an edge); a facet contact at the cutter's support point in the direction of the downward facet normal |
+
+## Adaptive path (`pathdrop.hpp`)
+
+The path is sampled at `max_step`. An interval is subdivided while its midpoint or quarter points leave the chord by more than `tol`.
+
+Where the cutter first meets a sharp edge, the CL height rises like a square root. A chord across even 0.02 mm then sags about 0.1 mm below the true path (3 mm ball), and the Z-map simulation showed that as a gouge along the part's edge. Deviation therefore keeps refining down to `min_step / 1000`; a change of contact alone stops at `min_step`.
+
+## Stock simulation (`zmap.hpp`)
+
+The stock is a height field. Each linear cutter move lowers every cell to the swept lower envelope: the minimum over the move of tip height + f(distance). The tip height is linear and f(distance) is convex, so a golden-section search finds the envelope.
+
+`target_heights` casts a vertical ray per cell, so stock - target gives leftover (+) or gouge (-).
+
+**End to end against the scallop theorem** (`tests/test_zmap.cpp`). A flat floor milled by a ball at `max_stepover(R, h)` leaves cusps that peak at h:
+
+| h (mm) | Simulated peak (mm, grid 0.02) | Gouge |
+|---|---|---|
+| 0.020 | 0.01991 | none |
+| 0.050 | 0.04988 | none |
+| 0.200 | 0.19996 | none |
+
+A single plunge reproduces the cutter profile to 1e-12 for all four cutter kinds. On wavy terrain, a drop-cutter zig-zag gouges at most 0.012 to 0.014 at a path tolerance of 0.01.
 
 ## Evidence
 

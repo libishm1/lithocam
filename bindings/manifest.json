@@ -13,7 +13,9 @@
     { "name": "lithocam::TriMesh", "header": "lithocam/dropcutter.hpp" },
     { "name": "lithocam::Vec2", "header": "lithocam/kerf.hpp" },
     { "name": "lithocam::CLPoint", "header": "lithocam/pathdrop.hpp" },
-    { "name": "lithocam::PathParams", "header": "lithocam/pathdrop.hpp" }
+    { "name": "lithocam::PathParams", "header": "lithocam/pathdrop.hpp" },
+    { "name": "lithocam::ZMap", "header": "lithocam/zmap.hpp" },
+    { "name": "lithocam::ZStats", "header": "lithocam/zmap.hpp" }
   ],
   "functions": [
     { "name": "lithocam::scallop_height", "header": "lithocam/scallop.hpp", "doc": "Scallop height of a ball (radius R) at stepover s" },
@@ -24,6 +26,11 @@
     { "name": "lithocam::drop_triangle", "header": "lithocam/dropcutter.hpp", "doc": "Drop-cutter tip height on one triangle" },
     { "name": "lithocam::drop_cutter", "header": "lithocam/dropcutter.hpp", "doc": "Drop-cutter tip height on a mesh at (x, y)" },
     { "name": "lithocam::adaptive_line", "header": "lithocam/pathdrop.hpp", "doc": "Adaptive CL points along an xy segment" },
-    { "name": "lithocam::zigzag", "header": "lithocam/pathdrop.hpp", "doc": "Zig-zag raster of adaptive CL passes along x" }
+    { "name": "lithocam::zigzag", "header": "lithocam/pathdrop.hpp", "doc": "Zig-zag raster of adaptive CL passes along x" },
+    { "name": "lithocam::make_stock", "header": "lithocam/zmap.hpp", "doc": "Flat stock height field over a rectangle" },
+    { "name": "lithocam::cut_move", "header": "lithocam/zmap.hpp", "doc": "Lower the stock by one linear cutter move" },
+    { "name": "lithocam::cut_passes", "header": "lithocam/zmap.hpp", "doc": "Lower the stock along every pass" },
+    { "name": "lithocam::target_heights", "header": "lithocam/zmap.hpp", "doc": "Highest mesh z above each cell centre" },
+    { "name": "lithocam::deviation", "header": "lithocam/zmap.hpp", "doc": "Stock minus target statistics in a window" }
   ]
 }

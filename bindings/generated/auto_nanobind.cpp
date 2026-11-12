@@ -23,6 +23,7 @@
 #include "lithocam/dropcutter.hpp"
 #include "lithocam/kerf.hpp"
 #include "lithocam/pathdrop.hpp"
+#include "lithocam/zmap.hpp"
 #include "lithocam/scallop.hpp"
 using namespace lithocam;
 
@@ -71,6 +72,24 @@ NB_MODULE(_lithocam, m) {
         .def_rw("min_step", &lithocam::PathParams::min_step)
         .def_rw("tol", &lithocam::PathParams::tol)
         .def_rw("floor", &lithocam::PathParams::floor);
+    nb::class_<lithocam::ZMap>(m, "ZMap")
+        .def(nb::init<>())
+        .def_rw("x0", &lithocam::ZMap::x0)
+        .def_rw("y0", &lithocam::ZMap::y0)
+        .def_rw("cell", &lithocam::ZMap::cell)
+        .def_rw("nx", &lithocam::ZMap::nx)
+        .def_rw("ny", &lithocam::ZMap::ny)
+        .def_rw("z", &lithocam::ZMap::z)
+        .def("at", static_cast<double & (lithocam::ZMap::*)(int, int)>(&lithocam::ZMap::at), nb::arg("i"), nb::arg("j"))
+        .def("at", static_cast<double (lithocam::ZMap::*)(int, int) const>(&lithocam::ZMap::at), nb::arg("i"), nb::arg("j"))
+        .def("cx", &lithocam::ZMap::cx, nb::arg("i"))
+        .def("cy", &lithocam::ZMap::cy, nb::arg("j"));
+    nb::class_<lithocam::ZStats>(m, "ZStats")
+        .def(nb::init<>())
+        .def_rw("min_dev", &lithocam::ZStats::min_dev)
+        .def_rw("max_dev", &lithocam::ZStats::max_dev)
+        .def_rw("mean_dev", &lithocam::ZStats::mean_dev)
+        .def_rw("cells", &lithocam::ZStats::cells);
     m.def("scallop_height", &lithocam::scallop_height, "Scallop height of a ball (radius R) at stepover s", nb::arg("tool_radius"), nb::arg("stepover"));
     m.def("max_stepover", &lithocam::max_stepover, "Largest stepover keeping the scallop at or below h", nb::arg("tool_radius"), nb::arg("scallop_limit"));
     m.def("signed_distance_convex", &lithocam::signed_distance_convex, "Signed distance to a convex CCW polygon (positive outside)", nb::arg("poly_ccw"), nb::arg("p"));
@@ -80,4 +99,9 @@ NB_MODULE(_lithocam, m) {
     m.def("drop_cutter", &lithocam::drop_cutter, "Drop-cutter tip height on a mesh at (x, y)", nb::arg("cutter"), nb::arg("mesh"), nb::arg("x"), nb::arg("y"));
     m.def("adaptive_line", &lithocam::adaptive_line, "Adaptive CL points along an xy segment", nb::arg("cutter"), nb::arg("mesh"), nb::arg("x0"), nb::arg("y0"), nb::arg("x1"), nb::arg("y1"), nb::arg("p"));
     m.def("zigzag", &lithocam::zigzag, "Zig-zag raster of adaptive CL passes along x", nb::arg("cutter"), nb::arg("mesh"), nb::arg("xmin"), nb::arg("xmax"), nb::arg("ymin"), nb::arg("ymax"), nb::arg("stepover"), nb::arg("p"));
+    m.def("make_stock", &lithocam::make_stock, "Flat stock height field over a rectangle", nb::arg("xmin"), nb::arg("xmax"), nb::arg("ymin"), nb::arg("ymax"), nb::arg("cell"), nb::arg("z_top"));
+    m.def("cut_move", &lithocam::cut_move, "Lower the stock by one linear cutter move", nb::arg("stock"), nb::arg("cutter"), nb::arg("a"), nb::arg("b"));
+    m.def("cut_passes", &lithocam::cut_passes, "Lower the stock along every pass", nb::arg("stock"), nb::arg("cutter"), nb::arg("passes"));
+    m.def("target_heights", &lithocam::target_heights, "Highest mesh z above each cell centre", nb::arg("mesh"), nb::arg("grid"));
+    m.def("deviation", &lithocam::deviation, "Stock minus target statistics in a window", nb::arg("stock"), nb::arg("target"), nb::arg("xmin"), nb::arg("xmax"), nb::arg("ymin"), nb::arg("ymax"));
 }

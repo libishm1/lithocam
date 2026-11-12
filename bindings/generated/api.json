@@ -72,6 +72,35 @@
        {"name": "tol", "type": "double", "readonly": false},
        {"name": "floor", "type": "double", "readonly": false}
      ],
+     "methods": []},
+    {"name": "lithocam::ZMap", "expose": "ZMap", "bases": [], "abstract": false, "final": false, "default_constructible": true,
+     "constructors": [
+       {"params": []}
+     ],
+     "fields": [
+       {"name": "x0", "type": "double", "readonly": false},
+       {"name": "y0", "type": "double", "readonly": false},
+       {"name": "cell", "type": "double", "readonly": false},
+       {"name": "nx", "type": "int", "readonly": false},
+       {"name": "ny", "type": "int", "readonly": false},
+       {"name": "z", "type": "vector<double, allocator<double>>", "readonly": false}
+     ],
+     "methods": [
+       {"name": "at", "returns": "double &", "params": [{"name": "i", "type": "int", "out": false}, {"name": "j", "type": "int", "out": false}], "static": false, "const": false, "virtual": false, "pure": false, "extension": false},
+       {"name": "at", "returns": "double", "params": [{"name": "i", "type": "int", "out": false}, {"name": "j", "type": "int", "out": false}], "static": false, "const": true, "virtual": false, "pure": false, "extension": false},
+       {"name": "cx", "returns": "double", "params": [{"name": "i", "type": "int", "out": false}], "static": false, "const": true, "virtual": false, "pure": false, "extension": false},
+       {"name": "cy", "returns": "double", "params": [{"name": "j", "type": "int", "out": false}], "static": false, "const": true, "virtual": false, "pure": false, "extension": false}
+     ]},
+    {"name": "lithocam::ZStats", "expose": "ZStats", "bases": [], "abstract": false, "final": false, "default_constructible": true,
+     "constructors": [
+       {"params": []}
+     ],
+     "fields": [
+       {"name": "min_dev", "type": "double", "readonly": false},
+       {"name": "max_dev", "type": "double", "readonly": false},
+       {"name": "mean_dev", "type": "double", "readonly": false},
+       {"name": "cells", "type": "long", "readonly": false}
+     ],
      "methods": []}
   ],
   "enums": [
@@ -86,6 +115,11 @@
     {"name": "drop_triangle", "qualified": "lithocam::drop_triangle", "returns": "double", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "tri", "type": "Tri", "out": false}, {"name": "x", "type": "double", "out": false}, {"name": "y", "type": "double", "out": false}]},
     {"name": "drop_cutter", "qualified": "lithocam::drop_cutter", "returns": "double", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "mesh", "type": "TriMesh", "out": false}, {"name": "x", "type": "double", "out": false}, {"name": "y", "type": "double", "out": false}]},
     {"name": "adaptive_line", "qualified": "lithocam::adaptive_line", "returns": "vector<CLPoint, allocator<CLPoint>>", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "mesh", "type": "TriMesh", "out": false}, {"name": "x0", "type": "double", "out": false}, {"name": "y0", "type": "double", "out": false}, {"name": "x1", "type": "double", "out": false}, {"name": "y1", "type": "double", "out": false}, {"name": "p", "type": "PathParams", "out": false}]},
-    {"name": "zigzag", "qualified": "lithocam::zigzag", "returns": "vector<vector<CLPoint, allocator<CLPoint>>, allocator<vector<CLPoint, allocator<CLPoint>>>>", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "mesh", "type": "TriMesh", "out": false}, {"name": "xmin", "type": "double", "out": false}, {"name": "xmax", "type": "double", "out": false}, {"name": "ymin", "type": "double", "out": false}, {"name": "ymax", "type": "double", "out": false}, {"name": "stepover", "type": "double", "out": false}, {"name": "p", "type": "PathParams", "out": false}]}
+    {"name": "zigzag", "qualified": "lithocam::zigzag", "returns": "vector<vector<CLPoint, allocator<CLPoint>>, allocator<vector<CLPoint, allocator<CLPoint>>>>", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "mesh", "type": "TriMesh", "out": false}, {"name": "xmin", "type": "double", "out": false}, {"name": "xmax", "type": "double", "out": false}, {"name": "ymin", "type": "double", "out": false}, {"name": "ymax", "type": "double", "out": false}, {"name": "stepover", "type": "double", "out": false}, {"name": "p", "type": "PathParams", "out": false}]},
+    {"name": "make_stock", "qualified": "lithocam::make_stock", "returns": "ZMap", "params": [{"name": "xmin", "type": "double", "out": false}, {"name": "xmax", "type": "double", "out": false}, {"name": "ymin", "type": "double", "out": false}, {"name": "ymax", "type": "double", "out": false}, {"name": "cell", "type": "double", "out": false}, {"name": "z_top", "type": "double", "out": false}]},
+    {"name": "cut_move", "qualified": "lithocam::cut_move", "returns": "void", "params": [{"name": "stock", "type": "ZMap", "out": false}, {"name": "cutter", "type": "Cutter", "out": false}, {"name": "a", "type": "CLPoint", "out": false}, {"name": "b", "type": "CLPoint", "out": false}]},
+    {"name": "cut_passes", "qualified": "lithocam::cut_passes", "returns": "void", "params": [{"name": "stock", "type": "ZMap", "out": false}, {"name": "cutter", "type": "Cutter", "out": false}, {"name": "passes", "type": "vector<vector<CLPoint, allocator<CLPoint>>, allocator<vector<CLPoint, allocator<CLPoint>>>>", "out": false}]},
+    {"name": "target_heights", "qualified": "lithocam::target_heights", "returns": "ZMap", "params": [{"name": "mesh", "type": "TriMesh", "out": false}, {"name": "grid", "type": "ZMap", "out": false}]},
+    {"name": "deviation", "qualified": "lithocam::deviation", "returns": "ZStats", "params": [{"name": "stock", "type": "ZMap", "out": false}, {"name": "target", "type": "ZMap", "out": false}, {"name": "xmin", "type": "double", "out": false}, {"name": "xmax", "type": "double", "out": false}, {"name": "ymin", "type": "double", "out": false}, {"name": "ymax", "type": "double", "out": false}]}
   ]
 }
