@@ -110,10 +110,49 @@
        {"name": "vertices", "type": "vector<P3, allocator<P3>>", "readonly": false},
        {"name": "triangles", "type": "vector<int, allocator<int>>", "readonly": false}
      ],
+     "methods": []},
+    {"name": "lithocam::Tool", "expose": "Tool", "bases": [], "abstract": false, "final": false, "default_constructible": true,
+     "constructors": [
+       {"params": []}
+     ],
+     "fields": [
+       {"name": "id", "type": "std::string", "readonly": false},
+       {"name": "name", "type": "std::string", "readonly": false},
+       {"name": "kind", "type": "ToolKind", "readonly": false},
+       {"name": "material", "type": "std::string", "readonly": false},
+       {"name": "diameter", "type": "double", "readonly": false},
+       {"name": "corner_radius", "type": "double", "readonly": false},
+       {"name": "tip_angle", "type": "double", "readonly": false},
+       {"name": "tip_diameter", "type": "double", "readonly": false},
+       {"name": "flute_length", "type": "double", "readonly": false},
+       {"name": "shank_diameter", "type": "double", "readonly": false},
+       {"name": "stickout", "type": "double", "readonly": false},
+       {"name": "holder_diameter", "type": "double", "readonly": false},
+       {"name": "holder_length", "type": "double", "readonly": false},
+       {"name": "thread_pitch", "type": "double", "readonly": false},
+       {"name": "bore_diameter", "type": "double", "readonly": false},
+       {"name": "flutes", "type": "int", "readonly": false},
+       {"name": "spindle_rpm", "type": "double", "readonly": false},
+       {"name": "surface_speed", "type": "double", "readonly": false},
+       {"name": "feed", "type": "double", "readonly": false},
+       {"name": "plunge_feed", "type": "double", "readonly": false},
+       {"name": "max_stepdown", "type": "double", "readonly": false},
+       {"name": "max_stepover", "type": "double", "readonly": false},
+       {"name": "coolant_flow", "type": "double", "readonly": false}
+     ],
+     "methods": []},
+    {"name": "lithocam::ToolLibrary", "expose": "ToolLibrary", "bases": [], "abstract": false, "final": false, "default_constructible": true,
+     "constructors": [
+       {"params": []}
+     ],
+     "fields": [
+       {"name": "tools", "type": "vector<Tool, allocator<Tool>>", "readonly": false}
+     ],
      "methods": []}
   ],
   "enums": [
-    {"name": "lithocam::CutterKind", "expose": "CutterKind", "underlying": "int", "values": [{"name": "Flat", "value": 0}, {"name": "Ball", "value": 1}, {"name": "Bull", "value": 2}, {"name": "Cone", "value": 3}]}
+    {"name": "lithocam::CutterKind", "expose": "CutterKind", "underlying": "int", "values": [{"name": "Flat", "value": 0}, {"name": "Ball", "value": 1}, {"name": "Bull", "value": 2}, {"name": "Cone", "value": 3}]},
+    {"name": "lithocam::ToolKind", "expose": "ToolKind", "underlying": "int", "values": [{"name": "FlatEndMill", "value": 0}, {"name": "BallEndMill", "value": 1}, {"name": "BullNoseMill", "value": 2}, {"name": "FaceMill", "value": 3}, {"name": "ChamferMill", "value": 4}, {"name": "Engraver", "value": 5}, {"name": "Drill", "value": 6}, {"name": "CoreDrill", "value": 7}, {"name": "Tap", "value": 8}, {"name": "ThreadMill", "value": 9}, {"name": "ProfileWheel", "value": 10}, {"name": "DiscSaw", "value": 11}, {"name": "DiamondWire", "value": 12}]}
   ],
   "functions": [
     {"name": "scallop_height", "qualified": "lithocam::scallop_height", "returns": "double", "params": [{"name": "tool_radius", "type": "double", "out": false}, {"name": "stepover", "type": "double", "out": false}]},
@@ -132,6 +171,22 @@
     {"name": "deviation", "qualified": "lithocam::deviation", "returns": "ZStats", "params": [{"name": "stock", "type": "ZMap", "out": false}, {"name": "target", "type": "ZMap", "out": false}, {"name": "xmin", "type": "double", "out": false}, {"name": "xmax", "type": "double", "out": false}, {"name": "ymin", "type": "double", "out": false}, {"name": "ymax", "type": "double", "out": false}]},
     {"name": "zmap_mesh", "qualified": "lithocam::zmap_mesh", "returns": "StockMesh", "params": [{"name": "stock", "type": "ZMap", "out": false}, {"name": "z_bottom", "type": "double", "out": false}]},
     {"name": "mesh_volume", "qualified": "lithocam::mesh_volume", "returns": "double", "params": [{"name": "mesh", "type": "StockMesh", "out": false}]},
-    {"name": "write_stl", "qualified": "lithocam::write_stl", "returns": "bool", "params": [{"name": "mesh", "type": "StockMesh", "out": false}, {"name": "path", "type": "std::string", "out": false}]}
+    {"name": "write_stl", "qualified": "lithocam::write_stl", "returns": "bool", "params": [{"name": "mesh", "type": "StockMesh", "out": false}, {"name": "path", "type": "std::string", "out": false}]},
+    {"name": "tool_kind_name", "qualified": "lithocam::tool_kind_name", "returns": "std::string", "params": [{"name": "kind", "type": "ToolKind", "out": false}]},
+    {"name": "tool_kind_from_name", "qualified": "lithocam::tool_kind_from_name", "returns": "ToolKind", "params": [{"name": "name", "type": "std::string", "out": false}]},
+    {"name": "all_tool_kinds", "qualified": "lithocam::all_tool_kinds", "returns": "vector<ToolKind, allocator<ToolKind>>", "params": []},
+    {"name": "validate_tool", "qualified": "lithocam::validate_tool", "returns": "std::string", "params": [{"name": "tool", "type": "Tool", "out": false}]},
+    {"name": "has_cutter", "qualified": "lithocam::has_cutter", "returns": "bool", "params": [{"name": "tool", "type": "Tool", "out": false}]},
+    {"name": "cutter_of", "qualified": "lithocam::cutter_of", "returns": "Cutter", "params": [{"name": "tool", "type": "Tool", "out": false}]},
+    {"name": "tool_operations", "qualified": "lithocam::tool_operations", "returns": "vector<std::string, allocator<std::string>>", "params": [{"name": "kind", "type": "ToolKind", "out": false}]},
+    {"name": "tools_for_operation", "qualified": "lithocam::tools_for_operation", "returns": "vector<Tool, allocator<Tool>>", "params": [{"name": "lib", "type": "ToolLibrary", "out": false}, {"name": "operation", "type": "std::string", "out": false}]},
+    {"name": "tools_of_kind", "qualified": "lithocam::tools_of_kind", "returns": "vector<Tool, allocator<Tool>>", "params": [{"name": "lib", "type": "ToolLibrary", "out": false}, {"name": "kind", "type": "ToolKind", "out": false}]},
+    {"name": "find_tool", "qualified": "lithocam::find_tool", "returns": "Tool", "params": [{"name": "lib", "type": "ToolLibrary", "out": false}, {"name": "id", "type": "std::string", "out": false}]},
+    {"name": "holder_clearance", "qualified": "lithocam::holder_clearance", "returns": "double", "params": [{"name": "tool", "type": "Tool", "out": false}]},
+    {"name": "parse_tool_library", "qualified": "lithocam::parse_tool_library", "returns": "ToolLibrary", "params": [{"name": "csv_text", "type": "std::string", "out": false}]},
+    {"name": "format_tool_library", "qualified": "lithocam::format_tool_library", "returns": "std::string", "params": [{"name": "lib", "type": "ToolLibrary", "out": false}]},
+    {"name": "read_tool_library", "qualified": "lithocam::read_tool_library", "returns": "ToolLibrary", "params": [{"name": "path", "type": "std::string", "out": false}]},
+    {"name": "write_tool_library", "qualified": "lithocam::write_tool_library", "returns": "bool", "params": [{"name": "lib", "type": "ToolLibrary", "out": false}, {"name": "path", "type": "std::string", "out": false}]},
+    {"name": "stone_tool_library", "qualified": "lithocam::stone_tool_library", "returns": "ToolLibrary", "params": []}
   ]
 }

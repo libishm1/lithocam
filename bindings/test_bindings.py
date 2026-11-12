@@ -61,4 +61,28 @@ if len(sys.argv) > 2:
         worst = max(abs(a - b) for a, b in zip(got, ref))
         print("python vs C++ CLI (bull R3 c1), points", len(got), "max diff", worst)
         assert worst < 1e-12
+
+# tool library: starter set, drop-cutter mapping, CSV round trip, errors as Python exceptions
+lib = lc.stone_tool_library()
+assert all(lc.validate_tool(t) == "" for t in lib.tools)
+bull = lc.find_tool(lib, "R25")
+c = lc.cutter_of(bull)
+assert c.kind == lc.CutterKind.Bull and c.radius == 12.5 and c.corner == 5.0
+assert lc.tool_kind_from_name(lc.tool_kind_name(lc.ToolKind.Engraver)) == lc.ToolKind.Engraver
+assert len(lc.all_tool_kinds()) >= 13
+assert [t.id for t in lc.tools_for_operation(lib, "wire_cut")] == ["WIRE7"]
+back = lc.parse_tool_library(lc.format_tool_library(lib))
+assert [t.id for t in back.tools] == [t.id for t in lib.tools]
+assert not lc.has_cutter(lc.find_tool(lib, "S400"))
+for bad in (lambda: lc.cutter_of(lc.find_tool(lib, "S400")), lambda: lc.tool_kind_from_name("spoon")):
+    try:
+        bad()
+        raise AssertionError("expected an exception")
+    except ValueError:
+        pass
+try:
+    lc.find_tool(lib, "nope")
+    raise AssertionError("expected an exception")
+except IndexError:
+    pass
 print("bindings OK")

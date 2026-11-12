@@ -4,7 +4,7 @@
   "targets": [
     {
       "target": "nanobind",
-      "bound": 23,
+      "bound": 39,
       "skipped": 0,
       "classes": [
         {
@@ -44,7 +44,23 @@
           {"member": "deviation", "signature": "ZStats (ZMap, ZMap, double, double, double, double)"},
           {"member": "zmap_mesh", "signature": "StockMesh (ZMap, double)"},
           {"member": "mesh_volume", "signature": "double (StockMesh)"},
-          {"member": "write_stl", "signature": "bool (StockMesh, std::string)"}
+          {"member": "write_stl", "signature": "bool (StockMesh, std::string)"},
+          {"member": "tool_kind_name", "signature": "std::string (ToolKind)"},
+          {"member": "tool_kind_from_name", "signature": "ToolKind (std::string)"},
+          {"member": "all_tool_kinds", "signature": "vector<ToolKind, allocator<ToolKind>> ()"},
+          {"member": "validate_tool", "signature": "std::string (Tool)"},
+          {"member": "has_cutter", "signature": "bool (Tool)"},
+          {"member": "cutter_of", "signature": "Cutter (Tool)"},
+          {"member": "tool_operations", "signature": "vector<std::string, allocator<std::string>> (ToolKind)"},
+          {"member": "tools_for_operation", "signature": "vector<Tool, allocator<Tool>> (ToolLibrary, std::string)"},
+          {"member": "tools_of_kind", "signature": "vector<Tool, allocator<Tool>> (ToolLibrary, ToolKind)"},
+          {"member": "find_tool", "signature": "Tool (ToolLibrary, std::string)"},
+          {"member": "holder_clearance", "signature": "double (Tool)"},
+          {"member": "parse_tool_library", "signature": "ToolLibrary (std::string)"},
+          {"member": "format_tool_library", "signature": "std::string (ToolLibrary)"},
+          {"member": "read_tool_library", "signature": "ToolLibrary (std::string)"},
+          {"member": "write_tool_library", "signature": "bool (ToolLibrary, std::string)"},
+          {"member": "stone_tool_library", "signature": "ToolLibrary ()"}
         ],
         "skipped": []
       }

@@ -26,6 +26,7 @@ nanobind_add_module(_lithocam NB_STATIC
   ${LITHOCAM_ROOT}/src/kerf.cpp
   ${LITHOCAM_ROOT}/src/dropcutter.cpp
   ${LITHOCAM_ROOT}/src/pathdrop.cpp
-  ${LITHOCAM_ROOT}/src/zmap.cpp)
+  ${LITHOCAM_ROOT}/src/zmap.cpp
+  ${LITHOCAM_ROOT}/src/tools.cpp)
 target_include_directories(_lithocam PRIVATE ${LITHOCAM_ROOT}/include)
 install(TARGETS _lithocam LIBRARY DESTINATION . RUNTIME DESTINATION .)

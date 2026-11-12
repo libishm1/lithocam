@@ -16,7 +16,10 @@
     { "name": "lithocam::PathParams", "header": "lithocam/pathdrop.hpp" },
     { "name": "lithocam::ZMap", "header": "lithocam/zmap.hpp" },
     { "name": "lithocam::ZStats", "header": "lithocam/zmap.hpp" },
-    { "name": "lithocam::StockMesh", "header": "lithocam/zmap.hpp" }
+    { "name": "lithocam::StockMesh", "header": "lithocam/zmap.hpp" },
+    { "name": "lithocam::ToolKind", "header": "lithocam/tools.hpp" },
+    { "name": "lithocam::Tool", "header": "lithocam/tools.hpp" },
+    { "name": "lithocam::ToolLibrary", "header": "lithocam/tools.hpp" }
   ],
   "functions": [
     { "name": "lithocam::scallop_height", "header": "lithocam/scallop.hpp", "doc": "Scallop height of a ball (radius R) at stepover s" },
@@ -35,6 +38,22 @@
     { "name": "lithocam::deviation", "header": "lithocam/zmap.hpp", "doc": "Stock minus target statistics in a window" },
     { "name": "lithocam::zmap_mesh", "header": "lithocam/zmap.hpp", "doc": "Watertight triangle mesh of the stock height field" },
     { "name": "lithocam::mesh_volume", "header": "lithocam/zmap.hpp", "doc": "Volume of a closed oriented triangle mesh" },
-    { "name": "lithocam::write_stl", "header": "lithocam/zmap.hpp", "doc": "Write a stock mesh as binary STL" }
+    { "name": "lithocam::write_stl", "header": "lithocam/zmap.hpp", "doc": "Write a stock mesh as binary STL" },
+    { "name": "lithocam::tool_kind_name", "header": "lithocam/tools.hpp", "doc": "Kind name as written in library files" },
+    { "name": "lithocam::tool_kind_from_name", "header": "lithocam/tools.hpp", "doc": "Kind from its library name" },
+    { "name": "lithocam::all_tool_kinds", "header": "lithocam/tools.hpp", "doc": "Every tool kind, for dropdowns" },
+    { "name": "lithocam::validate_tool", "header": "lithocam/tools.hpp", "doc": "Empty string when the tool is consistent, else the first problem" },
+    { "name": "lithocam::has_cutter", "header": "lithocam/tools.hpp", "doc": "True when the tool has a drop-cutter model" },
+    { "name": "lithocam::cutter_of", "header": "lithocam/tools.hpp", "doc": "Drop-cutter model of a tool (exact or conservative)" },
+    { "name": "lithocam::tool_operations", "header": "lithocam/tools.hpp", "doc": "Operation families a tool kind fits" },
+    { "name": "lithocam::tools_for_operation", "header": "lithocam/tools.hpp", "doc": "Library tools that fit an operation family" },
+    { "name": "lithocam::tools_of_kind", "header": "lithocam/tools.hpp", "doc": "Library tools of one kind" },
+    { "name": "lithocam::find_tool", "header": "lithocam/tools.hpp", "doc": "Tool by id" },
+    { "name": "lithocam::holder_clearance", "header": "lithocam/tools.hpp", "doc": "Deepest reach below a flat top before the holder touches" },
+    { "name": "lithocam::parse_tool_library", "header": "lithocam/tools.hpp", "doc": "Tool library from CSV text" },
+    { "name": "lithocam::format_tool_library", "header": "lithocam/tools.hpp", "doc": "Tool library as CSV text" },
+    { "name": "lithocam::read_tool_library", "header": "lithocam/tools.hpp", "doc": "Read a CSV tool library file" },
+    { "name": "lithocam::write_tool_library", "header": "lithocam/tools.hpp", "doc": "Write a CSV tool library file" },
+    { "name": "lithocam::stone_tool_library", "header": "lithocam/tools.hpp", "doc": "Starter library of common stone tool sizes" }
   ]
 }

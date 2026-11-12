@@ -24,6 +24,7 @@
 #include "lithocam/kerf.hpp"
 #include "lithocam/pathdrop.hpp"
 #include "lithocam/zmap.hpp"
+#include "lithocam/tools.hpp"
 #include "lithocam/scallop.hpp"
 using namespace lithocam;
 
@@ -36,6 +37,20 @@ NB_MODULE(_lithocam, m) {
         .value("Ball", lithocam::CutterKind::Ball)
         .value("Bull", lithocam::CutterKind::Bull)
         .value("Cone", lithocam::CutterKind::Cone);
+    nb::enum_<lithocam::ToolKind>(m, "ToolKind")
+        .value("FlatEndMill", lithocam::ToolKind::FlatEndMill)
+        .value("BallEndMill", lithocam::ToolKind::BallEndMill)
+        .value("BullNoseMill", lithocam::ToolKind::BullNoseMill)
+        .value("FaceMill", lithocam::ToolKind::FaceMill)
+        .value("ChamferMill", lithocam::ToolKind::ChamferMill)
+        .value("Engraver", lithocam::ToolKind::Engraver)
+        .value("Drill", lithocam::ToolKind::Drill)
+        .value("CoreDrill", lithocam::ToolKind::CoreDrill)
+        .value("Tap", lithocam::ToolKind::Tap)
+        .value("ThreadMill", lithocam::ToolKind::ThreadMill)
+        .value("ProfileWheel", lithocam::ToolKind::ProfileWheel)
+        .value("DiscSaw", lithocam::ToolKind::DiscSaw)
+        .value("DiamondWire", lithocam::ToolKind::DiamondWire);
     nb::class_<lithocam::P3>(m, "P3")
         .def(nb::init<>())
         .def_rw("x", &lithocam::P3::x)
@@ -94,6 +109,34 @@ NB_MODULE(_lithocam, m) {
         .def(nb::init<>())
         .def_rw("vertices", &lithocam::StockMesh::vertices)
         .def_rw("triangles", &lithocam::StockMesh::triangles);
+    nb::class_<lithocam::Tool>(m, "Tool")
+        .def(nb::init<>())
+        .def_rw("id", &lithocam::Tool::id)
+        .def_rw("name", &lithocam::Tool::name)
+        .def_rw("kind", &lithocam::Tool::kind)
+        .def_rw("material", &lithocam::Tool::material)
+        .def_rw("diameter", &lithocam::Tool::diameter)
+        .def_rw("corner_radius", &lithocam::Tool::corner_radius)
+        .def_rw("tip_angle", &lithocam::Tool::tip_angle)
+        .def_rw("tip_diameter", &lithocam::Tool::tip_diameter)
+        .def_rw("flute_length", &lithocam::Tool::flute_length)
+        .def_rw("shank_diameter", &lithocam::Tool::shank_diameter)
+        .def_rw("stickout", &lithocam::Tool::stickout)
+        .def_rw("holder_diameter", &lithocam::Tool::holder_diameter)
+        .def_rw("holder_length", &lithocam::Tool::holder_length)
+        .def_rw("thread_pitch", &lithocam::Tool::thread_pitch)
+        .def_rw("bore_diameter", &lithocam::Tool::bore_diameter)
+        .def_rw("flutes", &lithocam::Tool::flutes)
+        .def_rw("spindle_rpm", &lithocam::Tool::spindle_rpm)
+        .def_rw("surface_speed", &lithocam::Tool::surface_speed)
+        .def_rw("feed", &lithocam::Tool::feed)
+        .def_rw("plunge_feed", &lithocam::Tool::plunge_feed)
+        .def_rw("max_stepdown", &lithocam::Tool::max_stepdown)
+        .def_rw("max_stepover", &lithocam::Tool::max_stepover)
+        .def_rw("coolant_flow", &lithocam::Tool::coolant_flow);
+    nb::class_<lithocam::ToolLibrary>(m, "ToolLibrary")
+        .def(nb::init<>())
+        .def_rw("tools", &lithocam::ToolLibrary::tools);
     m.def("scallop_height", &lithocam::scallop_height, "Scallop height of a ball (radius R) at stepover s", nb::arg("tool_radius"), nb::arg("stepover"));
     m.def("max_stepover", &lithocam::max_stepover, "Largest stepover keeping the scallop at or below h", nb::arg("tool_radius"), nb::arg("scallop_limit"));
     m.def("signed_distance_convex", &lithocam::signed_distance_convex, "Signed distance to a convex CCW polygon (positive outside)", nb::arg("poly_ccw"), nb::arg("p"));
@@ -111,4 +154,20 @@ NB_MODULE(_lithocam, m) {
     m.def("zmap_mesh", &lithocam::zmap_mesh, "Watertight triangle mesh of the stock height field", nb::arg("stock"), nb::arg("z_bottom"));
     m.def("mesh_volume", &lithocam::mesh_volume, "Volume of a closed oriented triangle mesh", nb::arg("mesh"));
     m.def("write_stl", &lithocam::write_stl, "Write a stock mesh as binary STL", nb::arg("mesh"), nb::arg("path"));
+    m.def("tool_kind_name", &lithocam::tool_kind_name, "Kind name as written in library files", nb::arg("kind"));
+    m.def("tool_kind_from_name", &lithocam::tool_kind_from_name, "Kind from its library name", nb::arg("name"));
+    m.def("all_tool_kinds", &lithocam::all_tool_kinds, "Every tool kind, for dropdowns");
+    m.def("validate_tool", &lithocam::validate_tool, "Empty string when the tool is consistent, else the first problem", nb::arg("tool"));
+    m.def("has_cutter", &lithocam::has_cutter, "True when the tool has a drop-cutter model", nb::arg("tool"));
+    m.def("cutter_of", &lithocam::cutter_of, "Drop-cutter model of a tool (exact or conservative)", nb::arg("tool"));
+    m.def("tool_operations", &lithocam::tool_operations, "Operation families a tool kind fits", nb::arg("kind"));
+    m.def("tools_for_operation", &lithocam::tools_for_operation, "Library tools that fit an operation family", nb::arg("lib"), nb::arg("operation"));
+    m.def("tools_of_kind", &lithocam::tools_of_kind, "Library tools of one kind", nb::arg("lib"), nb::arg("kind"));
+    m.def("find_tool", &lithocam::find_tool, "Tool by id", nb::arg("lib"), nb::arg("id"));
+    m.def("holder_clearance", &lithocam::holder_clearance, "Deepest reach below a flat top before the holder touches", nb::arg("tool"));
+    m.def("parse_tool_library", &lithocam::parse_tool_library, "Tool library from CSV text", nb::arg("csv_text"));
+    m.def("format_tool_library", &lithocam::format_tool_library, "Tool library as CSV text", nb::arg("lib"));
+    m.def("read_tool_library", &lithocam::read_tool_library, "Read a CSV tool library file", nb::arg("path"));
+    m.def("write_tool_library", &lithocam::write_tool_library, "Write a CSV tool library file", nb::arg("lib"), nb::arg("path"));
+    m.def("stone_tool_library", &lithocam::stone_tool_library, "Starter library of common stone tool sizes");
 }
