@@ -74,6 +74,29 @@ def test_part_far_out_of_reach_is_unreachable(ur):
     assert robot.wire_reach(ur, rep, (5.0, 0.0, 0.0)).fraction == 0.0
 
 
+def test_wire_face_path_is_continuous_and_exact(ur, kr):
+    """Sweeping one twisted-column side: every configuration reproduces its target; joint steps stay small."""
+    rep = robot.load_ruled_json(str(DATA / "ruled_json" / "twisted_column.json"))
+    face = next(f for f in rep.faces if f.label == "wire" and len(f.rulings) >= 5)
+    for cell, place, bow in ((ur, (0.5, -0.3, 0.0), 0.25), (kr, (1.4, -0.5, 0.0), 0.6)):
+        jp = robot.wire_face_path(cell, face, 0.0035, place, bow_depth=bow)
+        assert not jp.missing and len(jp.joints) == len(face.rulings)
+        for q, T in zip(jp.joints, jp.targets):
+            assert np.linalg.norm(cell.fk(q) - T) < 1e-6
+        assert jp.max_step < math.radians(45), math.degrees(jp.max_step)
+
+
+def test_exporters_write_every_configuration():
+    from lithocam import export
+    qs = [[0.1 * i, -1.0, 1.2, -0.3, 1.5, 0.0] for i in range(4)]
+    ur_prog = export.urscript(qs, home=[0, -1.57, 1.57, -1.57, -1.57, 0], digital_out=0)
+    assert ur_prog.count("movej(") == 6 and "set_standard_digital_out(0, True)" in ur_prog
+    assert ur_prog.strip().endswith("lithocam()")
+    k = export.krl(qs, output=12)
+    assert k.count("PTP {AXIS:") == 4 and "$OUT[12] = TRUE" in k and k.strip().endswith("END")
+    assert "A1 17.1887" in k                                 # 0.3 rad on the fourth point
+
+
 def test_far_side_face_is_out_of_reach(ur):
     """The panel spans x = 0.5 .. 1.1 m. On its far side (normal +x) the bow's flange would sit at x = 1.35 m,
     beyond the UR10e's 1.3 m reach; the near side (normal -x) is fully reachable. (No collision check yet, so the

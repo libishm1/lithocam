@@ -83,6 +83,21 @@ class Cell:
             return []
         return [np.asarray(sols[i], dtype=np.float64).flatten() for i in range(len(sols))]
 
+    def wrap_variants(self, q: np.ndarray) -> List[np.ndarray]:
+        """All configurations equal to q modulo 2 pi on each joint that stay inside the limits (UR joints span
+        +-360 degrees, so most poses have several)."""
+        out = [np.array(q, dtype=np.float64)]
+        for j in range(len(q)):
+            nxt = []
+            for v in out:
+                for k in (-1, 1):
+                    w = v.copy()
+                    w[j] += k * 2 * math.pi
+                    if self.limits[j, 0] - 1e-9 <= w[j] <= self.limits[j, 1] + 1e-9:
+                        nxt.append(w)
+            out += nxt
+        return out
+
     def within_limits(self, q: np.ndarray) -> bool:
         return bool(np.all(q >= self.limits[:, 0] - 1e-9) and np.all(q <= self.limits[:, 1] + 1e-9))
 
@@ -184,6 +199,63 @@ def wire_reach(cell: Cell, ruled_report, placement: Sequence[float] = (0.6, 0.0,
             rf.reachable += best is not None
         faces.append(rf)
     return ReachReport(cell.name, list(off), faces)
+
+
+@dataclass
+class JointPath:
+    joints: List[np.ndarray]          # one configuration per target, in target order
+    targets: List[np.ndarray]         # the tool0 poses (4x4, base frame)
+    rolls: List[float]                # chosen roll about the wire per target (degrees)
+    max_step: float                   # largest joint change between consecutive targets (radians)
+    missing: List[int]                # target indices with no solution (path is broken there)
+
+
+def wire_face_path(cell: Cell, face, wire_radius: float, placement: Sequence[float], units: float = 1e-3,
+                   bow_depth: float = 0.25, roll_deg: Sequence[float] = tuple(range(-60, 61, 10)),
+                   seed: Optional[np.ndarray] = None) -> JointPath:
+    """Joint path for sweeping the wire across one face, ruling by ruling.
+
+    Rulings are ordered along the sweep (by their midpoints' projection on the main sweep direction). For each
+    ruling, rolls are tried nearest-first to the previous roll, and among the verified IK solutions the one
+    closest to the previous configuration (max absolute joint change) is kept.
+    """
+    off = np.asarray(placement, dtype=np.float64)
+    rs = list(face.rulings)
+    mids = np.array([(np.asarray(r.p0) + np.asarray(r.p1)) / 2 for r in rs])
+    if len(rs) > 1:
+        c = mids - mids.mean(axis=0)
+        sweep = np.linalg.svd(c, full_matrices=False)[2][0]
+        order = np.argsort(c @ sweep)
+        rs = [rs[i] for i in order]
+    prev_q = seed if seed is not None else None
+    prev_roll = 0.0
+    joints, targets, rolls, missing = [], [], [], []
+    for k, r in enumerate(rs):
+        p0 = np.asarray(r.p0) * units + off
+        p1 = np.asarray(r.p1) * units + off
+        best = None
+        for a in sorted(roll_deg, key=lambda v: abs(v - prev_roll)):
+            T = wire_target(p0, p1, r.normal, wire_radius, math.radians(a), bow_depth)
+            sols = cell.ik(T, prev_q)
+            if not sols:
+                continue
+            sols = [w for s in sols for w in cell.wrap_variants(s)]
+            q = sols[0] if prev_q is None else min(sols, key=lambda s: float(np.max(np.abs(s - prev_q))))
+            step = 0.0 if prev_q is None else float(np.max(np.abs(q - prev_q)))
+            if best is None or step < best[0] - 1e-9:
+                best = (step, q, T, a)
+            if step < math.radians(15):
+                break
+        if best is None:
+            missing.append(k)
+            continue
+        _, q, T, a = best
+        joints.append(q)
+        targets.append(T)
+        rolls.append(a)
+        prev_q, prev_roll = q, a
+    steps = [float(np.max(np.abs(joints[i] - joints[i - 1]))) for i in range(1, len(joints))]
+    return JointPath(joints, targets, rolls, max(steps) if steps else 0.0, missing)
 
 
 def summary(rep: ReachReport) -> Dict[str, object]:
