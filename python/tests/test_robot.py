@@ -119,6 +119,27 @@ def test_track_extends_the_kr120(kr):
     assert all(c[0] > 0 for c in got.choices)
 
 
+def test_collision_checking_rejects_paths_through_the_part():
+    """Without obstacles the UR10e path over the twisted column's face 1 runs the arm through the column; with the
+    column (its STL) and a table in the scene and the turntable turning the face to the robot, every ruling is solved
+    with no colliding configuration."""
+    rep = robot.load_ruled_json(str(DATA / "ruled_json" / "twisted_column.json"))
+    face = next(f for f in rep.faces if f.index == 1)
+    place = (0.5, -0.3, 0.0)
+    blind = robot.wire_face_path(robot.Cell("ur10e"), face, 0.0035, place, bow_depth=0.25)
+    probe = robot.Cell("ur10e")
+    probe.add_mesh_obstacle("part", str(DATA / "stl" / "twisted_column.stl"), 1e-3, place)
+    assert sum(probe.in_collision(q) for q in blind.joints) > 0
+    yaw = robot.facing_yaw(face, place)
+    cell = robot.Cell("ur10e")
+    cell.add_mesh_obstacle("part", str(DATA / "stl" / "twisted_column.stl"), 1e-3, place, yaw)
+    cell.add_box_obstacle("table", (0.8, 0.8, 0.04), (place[0], place[1], -0.021))
+    jp = robot.wire_face_path(cell, robot.turned_face(face, yaw), 0.0035, place, bow_depth=0.25,
+                              roll_deg=tuple(range(-90, 91, 10)))
+    assert not jp.missing and len(jp.joints) == len(face.rulings)
+    assert not any(cell.in_collision(q) for q in jp.joints)
+
+
 def test_far_side_face_is_out_of_reach(ur):
     """The panel spans x = 0.5 .. 1.1 m. On its far side (normal +x) the bow's flange would sit at x = 1.35 m,
     beyond the UR10e's 1.3 m reach; the near side (normal -x) is fully reachable. (No collision check yet, so the

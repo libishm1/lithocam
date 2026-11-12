@@ -66,6 +66,67 @@ class Cell:
             self.kdl = None
         self.joint_names = list(self.kin.getJointNames())
         self.limits = np.asarray(self.kin.getLimits().joint_limits, dtype=np.float64)
+        self.obstacles: List[str] = []
+        self._mgr = None
+
+    # ------------------------------------------------------------ collision
+    def _add_static(self, name: str, geoms, xyz=(0.0, 0.0, 0.0), yaw: float = 0.0):
+        from tesseract_robotics.tesseract_common import AngleAxisd, Translation3d
+        from tesseract_robotics.tesseract_environment import AddLinkCommand
+        from tesseract_robotics.tesseract_scene_graph import Collision, Joint, JointType_FIXED, Link, Visual
+
+        link = Link(name)
+        for g in geoms:
+            c, v = Collision(), Visual()
+            c.geometry, v.geometry = g, g
+            link.collision.push_back(c)
+            link.visual.push_back(v)
+        j = Joint(name + "_joint")
+        j.parent_link_name = "world"
+        j.child_link_name = name
+        j.type = JointType_FIXED
+        j.parent_to_joint_origin_transform = (Isometry3d.Identity() * Translation3d(*[float(v) for v in xyz]) *
+                                              AngleAxisd(float(yaw), np.array([0.0, 0.0, 1.0])))
+        if not self.env.applyCommand(AddLinkCommand(link, j)):
+            raise RuntimeError("could not add obstacle " + name)
+        self.obstacles.append(name)
+        self._mgr = None
+
+    def add_mesh_obstacle(self, name: str, stl_path: str, scale: float = 1e-3, xyz=(0.0, 0.0, 0.0),
+                          yaw: float = 0.0):
+        """A static obstacle (the part, a fixture) from an STL file; scale converts its units to metres; the mesh is
+        turned by `yaw` (radians, about z through its origin) and placed at xyz (a turntable position)."""
+        from tesseract_robotics.tesseract_geometry import createMeshFromPath
+        meshes = createMeshFromPath(str(stl_path), np.array([scale, scale, scale], dtype=np.float64))
+        self._add_static(name, [meshes[i] for i in range(len(meshes))], xyz, yaw)
+
+    def add_box_obstacle(self, name: str, size, center):
+        """A static box (a table, a wall) in metres."""
+        from tesseract_robotics.tesseract_geometry import Box
+        self._add_static(name, [Box(*[float(v) for v in size])], center)
+
+    def in_collision(self, q, margin: float = 0.0) -> bool:
+        """True when any robot link touches an obstacle (or another link not excluded in the SRDF) at q."""
+        from tesseract_robotics.tesseract_collision import (ContactRequest, ContactResultMap,
+                                                            ContactResultVector, ContactTestType_FIRST)
+        from tesseract_robotics.tesseract_common import CollisionMarginData
+        if self._mgr is None:
+            self._solver = self.env.getStateSolver()
+            m = self.env.getDiscreteContactManager()
+            m.setActiveCollisionObjects(self.env.getActiveLinkNames())
+            m.setCollisionMarginData(CollisionMarginData(margin))
+            self._mgr = m
+        self._solver.setState(self.joint_names, np.asarray(q, dtype=np.float64))
+        state = self._solver.getState()           # keep the state alive while its transforms are used
+        self._mgr.setCollisionObjectsTransform(state.link_transforms)
+        res = ContactResultMap()
+        self._mgr.contactTest(res, ContactRequest(ContactTestType_FIRST))
+        vec = ContactResultVector()
+        res.flattenMoveResults(vec)
+        return len(vec) > 0
+
+    def collision_free(self, sols: List[np.ndarray]) -> List[np.ndarray]:
+        return [q for q in sols if not self.in_collision(q)] if self.obstacles else sols
 
     def fk(self, q: Sequence[float]) -> np.ndarray:
         return np.asarray(self.kin.calcFwdKin(np.asarray(q, dtype=np.float64))[TIP].matrix())
@@ -212,7 +273,27 @@ class JointPath:
 
 def wire_face_path(cell: Cell, face, wire_radius: float, placement: Sequence[float], units: float = 1e-3,
                    bow_depth: float = 0.25, roll_deg: Sequence[float] = tuple(range(-60, 61, 10)),
-                   seed: Optional[np.ndarray] = None) -> JointPath:
+                   seed: Optional[np.ndarray] = None, try_starts: int = 8) -> JointPath:
+    """Without a seed, every (collision-free) IK branch of the first ruling is tried as the start and the path with
+    the smallest largest joint step is kept; with a seed the path continues from it."""
+    if seed is not None or try_starts <= 1:
+        return _wire_face_path(cell, face, wire_radius, placement, units, bow_depth, roll_deg, seed)
+    first = _wire_face_path(cell, face, wire_radius, placement, units, bow_depth, roll_deg, None)
+    if not first.joints:
+        return first
+    T0 = first.targets[0]
+    starts = cell.collision_free([w for s in cell.ik(T0) for w in cell.wrap_variants(s)])[:try_starts]
+    best = first
+    for q0 in starts:
+        jp = _wire_face_path(cell, face, wire_radius, placement, units, bow_depth, roll_deg, q0)
+        if len(jp.missing) <= len(best.missing) and jp.max_step < best.max_step:
+            best = jp
+    return best
+
+
+def _wire_face_path(cell: Cell, face, wire_radius: float, placement: Sequence[float], units: float = 1e-3,
+                    bow_depth: float = 0.25, roll_deg: Sequence[float] = tuple(range(-60, 61, 10)),
+                    seed: Optional[np.ndarray] = None) -> JointPath:
     """Joint path for sweeping the wire across one face, ruling by ruling.
 
     Rulings are ordered along the sweep (by their midpoints' projection on the main sweep direction). For each
@@ -239,7 +320,9 @@ def wire_face_path(cell: Cell, face, wire_radius: float, placement: Sequence[flo
             sols = cell.ik(T, prev_q)
             if not sols:
                 continue
-            sols = [w for s in sols for w in cell.wrap_variants(s)]
+            sols = cell.collision_free([w for s in sols for w in cell.wrap_variants(s)])
+            if not sols:
+                continue
             q = sols[0] if prev_q is None else min(sols, key=lambda s: float(np.max(np.abs(s - prev_q))))
             step = 0.0 if prev_q is None else float(np.max(np.abs(q - prev_q)))
             if best is None or step < best[0] - 1e-9:
@@ -256,6 +339,59 @@ def wire_face_path(cell: Cell, face, wire_radius: float, placement: Sequence[flo
         prev_q, prev_roll = q, a
     steps = [float(np.max(np.abs(joints[i] - joints[i - 1]))) for i in range(1, len(joints))]
     return JointPath(joints, targets, rolls, max(steps) if steps else 0.0, missing)
+
+
+def axis_target(tip, axis, spindle: float, spin: float) -> np.ndarray:
+    """tool0 pose for a spindle whose tool axis is tool z: the tip sits `spindle` metres along z from tool0, the
+    tool axis (tip -> shank) points against tool z, and `spin` turns the pose about the axis (free for a rotating
+    cutter: the 5-axis redundancy)."""
+    tip, axis = np.asarray(tip, float), np.asarray(axis, float) / np.linalg.norm(axis)
+    z = -axis
+    a = np.array([1.0, 0, 0]) if abs(z[0]) < 0.9 else np.array([0, 1.0, 0])
+    x = np.cross(a, z)
+    x /= np.linalg.norm(x)
+    y = np.cross(z, x)
+    R = np.column_stack([x, y, z]) @ np.array([[math.cos(spin), -math.sin(spin), 0],
+                                               [math.sin(spin), math.cos(spin), 0], [0, 0, 1]])
+    T = np.eye(4)
+    T[:3, :3] = R
+    T[:3, 3] = tip - z * spindle
+    return T
+
+
+def axis_path(cell: Cell, tips, axes, spindle: float, placement: Sequence[float], units: float = 1e-3,
+              spin_deg: Sequence[float] = tuple(range(-180, 180, 15)), seed: Optional[np.ndarray] = None) -> JointPath:
+    """Joint path for 5-axis CL frames (tool tip + tool axis): spin tried nearest-first, verified IK, closest
+    configuration (2 pi wrap variants included)."""
+    off = np.asarray(placement, float)
+    prev_q, prev_spin = seed, 0.0
+    joints, targets, spins, missing = [], [], [], []
+    for k, (p, a) in enumerate(zip(tips, axes)):
+        best = None
+        for s in sorted(spin_deg, key=lambda v: abs(((v - prev_spin) + 180) % 360 - 180)):
+            T = axis_target(np.asarray(p) * units + off, a, spindle, math.radians(s))
+            sols = cell.ik(T, prev_q)
+            if not sols:
+                continue
+            sols = cell.collision_free([w for q in sols for w in cell.wrap_variants(q)])
+            if not sols:
+                continue
+            q = sols[0] if prev_q is None else min(sols, key=lambda v: float(np.max(np.abs(v - prev_q))))
+            step = 0.0 if prev_q is None else float(np.max(np.abs(q - prev_q)))
+            if best is None or step < best[0] - 1e-9:
+                best = (step, q, T, s)
+            if step < math.radians(10):
+                break
+        if best is None:
+            missing.append(k)
+            continue
+        _, q, T, s = best
+        joints.append(q)
+        targets.append(T)
+        spins.append(s)
+        prev_q, prev_spin = q, s
+    steps = [float(np.max(np.abs(joints[i] - joints[i - 1]))) for i in range(1, len(joints))]
+    return JointPath(joints, targets, spins, max(steps) if steps else 0.0, missing)
 
 
 @dataclass
@@ -330,6 +466,23 @@ def wire_reach_ext(cell: Cell, ruled_report, placement: Sequence[float], pos: Po
             if found:
                 prev = found
     return ExtReach(rulings, sum(c is not None for c in choices), choices)
+
+
+def turned_face(face, yaw: float):
+    """The face's rulings turned by yaw (radians) about the part's z axis (a turntable under the part)."""
+    from types import SimpleNamespace as NS
+    c, s = math.cos(yaw), math.sin(yaw)
+    Rz = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1.0]])
+    rs = [NS(p0=(Rz @ np.asarray(r.p0)).tolist(), p1=(Rz @ np.asarray(r.p1)).tolist(),
+             normal=(Rz @ np.asarray(r.normal)).tolist()) for r in face.rulings]
+    return NS(index=face.index, label=face.label, rulings=rs)
+
+
+def facing_yaw(face, placement: Sequence[float]) -> float:
+    """Turntable angle that points the face's mean outward normal at the robot base (horizontal component)."""
+    n = np.mean([np.asarray(r.normal) for r in face.rulings], axis=0)
+    want = -np.asarray(placement, float)[:2]
+    return math.atan2(want[1], want[0]) - math.atan2(n[1], n[0])
 
 
 def summary(rep: ReachReport) -> Dict[str, object]:

@@ -41,11 +41,19 @@ def link(name, geom=""):
     return '  <link name="{}">{}</link>\n'.format(name, geom)
 
 
+def visual_path(collision_path):
+    """cells/meshes/<robot>/<name>.stl (collision) -> cells/meshes/<robot>/visual/<name>.dae (visual)."""
+    robot, name = collision_path.split("/")
+    return "{}/visual/{}.dae".format(robot, name.rsplit(".", 1)[0])
+
+
 def mesh(path, xyz="0 0 0", rpy="0 0 0"):
-    """Official mesh (cells/meshes/...) as both visual and collision geometry, at the official mesh offset."""
-    g = '<geometry><mesh filename="package://cells/meshes/{}"/></geometry>'.format(path)
+    """Official meshes at the official offset: the visual COLLADA mesh for display, the collision STL for
+    calculation (Tesseract uses the collision geometry, as convex hulls, for contact checks)."""
     o = '<origin xyz="{}" rpy="{}"/>'.format(xyz, rpy)
-    return "<visual>{0}{1}</visual><collision>{0}{1}</collision>".format(o, g)
+    gv = '<geometry><mesh filename="package://cells/meshes/{}"/></geometry>'.format(visual_path(path))
+    gc = '<geometry><mesh filename="package://cells/meshes/{}"/></geometry>'.format(path)
+    return "<visual>{}{}</visual><collision>{}{}</collision>".format(o, gv, o, gc)
 
 
 D90 = math.radians(90)

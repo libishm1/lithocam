@@ -131,24 +131,18 @@ frames += [frames[-1]] * 4
 save(frames, "wire_cuts.gif", 650)
 
 # ---------------------------------------------------------------- 4) robot wire sweep, official robot meshes
+# Display: the official visual (COLLADA) meshes with their material colours. Calculation (IK, collision) used the
+# official collision meshes in Tesseract when the data was made.
 import importlib.util  # noqa: E402
-from matplotlib.colors import LightSource  # noqa: E402
+import math  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "python" / "src"))
+from lithocam import viz  # noqa: E402
 
 CELLS = Path(__file__).resolve().parents[2] / "cells"
 spec = importlib.util.spec_from_file_location("make_cells", CELLS / "make_cells.py")
 mc = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mc)
-
-
-def read_stl(path):
-    data = Path(path).read_bytes()
-    if data[:5].lower() == b"solid" and b"facet" in data[:400]:
-        v = [list(map(float, l.split()[1:4])) for l in data.decode(errors="ignore").splitlines()
-             if l.strip().startswith("vertex")]
-        return np.asarray(v).reshape(-1, 3, 3)
-    n = int.from_bytes(data[80:84], "little")
-    rec = np.frombuffer(data[84:84 + 50 * n], dtype=np.dtype([("n", "<f4", 3), ("v", "<f4", (3, 3)), ("a", "<u2")]))
-    return rec["v"].astype(np.float64)
 
 
 def rpy_matrix(xyz, rpy):
@@ -163,45 +157,58 @@ def rpy_matrix(xyz, rpy):
     return T
 
 
-import math  # noqa: E402
+def visual_parts(meshdef, cell_mm=4.0):
+    """link -> [(decimated triangles in the link frame, rgb)] from the official visual meshes."""
+    out = {}
+    for ln, (stl, xyz, rpy) in meshdef.items():
+        To = rpy_matrix(xyz, rpy)
+        parts = []
+        for tri, rgb in viz.read_dae(CELLS / "meshes" / mc.visual_path(stl)):
+            t = viz.decimate(tri, cell_mm * 1e-3)
+            w = t.reshape(-1, 3) @ To[:3, :3].T + To[:3, 3]
+            parts.append((w.reshape(-1, 3, 3), rgb))
+        out[ln] = parts
+    return out
 
-LIGHT = LightSource(azdeg=225, altdeg=45)
-LDIR = np.array([-0.4, -0.5, 0.77])
-LDIR /= np.linalg.norm(LDIR)
 
-
-def shaded(tris, hex_colour, alpha=1.0):
-    """Lambert shading per triangle (two-sided), as an RGBA array."""
-    base = np.array(matplotlib.colors.to_rgb(hex_colour))
-    n = np.cross(tris[:, 1] - tris[:, 0], tris[:, 2] - tris[:, 0])
-    ln = np.linalg.norm(n, axis=1)
-    ln[ln == 0] = 1
-    k = 0.35 + 0.65 * np.abs((n / ln[:, None]) @ LDIR)
-    rgb = np.clip(base[None, :] * k[:, None], 0, 1)
-    return np.hstack([rgb, np.full((len(tris), 1), alpha)])
-ROBOTS = {"ur10e": (mc.UR_MESH, "#5f87b6", "UR10e"), "kr120": (mc.KR_MESH, "#f08c00", "KUKA KR120 R2500 PRO")}
+ROBOTS = {"ur10e": (mc.UR_MESH, "UR10e"), "kr120": (mc.KR_MESH, "KUKA KR120 R2500 PRO")}
 col = json.loads((DATA / "ruled_twisted_column.json").read_text())
-for rname, (meshdef, colour, label) in ROBOTS.items():
+part_mm = np.vstack([np.asarray(f["tris"]) for f in col if f["tris"]])
+for rname, (meshdef, label) in ROBOTS.items():
     r = json.loads((DATA / "robot_{}_column.json".format(rname)).read_text())
     off = np.asarray(r["placement"])
-    part = np.vstack([np.asarray(f["tris"]) for f in col if f["tris"]]) * 1e-3 + off
-    meshes = {ln: (read_stl(CELLS / "meshes" / m[0]), rpy_matrix(m[1], m[2])) for ln, m in meshdef.items()}
-    world = []
+    vis = visual_parts(meshdef)
+    hits = sum(s["colliding"] for s in r["summary"])
+    solved = sum(s["solved"] for s in r["summary"])
+    total = sum(s["rulings"] for s in r["summary"])
+
+    def part_at(yaw):
+        c, s = math.cos(yaw), math.sin(yaw)
+        Rz = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1.0]])
+        return (part_mm.reshape(-1, 3) * 1e-3) @ Rz.T + off
+
+    table = np.array([[[-0.4, -0.4, 0], [0.4, -0.4, 0], [0.4, 0.4, 0]], [[-0.4, -0.4, 0], [0.4, 0.4, 0], [-0.4, 0.4, 0]]])
+    table = table + np.array([off[0], off[1], -0.001])
+    pts = [part_at(0.0), table.reshape(-1, 3)]
     for fr in r["frames"][::6]:
-        for ln, (tri, To) in meshes.items():
-            T = np.asarray(fr["tf"][ln]) @ To
-            world.append((tri.reshape(-1, 3) @ T[:3, :3].T + T[:3, 3]))
-    pts = np.vstack([part.reshape(-1, 3)] + world)
+        for ln, parts in vis.items():
+            T = np.asarray(fr["tf"][ln])
+            pts += [p.reshape(-1, 3) @ T[:3, :3].T + T[:3, 3] for p, _ in parts]
+    pts = np.vstack(pts)
     frames = []
-    for k, fr in enumerate(r["frames"]):
+    for fr in r["frames"]:
         fig = plt.figure(figsize=(6.8, 5.6))
         ax = fig.add_subplot(projection="3d")
-        ax.add_collection3d(Poly3DCollection(part, facecolors=shaded(part, "#c9b9a0", 0.45), edgecolors="none"))
-        for ln, (tri, To) in meshes.items():
-            T = np.asarray(fr["tf"][ln]) @ To
-            w = tri @ T[:3, :3].T + T[:3, 3]
-            ax.add_collection3d(Poly3DCollection(w, facecolors=shaded(w, colour if ln != "base_link" else "#4a5568"),
-                                                 edgecolors="none"))
+        ax.add_collection3d(Poly3DCollection(table, facecolors=viz.shaded(table, (0.55, 0.55, 0.55), 0.5),
+                                             edgecolors="none"))
+        part = part_at(fr["yaw"]).reshape(-1, 3, 3)
+        ax.add_collection3d(Poly3DCollection(part, facecolors=viz.shaded(part, (0.79, 0.73, 0.63), 0.5),
+                                             edgecolors="none"))
+        for ln, parts in vis.items():
+            T = np.asarray(fr["tf"][ln])
+            for p, rgb in parts:
+                w = p @ T[:3, :3].T + T[:3, 3]
+                ax.add_collection3d(Poly3DCollection(w, facecolors=viz.shaded(w, rgb), edgecolors="none"))
         a, b = np.asarray(fr["wire"])
         t0 = np.asarray(fr["tool0"])
         for e in (a, b):
@@ -211,10 +218,10 @@ for rname, (meshdef, colour, label) in ROBOTS.items():
         ax.view_init(elev=18, azim=-150 if rname == "ur10e" else -120)
         clean(ax)
         fig.subplots_adjust(left=0, right=1, top=0.93, bottom=0.07)
-        ax.set_title("{} wire sweep over the twisted column (face {}), verified IK".format(label, fr["face"]),
-                     fontsize=9)
-        fig.text(0.5, 0.04, "official robot meshes; lithocam.robot.wire_face_path: kerf-offset rulings, roll "
-                 "redundancy, nearest configuration", ha="center", fontsize=7.5)
+        ax.set_title("{} wire sweep, face {}, turntable {:.0f} deg".format(label, fr["face"],
+                                                                           math.degrees(fr["yaw"]) % 360), fontsize=9)
+        fig.text(0.5, 0.04, "collision-checked with the official collision meshes: {} of {} rulings solved, {} "
+                 "colliding configurations".format(solved, total, hits), ha="center", fontsize=7.5)
         frames.append(grab(fig))
         plt.close(fig)
     save(frames, "robot_wire_sweep.gif" if rname == "ur10e" else "robot_wire_sweep_kr120.gif", 220)
