@@ -22,6 +22,7 @@
 #include <vector>
 #include "lithocam/dropcutter.hpp"
 #include "lithocam/kerf.hpp"
+#include "lithocam/pathdrop.hpp"
 #include "lithocam/scallop.hpp"
 using namespace lithocam;
 
@@ -58,6 +59,18 @@ NB_MODULE(_lithocam, m) {
         .def(nb::init<>())
         .def_rw("x", &lithocam::Vec2::x)
         .def_rw("y", &lithocam::Vec2::y);
+    nb::class_<lithocam::CLPoint>(m, "CLPoint")
+        .def(nb::init<>())
+        .def_rw("x", &lithocam::CLPoint::x)
+        .def_rw("y", &lithocam::CLPoint::y)
+        .def_rw("z", &lithocam::CLPoint::z)
+        .def_rw("contact", &lithocam::CLPoint::contact);
+    nb::class_<lithocam::PathParams>(m, "PathParams")
+        .def(nb::init<>())
+        .def_rw("max_step", &lithocam::PathParams::max_step)
+        .def_rw("min_step", &lithocam::PathParams::min_step)
+        .def_rw("tol", &lithocam::PathParams::tol)
+        .def_rw("floor", &lithocam::PathParams::floor);
     m.def("scallop_height", &lithocam::scallop_height, "Scallop height of a ball (radius R) at stepover s", nb::arg("tool_radius"), nb::arg("stepover"));
     m.def("max_stepover", &lithocam::max_stepover, "Largest stepover keeping the scallop at or below h", nb::arg("tool_radius"), nb::arg("scallop_limit"));
     m.def("signed_distance_convex", &lithocam::signed_distance_convex, "Signed distance to a convex CCW polygon (positive outside)", nb::arg("poly_ccw"), nb::arg("p"));
@@ -65,4 +78,6 @@ NB_MODULE(_lithocam, m) {
     m.def("profile", &lithocam::profile, "Cutter lower-surface height above the tip at distance d", nb::arg("cutter"), nb::arg("d"));
     m.def("drop_triangle", &lithocam::drop_triangle, "Drop-cutter tip height on one triangle", nb::arg("cutter"), nb::arg("tri"), nb::arg("x"), nb::arg("y"));
     m.def("drop_cutter", &lithocam::drop_cutter, "Drop-cutter tip height on a mesh at (x, y)", nb::arg("cutter"), nb::arg("mesh"), nb::arg("x"), nb::arg("y"));
+    m.def("adaptive_line", &lithocam::adaptive_line, "Adaptive CL points along an xy segment", nb::arg("cutter"), nb::arg("mesh"), nb::arg("x0"), nb::arg("y0"), nb::arg("x1"), nb::arg("y1"), nb::arg("p"));
+    m.def("zigzag", &lithocam::zigzag, "Zig-zag raster of adaptive CL passes along x", nb::arg("cutter"), nb::arg("mesh"), nb::arg("xmin"), nb::arg("xmax"), nb::arg("ymin"), nb::arg("ymax"), nb::arg("stepover"), nb::arg("p"));
 }

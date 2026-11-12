@@ -50,6 +50,28 @@
        {"name": "x", "type": "double", "readonly": false},
        {"name": "y", "type": "double", "readonly": false}
      ],
+     "methods": []},
+    {"name": "lithocam::CLPoint", "expose": "CLPoint", "bases": [], "abstract": false, "final": false, "default_constructible": true,
+     "constructors": [
+       {"params": []}
+     ],
+     "fields": [
+       {"name": "x", "type": "double", "readonly": false},
+       {"name": "y", "type": "double", "readonly": false},
+       {"name": "z", "type": "double", "readonly": false},
+       {"name": "contact", "type": "bool", "readonly": false}
+     ],
+     "methods": []},
+    {"name": "lithocam::PathParams", "expose": "PathParams", "bases": [], "abstract": false, "final": false, "default_constructible": true,
+     "constructors": [
+       {"params": []}
+     ],
+     "fields": [
+       {"name": "max_step", "type": "double", "readonly": false},
+       {"name": "min_step", "type": "double", "readonly": false},
+       {"name": "tol", "type": "double", "readonly": false},
+       {"name": "floor", "type": "double", "readonly": false}
+     ],
      "methods": []}
   ],
   "enums": [
@@ -62,6 +84,8 @@
     {"name": "kerf_path_convex", "qualified": "lithocam::kerf_path_convex", "returns": "vector<Vec2, allocator<Vec2>>", "params": [{"name": "part_ccw", "type": "vector<Vec2, allocator<Vec2>>", "out": false}, {"name": "kerf", "type": "double", "out": false}, {"name": "max_overcut", "type": "double", "out": false}]},
     {"name": "profile", "qualified": "lithocam::profile", "returns": "double", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "d", "type": "double", "out": false}]},
     {"name": "drop_triangle", "qualified": "lithocam::drop_triangle", "returns": "double", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "tri", "type": "Tri", "out": false}, {"name": "x", "type": "double", "out": false}, {"name": "y", "type": "double", "out": false}]},
-    {"name": "drop_cutter", "qualified": "lithocam::drop_cutter", "returns": "double", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "mesh", "type": "TriMesh", "out": false}, {"name": "x", "type": "double", "out": false}, {"name": "y", "type": "double", "out": false}]}
+    {"name": "drop_cutter", "qualified": "lithocam::drop_cutter", "returns": "double", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "mesh", "type": "TriMesh", "out": false}, {"name": "x", "type": "double", "out": false}, {"name": "y", "type": "double", "out": false}]},
+    {"name": "adaptive_line", "qualified": "lithocam::adaptive_line", "returns": "vector<CLPoint, allocator<CLPoint>>", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "mesh", "type": "TriMesh", "out": false}, {"name": "x0", "type": "double", "out": false}, {"name": "y0", "type": "double", "out": false}, {"name": "x1", "type": "double", "out": false}, {"name": "y1", "type": "double", "out": false}, {"name": "p", "type": "PathParams", "out": false}]},
+    {"name": "zigzag", "qualified": "lithocam::zigzag", "returns": "vector<vector<CLPoint, allocator<CLPoint>>, allocator<vector<CLPoint, allocator<CLPoint>>>>", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "mesh", "type": "TriMesh", "out": false}, {"name": "xmin", "type": "double", "out": false}, {"name": "xmax", "type": "double", "out": false}, {"name": "ymin", "type": "double", "out": false}, {"name": "ymax", "type": "double", "out": false}, {"name": "stepover", "type": "double", "out": false}, {"name": "p", "type": "PathParams", "out": false}]}
   ]
 }

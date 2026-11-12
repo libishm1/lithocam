@@ -5,6 +5,7 @@
 //   contact:   the computed height equals the maximum over a dense sampling within the sampling error;
 //   index:     the grid-indexed result equals brute force over all triangles;
 //   exact:     closed-form cases (flat plane, single vertex, horizontal edge, sloped plane).
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <limits>

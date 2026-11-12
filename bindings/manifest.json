@@ -11,7 +11,9 @@
     { "name": "lithocam::Tri", "header": "lithocam/dropcutter.hpp" },
     { "name": "lithocam::Cutter", "header": "lithocam/dropcutter.hpp" },
     { "name": "lithocam::TriMesh", "header": "lithocam/dropcutter.hpp" },
-    { "name": "lithocam::Vec2", "header": "lithocam/kerf.hpp" }
+    { "name": "lithocam::Vec2", "header": "lithocam/kerf.hpp" },
+    { "name": "lithocam::CLPoint", "header": "lithocam/pathdrop.hpp" },
+    { "name": "lithocam::PathParams", "header": "lithocam/pathdrop.hpp" }
   ],
   "functions": [
     { "name": "lithocam::scallop_height", "header": "lithocam/scallop.hpp", "doc": "Scallop height of a ball (radius R) at stepover s" },
@@ -20,6 +22,8 @@
     { "name": "lithocam::kerf_path_convex", "header": "lithocam/kerf.hpp", "doc": "Wire or blade centre path around a convex part, never gouging, overcut bounded" },
     { "name": "lithocam::profile", "header": "lithocam/dropcutter.hpp", "doc": "Cutter lower-surface height above the tip at distance d" },
     { "name": "lithocam::drop_triangle", "header": "lithocam/dropcutter.hpp", "doc": "Drop-cutter tip height on one triangle" },
-    { "name": "lithocam::drop_cutter", "header": "lithocam/dropcutter.hpp", "doc": "Drop-cutter tip height on a mesh at (x, y)" }
+    { "name": "lithocam::drop_cutter", "header": "lithocam/dropcutter.hpp", "doc": "Drop-cutter tip height on a mesh at (x, y)" },
+    { "name": "lithocam::adaptive_line", "header": "lithocam/pathdrop.hpp", "doc": "Adaptive CL points along an xy segment" },
+    { "name": "lithocam::zigzag", "header": "lithocam/pathdrop.hpp", "doc": "Zig-zag raster of adaptive CL passes along x" }
   ]
 }
