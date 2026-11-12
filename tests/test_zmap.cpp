@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <map>
+#include <utility>
 #include <vector>
 
 #include "check.hpp"
@@ -84,6 +86,37 @@ int main() {
         std::printf("terrain, cutter %d: stock - target min %.4f max %.4f mean %.4f over %ld cells\n",
                     static_cast<int>(k), st.min_dev, st.max_dev, st.mean_dev, st.cells);
         lcheck::expect(st.min_dev >= -2 * pp.tol, "no gouge beyond 2 x path tolerance");
+        ++cases;
+    }
+    // 4) stock mesh: watertight (every edge in exactly two triangles, opposite directions) and its volume equals
+    //    the height field's volume (trapezoid rule over grid squares, split as the mesh is: exact for the mesh)
+    {
+        Cutter c{CutterKind::Ball, 3.0};
+        ZMap s = make_stock(0, 30, 0, 20, 0.25, 10.0);
+        for (int k = 0; k < 6; ++k) cut_move(s, c, {2.0, 3.0 + 3 * k, 7.0 + 0.3 * k, true}, {28.0, 4.0 + 3 * k, 6.5, true});
+        StockMesh m = zmap_mesh(s, 0.0);
+        std::map<std::pair<int, int>, int> edges;
+        for (std::size_t k = 0; k < m.triangles.size(); k += 3)
+            for (int e = 0; e < 3; ++e) {
+                int a = m.triangles[k + e], b = m.triangles[k + (e + 1) % 3];
+                edges[{a, b}] += 1;
+            }
+        bool manifold = true;
+        for (const auto& [ab, n] : edges) {
+            auto it = edges.find({ab.second, ab.first});
+            if (n != 1 || it == edges.end() || it->second != 1) manifold = false;
+        }
+        lcheck::expect(manifold, "stock mesh: every directed edge once, its reverse once (closed, oriented)");
+        double hv = 0;                                   // exact volume of the two-triangle-per-square surface
+        for (int j = 0; j + 1 < s.ny; ++j)
+            for (int i = 0; i + 1 < s.nx; ++i) {
+                double a = s.at(i, j), b = s.at(i + 1, j), cc = s.at(i + 1, j + 1), d = s.at(i, j + 1);
+                hv += s.cell * s.cell * ((a + b + cc) / 3 + (a + cc + d) / 3) / 2;
+            }
+        double mv = mesh_volume(m);
+        std::printf("stock mesh: %zu vertices, %zu triangles, volume %.6f vs height field %.6f\n", m.vertices.size(),
+                    m.triangles.size() / 3, mv, hv);
+        lcheck::expect(std::fabs(mv - hv) < 1e-9 * hv, "stock mesh volume equals the height-field volume");
         ++cases;
     }
     return lcheck::finish("zmap", cases);

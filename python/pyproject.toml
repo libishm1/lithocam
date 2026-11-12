@@ -19,6 +19,8 @@ test = ["pytest>=7"]
 ruled = ["cadquery-ocp>=7.7"]
 # lithocam.robot: robot cells (cells/) in Tesseract.
 robot = ["tesseract-robotics>=0.35", "numpy"]
+# lithocam.meshsim: mesh stock removal with Manifold (Apache-2.0); needs `ruled` too.
+mesh = ["manifold3d>=3.0", "numpy"]
 
 [project.scripts]
 lithocam-features = "lithocam.features:main"

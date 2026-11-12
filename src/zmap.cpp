@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <fstream>
 #include <limits>
 
 namespace lithocam {
@@ -113,6 +115,80 @@ ZStats deviation(const ZMap& s, const ZMap& t, double xmin, double xmax, double 
         }
     st.mean_dev = st.cells ? sum / st.cells : 0;
     return st;
+}
+
+StockMesh zmap_mesh(const ZMap& s, double zb) {
+    StockMesh m;
+    const int nx = s.nx, ny = s.ny;
+    // top vertices (row-major), then bottom vertices along the boundary ring
+    m.vertices.reserve(static_cast<std::size_t>(nx) * ny + 2 * (nx + ny));
+    for (int j = 0; j < ny; ++j)
+        for (int i = 0; i < nx; ++i) m.vertices.push_back({s.cx(i), s.cy(j), s.at(i, j)});
+    auto top = [&](int i, int j) { return j * nx + i; };
+    auto tri = [&](int a, int b, int c) {
+        m.triangles.push_back(a);
+        m.triangles.push_back(b);
+        m.triangles.push_back(c);
+    };
+    for (int j = 0; j + 1 < ny; ++j)
+        for (int i = 0; i + 1 < nx; ++i) {
+            int a = top(i, j), b = top(i + 1, j), c = top(i + 1, j + 1), d = top(i, j + 1);
+            tri(a, b, c);                                 // counter-clockwise seen from above: normal up
+            tri(a, c, d);
+        }
+    // boundary ring of top vertices, counter-clockwise seen from above
+    std::vector<int> ring;
+    for (int i = 0; i < nx; ++i) ring.push_back(top(i, 0));
+    for (int j = 1; j < ny; ++j) ring.push_back(top(nx - 1, j));
+    for (int i = nx - 2; i >= 0; --i) ring.push_back(top(i, ny - 1));
+    for (int j = ny - 2; j >= 1; --j) ring.push_back(top(0, j));
+    int base = static_cast<int>(m.vertices.size());
+    for (int v : ring) m.vertices.push_back({m.vertices[v].x, m.vertices[v].y, zb});
+    int n = static_cast<int>(ring.size());
+    for (int k = 0; k < n; ++k) {                        // walls: outward normals
+        int t0 = ring[k], t1 = ring[(k + 1) % n], b0 = base + k, b1 = base + (k + 1) % n;
+        tri(t0, b0, b1);
+        tri(t0, b1, t1);
+    }
+    // bottom: fan from a centre vertex, normal down
+    P3 c{0.5 * (s.cx(0) + s.cx(nx - 1)), 0.5 * (s.cy(0) + s.cy(ny - 1)), zb};
+    int ci = static_cast<int>(m.vertices.size());
+    m.vertices.push_back(c);
+    for (int k = 0; k < n; ++k) tri(ci, base + (k + 1) % n, base + k);
+    return m;
+}
+
+double mesh_volume(const StockMesh& m) {
+    double v = 0;
+    for (std::size_t k = 0; k + 2 < m.triangles.size(); k += 3) {
+        const P3 &a = m.vertices[m.triangles[k]], &b = m.vertices[m.triangles[k + 1]], &c = m.vertices[m.triangles[k + 2]];
+        v += a.x * (b.y * c.z - b.z * c.y) - a.y * (b.x * c.z - b.z * c.x) + a.z * (b.x * c.y - b.y * c.x);
+    }
+    return v / 6.0;
+}
+
+bool write_stl(const StockMesh& m, const std::string& path) {
+    std::ofstream f(path, std::ios::binary);
+    if (!f) return false;
+    char header[80] = "lithocam stock mesh";
+    f.write(header, 80);
+    std::uint32_t n = static_cast<std::uint32_t>(m.triangles.size() / 3);
+    f.write(reinterpret_cast<const char*>(&n), 4);
+    for (std::size_t k = 0; k + 2 < m.triangles.size(); k += 3) {
+        const P3 &a = m.vertices[m.triangles[k]], &b = m.vertices[m.triangles[k + 1]], &c = m.vertices[m.triangles[k + 2]];
+        double ux = b.x - a.x, uy = b.y - a.y, uz = b.z - a.z, vx = c.x - a.x, vy = c.y - a.y, vz = c.z - a.z;
+        double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+        double nl = std::sqrt(nx * nx + ny * ny + nz * nz);
+        float rec[12] = {static_cast<float>(nl > 0 ? nx / nl : 0), static_cast<float>(nl > 0 ? ny / nl : 0),
+                         static_cast<float>(nl > 0 ? nz / nl : 0),
+                         static_cast<float>(a.x), static_cast<float>(a.y), static_cast<float>(a.z),
+                         static_cast<float>(b.x), static_cast<float>(b.y), static_cast<float>(b.z),
+                         static_cast<float>(c.x), static_cast<float>(c.y), static_cast<float>(c.z)};
+        f.write(reinterpret_cast<const char*>(rec), 48);
+        std::uint16_t attr = 0;
+        f.write(reinterpret_cast<const char*>(&attr), 2);
+    }
+    return static_cast<bool>(f);
 }
 
 }  // namespace lithocam

@@ -90,6 +90,10 @@ NB_MODULE(_lithocam, m) {
         .def_rw("max_dev", &lithocam::ZStats::max_dev)
         .def_rw("mean_dev", &lithocam::ZStats::mean_dev)
         .def_rw("cells", &lithocam::ZStats::cells);
+    nb::class_<lithocam::StockMesh>(m, "StockMesh")
+        .def(nb::init<>())
+        .def_rw("vertices", &lithocam::StockMesh::vertices)
+        .def_rw("triangles", &lithocam::StockMesh::triangles);
     m.def("scallop_height", &lithocam::scallop_height, "Scallop height of a ball (radius R) at stepover s", nb::arg("tool_radius"), nb::arg("stepover"));
     m.def("max_stepover", &lithocam::max_stepover, "Largest stepover keeping the scallop at or below h", nb::arg("tool_radius"), nb::arg("scallop_limit"));
     m.def("signed_distance_convex", &lithocam::signed_distance_convex, "Signed distance to a convex CCW polygon (positive outside)", nb::arg("poly_ccw"), nb::arg("p"));
@@ -104,4 +108,7 @@ NB_MODULE(_lithocam, m) {
     m.def("cut_passes", &lithocam::cut_passes, "Lower the stock along every pass", nb::arg("stock"), nb::arg("cutter"), nb::arg("passes"));
     m.def("target_heights", &lithocam::target_heights, "Highest mesh z above each cell centre", nb::arg("mesh"), nb::arg("grid"));
     m.def("deviation", &lithocam::deviation, "Stock minus target statistics in a window", nb::arg("stock"), nb::arg("target"), nb::arg("xmin"), nb::arg("xmax"), nb::arg("ymin"), nb::arg("ymax"));
+    m.def("zmap_mesh", &lithocam::zmap_mesh, "Watertight triangle mesh of the stock height field", nb::arg("stock"), nb::arg("z_bottom"));
+    m.def("mesh_volume", &lithocam::mesh_volume, "Volume of a closed oriented triangle mesh", nb::arg("mesh"));
+    m.def("write_stl", &lithocam::write_stl, "Write a stock mesh as binary STL", nb::arg("mesh"), nb::arg("path"));
 }

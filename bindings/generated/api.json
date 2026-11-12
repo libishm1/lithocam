@@ -101,6 +101,15 @@
        {"name": "mean_dev", "type": "double", "readonly": false},
        {"name": "cells", "type": "long", "readonly": false}
      ],
+     "methods": []},
+    {"name": "lithocam::StockMesh", "expose": "StockMesh", "bases": [], "abstract": false, "final": false, "default_constructible": true,
+     "constructors": [
+       {"params": []}
+     ],
+     "fields": [
+       {"name": "vertices", "type": "vector<P3, allocator<P3>>", "readonly": false},
+       {"name": "triangles", "type": "vector<int, allocator<int>>", "readonly": false}
+     ],
      "methods": []}
   ],
   "enums": [
@@ -120,6 +129,9 @@
     {"name": "cut_move", "qualified": "lithocam::cut_move", "returns": "void", "params": [{"name": "stock", "type": "ZMap", "out": false}, {"name": "cutter", "type": "Cutter", "out": false}, {"name": "a", "type": "CLPoint", "out": false}, {"name": "b", "type": "CLPoint", "out": false}]},
     {"name": "cut_passes", "qualified": "lithocam::cut_passes", "returns": "void", "params": [{"name": "stock", "type": "ZMap", "out": false}, {"name": "cutter", "type": "Cutter", "out": false}, {"name": "passes", "type": "vector<vector<CLPoint, allocator<CLPoint>>, allocator<vector<CLPoint, allocator<CLPoint>>>>", "out": false}]},
     {"name": "target_heights", "qualified": "lithocam::target_heights", "returns": "ZMap", "params": [{"name": "mesh", "type": "TriMesh", "out": false}, {"name": "grid", "type": "ZMap", "out": false}]},
-    {"name": "deviation", "qualified": "lithocam::deviation", "returns": "ZStats", "params": [{"name": "stock", "type": "ZMap", "out": false}, {"name": "target", "type": "ZMap", "out": false}, {"name": "xmin", "type": "double", "out": false}, {"name": "xmax", "type": "double", "out": false}, {"name": "ymin", "type": "double", "out": false}, {"name": "ymax", "type": "double", "out": false}]}
+    {"name": "deviation", "qualified": "lithocam::deviation", "returns": "ZStats", "params": [{"name": "stock", "type": "ZMap", "out": false}, {"name": "target", "type": "ZMap", "out": false}, {"name": "xmin", "type": "double", "out": false}, {"name": "xmax", "type": "double", "out": false}, {"name": "ymin", "type": "double", "out": false}, {"name": "ymax", "type": "double", "out": false}]},
+    {"name": "zmap_mesh", "qualified": "lithocam::zmap_mesh", "returns": "StockMesh", "params": [{"name": "stock", "type": "ZMap", "out": false}, {"name": "z_bottom", "type": "double", "out": false}]},
+    {"name": "mesh_volume", "qualified": "lithocam::mesh_volume", "returns": "double", "params": [{"name": "mesh", "type": "StockMesh", "out": false}]},
+    {"name": "write_stl", "qualified": "lithocam::write_stl", "returns": "bool", "params": [{"name": "mesh", "type": "StockMesh", "out": false}, {"name": "path", "type": "std::string", "out": false}]}
   ]
 }

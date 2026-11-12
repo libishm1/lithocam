@@ -15,7 +15,8 @@
     { "name": "lithocam::CLPoint", "header": "lithocam/pathdrop.hpp" },
     { "name": "lithocam::PathParams", "header": "lithocam/pathdrop.hpp" },
     { "name": "lithocam::ZMap", "header": "lithocam/zmap.hpp" },
-    { "name": "lithocam::ZStats", "header": "lithocam/zmap.hpp" }
+    { "name": "lithocam::ZStats", "header": "lithocam/zmap.hpp" },
+    { "name": "lithocam::StockMesh", "header": "lithocam/zmap.hpp" }
   ],
   "functions": [
     { "name": "lithocam::scallop_height", "header": "lithocam/scallop.hpp", "doc": "Scallop height of a ball (radius R) at stepover s" },
@@ -31,6 +32,9 @@
     { "name": "lithocam::cut_move", "header": "lithocam/zmap.hpp", "doc": "Lower the stock by one linear cutter move" },
     { "name": "lithocam::cut_passes", "header": "lithocam/zmap.hpp", "doc": "Lower the stock along every pass" },
     { "name": "lithocam::target_heights", "header": "lithocam/zmap.hpp", "doc": "Highest mesh z above each cell centre" },
-    { "name": "lithocam::deviation", "header": "lithocam/zmap.hpp", "doc": "Stock minus target statistics in a window" }
+    { "name": "lithocam::deviation", "header": "lithocam/zmap.hpp", "doc": "Stock minus target statistics in a window" },
+    { "name": "lithocam::zmap_mesh", "header": "lithocam/zmap.hpp", "doc": "Watertight triangle mesh of the stock height field" },
+    { "name": "lithocam::mesh_volume", "header": "lithocam/zmap.hpp", "doc": "Volume of a closed oriented triangle mesh" },
+    { "name": "lithocam::write_stl", "header": "lithocam/zmap.hpp", "doc": "Write a stock mesh as binary STL" }
   ]
 }

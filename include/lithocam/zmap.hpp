@@ -13,6 +13,7 @@
 // stock - target is the leftover material (positive) or a gouge (negative) at each cell.
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "lithocam/dropcutter.hpp"
@@ -48,5 +49,21 @@ struct ZStats {
 };
 
 ZStats deviation(const ZMap& stock, const ZMap& target, double xmin, double xmax, double ymin, double ymax);
+
+// Watertight triangle mesh of the stock: the height field as the top (two triangles per grid square, vertices at
+// cell centres), vertical walls around the boundary, and a flat bottom at z_bottom (below every height).
+// Outward orientation; every edge is shared by exactly two triangles.
+struct StockMesh {
+    std::vector<P3> vertices;
+    std::vector<int> triangles;   // 3 indices per triangle
+};
+
+StockMesh zmap_mesh(const ZMap& stock, double z_bottom);
+
+// Volume of a closed, outward-oriented triangle mesh (divergence theorem).
+double mesh_volume(const StockMesh& mesh);
+
+// Binary STL. Returns false when the file cannot be written.
+bool write_stl(const StockMesh& mesh, const std::string& path);
 
 }  // namespace lithocam

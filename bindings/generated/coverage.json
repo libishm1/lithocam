@@ -4,7 +4,7 @@
   "targets": [
     {
       "target": "nanobind",
-      "bound": 20,
+      "bound": 23,
       "skipped": 0,
       "classes": [
         {
@@ -41,7 +41,10 @@
           {"member": "cut_move", "signature": "void (ZMap, Cutter, CLPoint, CLPoint)"},
           {"member": "cut_passes", "signature": "void (ZMap, Cutter, vector<vector<CLPoint, allocator<CLPoint>>, allocator<vector<CLPoint, allocator<CLPoint>>>>)"},
           {"member": "target_heights", "signature": "ZMap (TriMesh, ZMap)"},
-          {"member": "deviation", "signature": "ZStats (ZMap, ZMap, double, double, double, double)"}
+          {"member": "deviation", "signature": "ZStats (ZMap, ZMap, double, double, double, double)"},
+          {"member": "zmap_mesh", "signature": "StockMesh (ZMap, double)"},
+          {"member": "mesh_volume", "signature": "double (StockMesh)"},
+          {"member": "write_stl", "signature": "bool (StockMesh, std::string)"}
         ],
         "skipped": []
       }
