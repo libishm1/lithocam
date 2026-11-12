@@ -1,0 +1,365 @@
+{
+ "document": {
+  "schema_version": "quiddity-rust/recognition/6",
+  "package": {
+   "name": "quiddity-rust",
+   "version": "0.4.9"
+  },
+  "coordinate_space": "file",
+  "frame": {
+   "status": "inferred",
+   "origin": [
+    750.0,
+    299.6699320862345,
+    10.0
+   ],
+   "x": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "y": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "z": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "gauge": "orthogonal"
+  },
+  "face_count": 8,
+  "records": [
+   {
+    "id": "holes/0",
+    "family": "holes",
+    "record_type": "HoleRecord",
+    "faces": [
+     7
+    ],
+    "parameters": {
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "bottom": "through",
+     "cbore": null,
+     "csink": null,
+     "depth": 20.0,
+     "diameter": 35.0,
+     "location": [
+      750.0,
+      540.0,
+      20.0
+     ],
+     "spotface": null
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "freeform_surfaces/0",
+    "family": "freeform_surfaces",
+    "record_type": "FreeformSurface",
+    "faces": [
+     6
+    ],
+    "parameters": {
+     "construction_axis": "u",
+     "construction_kind": "linear_extrusion",
+     "construction_vector": [
+      0.0,
+      0.0,
+      22.0
+     ],
+     "continuity_group": [
+      6
+     ],
+     "continuity_links": [],
+     "face": 6,
+     "offset_basis": null,
+     "offset_distance": null,
+     "offset_partner": null,
+     "support": {
+      "poles": [
+       [
+        [
+         500.0,
+         125.0,
+         -1.0
+        ],
+        [
+         500.0,
+         100.0,
+         -1.0
+        ],
+        [
+         525.0,
+         100.0,
+         -1.0
+        ],
+        [
+         750.0,
+         100.0,
+         -1.0
+        ],
+        [
+         975.0,
+         100.0,
+         -1.0
+        ],
+        [
+         1000.0,
+         100.0,
+         -1.0
+        ],
+        [
+         1000.0,
+         125.0,
+         -1.0
+        ],
+        [
+         1000.0,
+         300.0,
+         -1.0
+        ],
+        [
+         1000.0,
+         475.0,
+         -1.0
+        ],
+        [
+         1000.0,
+         500.0,
+         -1.0
+        ],
+        [
+         975.0,
+         500.0,
+         -1.0
+        ],
+        [
+         750.0,
+         500.0,
+         -1.0
+        ],
+        [
+         525.0,
+         500.0,
+         -1.0
+        ],
+        [
+         500.0,
+         500.0,
+         -1.0
+        ],
+        [
+         500.0,
+         475.0,
+         -1.0
+        ],
+        [
+         500.0,
+         300.0,
+         -1.0
+        ]
+       ],
+       [
+        [
+         500.0,
+         125.0,
+         21.0
+        ],
+        [
+         500.0,
+         100.0,
+         21.0
+        ],
+        [
+         525.0,
+         100.0,
+         21.0
+        ],
+        [
+         750.0,
+         100.0,
+         21.0
+        ],
+        [
+         975.0,
+         100.0,
+         21.0
+        ],
+        [
+         1000.0,
+         100.0,
+         21.0
+        ],
+        [
+         1000.0,
+         125.0,
+         21.0
+        ],
+        [
+         1000.0,
+         300.0,
+         21.0
+        ],
+        [
+         1000.0,
+         475.0,
+         21.0
+        ],
+        [
+         1000.0,
+         500.0,
+         21.0
+        ],
+        [
+         975.0,
+         500.0,
+         21.0
+        ],
+        [
+         750.0,
+         500.0,
+         21.0
+        ],
+        [
+         525.0,
+         500.0,
+         21.0
+        ],
+        [
+         500.0,
+         500.0,
+         21.0
+        ],
+        [
+         500.0,
+         475.0,
+         21.0
+        ],
+        [
+         500.0,
+         300.0,
+         21.0
+        ]
+       ]
+      ],
+      "u_degree": 1,
+      "u_knots": [
+       0.0,
+       22.0
+      ],
+      "u_multiplicities": [
+       2,
+       2
+      ],
+      "u_periodic": false,
+      "v_degree": 2,
+      "v_knots": [
+       0.0,
+       39.2699081698724,
+       40.1699081698724,
+       79.4398163397447,
+       80.3148163397447,
+       119.584724509617,
+       120.484724509617,
+       159.75463267949,
+       160.62963267949
+      ],
+      "v_multiplicities": [
+       2,
+       2,
+       2,
+       2,
+       2,
+       2,
+       2,
+       2,
+       2
+      ],
+      "v_periodic": true,
+      "weights": [
+       [
+        1.0,
+        0.707106781186548,
+        1.0,
+        1.0,
+        1.0,
+        0.707106781186549,
+        1.0,
+        1.0,
+        1.0,
+        0.707106781186549,
+        1.0,
+        1.0,
+        1.0,
+        0.707106781186546,
+        1.0,
+        1.0
+       ],
+       [
+        1.0,
+        0.707106781186548,
+        1.0,
+        1.0,
+        1.0,
+        0.707106781186549,
+        1.0,
+        1.0,
+        1.0,
+        0.707106781186549,
+        1.0,
+        1.0,
+        1.0,
+        0.707106781186546,
+        1.0,
+        1.0
+       ]
+      ]
+     },
+     "support_kind": "bspline"
+    },
+    "evidence_status": "verified"
+   }
+  ],
+  "face_accounting": [
+   {
+    "group": "unexplained"
+   },
+   {
+    "group": "unexplained"
+   },
+   {
+    "group": "unexplained"
+   },
+   {
+    "group": "unexplained"
+   },
+   {
+    "group": "unexplained"
+   },
+   {
+    "group": "unexplained"
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "freeform_surfaces/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "holes/0"
+    ]
+   }
+  ],
+  "source_sha256": "18ace5ff46541f81b81ab0d0de0357921afaf4106f51bbe73b32578a49601700",
+  "run_mode": "strict"
+ }
+}

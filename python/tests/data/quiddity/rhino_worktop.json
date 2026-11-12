@@ -1,0 +1,600 @@
+{
+ "document": {
+  "schema_version": "quiddity-rust/recognition/6",
+  "package": {
+   "name": "quiddity-rust",
+   "version": "0.4.9"
+  },
+  "coordinate_space": "file",
+  "frame": {
+   "status": "inferred",
+   "origin": [
+    750.0000000000001,
+    299.6699320862345,
+    10.0
+   ],
+   "x": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "y": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "z": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "gauge": "orthogonal"
+  },
+  "face_count": 15,
+  "records": [
+   {
+    "id": "fillets/0",
+    "family": "fillets",
+    "record_type": "Fillet",
+    "faces": [
+     8
+    ],
+    "parameters": {
+     "at": [
+      992.678,
+      107.322,
+      10.0
+     ],
+     "axis": "z",
+     "radius": 25.0,
+     "side": "concave",
+     "turned": false
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "fillets/1",
+    "family": "fillets",
+    "record_type": "Fillet",
+    "faces": [
+     6
+    ],
+    "parameters": {
+     "at": [
+      507.322,
+      107.322,
+      10.0
+     ],
+     "axis": "z",
+     "radius": 25.0,
+     "side": "concave",
+     "turned": false
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "fillets/2",
+    "family": "fillets",
+    "record_type": "Fillet",
+    "faces": [
+     10
+    ],
+    "parameters": {
+     "at": [
+      992.678,
+      492.678,
+      10.0
+     ],
+     "axis": "z",
+     "radius": 25.0,
+     "side": "concave",
+     "turned": false
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "fillets/3",
+    "family": "fillets",
+    "record_type": "Fillet",
+    "faces": [
+     12
+    ],
+    "parameters": {
+     "at": [
+      507.322,
+      492.678,
+      10.0
+     ],
+     "axis": "z",
+     "radius": 25.0,
+     "side": "concave",
+     "turned": false
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "holes/0",
+    "family": "holes",
+    "record_type": "HoleRecord",
+    "faces": [
+     14
+    ],
+    "parameters": {
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "bottom": "through",
+     "cbore": null,
+     "csink": null,
+     "depth": 20.0,
+     "diameter": 35.0,
+     "location": [
+      750.0,
+      540.0,
+      20.0
+     ],
+     "spotface": null
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "plates/0",
+    "family": "plates",
+    "record_type": "Plate",
+    "faces": [
+     1,
+     9
+    ],
+    "parameters": {
+     "axis": "x",
+     "body_key": [
+      0.0,
+      0.0,
+      0.0,
+      1500.0,
+      600.0,
+      20.0,
+      13991487.8368,
+      1520489.49119
+     ],
+     "hi": 1500.0,
+     "lo": 1000.0,
+     "u": 299.99999999267874,
+     "v": 10.000000000319142
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "plates/1",
+    "family": "plates",
+    "record_type": "Plate",
+    "faces": [
+     3,
+     13
+    ],
+    "parameters": {
+     "axis": "x",
+     "body_key": [
+      0.0,
+      0.0,
+      0.0,
+      1500.0,
+      600.0,
+      20.0,
+      13991487.8368,
+      1520489.49119
+     ],
+     "hi": 500.0,
+     "lo": 0.0,
+     "u": 300.00000000732126,
+     "v": 10.000000000319142
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "slots/0",
+    "family": "slots",
+    "record_type": "Slot",
+    "faces": [
+     7,
+     9,
+     11,
+     13
+    ],
+    "parameters": {
+     "body_key": [
+      0.0,
+      0.0,
+      0.0,
+      1500.0,
+      600.0,
+      20.0,
+      13991487.8368,
+      1520489.49119
+     ],
+     "corner_radius": 25.0,
+     "d_hi": 20.0,
+     "d_lo": 0.0,
+     "end_radius": null,
+     "hi": 1000.0,
+     "length": 500.0,
+     "lo": 500.0,
+     "long_axis": "x",
+     "source": null,
+     "w_center": 300.0,
+     "width": 400.0,
+     "width_axis": "y"
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "step_levels/0",
+    "family": "step_levels",
+    "record_type": "FaceLevel",
+    "faces": [
+     9
+    ],
+    "parameters": {
+     "body_key": [
+      0.0,
+      0.0,
+      0.0,
+      1500.0,
+      600.0,
+      20.0,
+      13991487.8368,
+      1520489.49119
+     ],
+     "height_axis": "x",
+     "origin": [
+      750.0000000000001,
+      299.6699320862345,
+      10.0
+     ],
+     "x_axis": "z",
+     "x_span": [
+      -10.0,
+      10.0
+     ],
+     "y_axis": "y",
+     "y_span": [
+      -174.6699320862345,
+      175.3300679137655
+     ],
+     "z": 249.9999999999999
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "step_levels/1",
+    "family": "step_levels",
+    "record_type": "FaceLevel",
+    "faces": [
+     13
+    ],
+    "parameters": {
+     "body_key": [
+      0.0,
+      0.0,
+      0.0,
+      1500.0,
+      600.0,
+      20.0,
+      13991487.8368,
+      1520489.49119
+     ],
+     "height_axis": "x",
+     "origin": [
+      750.0000000000001,
+      299.6699320862345,
+      10.0
+     ],
+     "x_axis": "z",
+     "x_span": [
+      -10.0,
+      10.0
+     ],
+     "y_axis": "y",
+     "y_span": [
+      -174.6699320862345,
+      175.3300679137655
+     ],
+     "z": -250.0000000000001
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "risers/0",
+    "family": "risers",
+    "record_type": "RiserEvidence",
+    "faces": [
+     7
+    ],
+    "parameters": {
+     "axis": "y",
+     "body_key": [
+      0.0,
+      0.0,
+      0.0,
+      1500.0,
+      600.0,
+      20.0,
+      13991487.8368,
+      1520489.49119
+     ],
+     "body_levels": [
+      {
+       "body_key": [
+        0.0,
+        0.0,
+        0.0,
+        1500.0,
+        600.0,
+        20.0,
+        13991487.8368,
+        1520489.49119
+       ],
+       "height_axis": "x",
+       "origin": [
+        750.0000000000001,
+        299.6699320862345,
+        10.0
+       ],
+       "x_axis": "z",
+       "x_span": [
+        -10.0,
+        10.0
+       ],
+       "y_axis": "y",
+       "y_span": [
+        -174.6699320862345,
+        175.3300679137655
+       ],
+       "z": -250.0000000000001
+      },
+      {
+       "body_key": [
+        0.0,
+        0.0,
+        0.0,
+        1500.0,
+        600.0,
+        20.0,
+        13991487.8368,
+        1520489.49119
+       ],
+       "height_axis": "x",
+       "origin": [
+        750.0000000000001,
+        299.6699320862345,
+        10.0
+       ],
+       "x_axis": "z",
+       "x_span": [
+        -10.0,
+        10.0
+       ],
+       "y_axis": "y",
+       "y_span": [
+        -174.6699320862345,
+        175.3300679137655
+       ],
+       "z": 249.9999999999999
+      }
+     ],
+     "height_axis": "x",
+     "hi_at_envelope": false,
+     "lo_at_envelope": false,
+     "origin": [
+      750.0000000000001,
+      299.6699320862345,
+      10.0
+     ],
+     "other_axis": "z",
+     "other_positions": [],
+     "positions": [
+      -199.67
+     ],
+     "tol": 0.5,
+     "vertical": true,
+     "z_hi": 224.9999999999999,
+     "z_lo": -225.0000000000001
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "risers/1",
+    "family": "risers",
+    "record_type": "RiserEvidence",
+    "faces": [
+     11
+    ],
+    "parameters": {
+     "axis": "y",
+     "body_key": [
+      0.0,
+      0.0,
+      0.0,
+      1500.0,
+      600.0,
+      20.0,
+      13991487.8368,
+      1520489.49119
+     ],
+     "body_levels": [
+      {
+       "body_key": [
+        0.0,
+        0.0,
+        0.0,
+        1500.0,
+        600.0,
+        20.0,
+        13991487.8368,
+        1520489.49119
+       ],
+       "height_axis": "x",
+       "origin": [
+        750.0000000000001,
+        299.6699320862345,
+        10.0
+       ],
+       "x_axis": "z",
+       "x_span": [
+        -10.0,
+        10.0
+       ],
+       "y_axis": "y",
+       "y_span": [
+        -174.6699320862345,
+        175.3300679137655
+       ],
+       "z": -250.0000000000001
+      },
+      {
+       "body_key": [
+        0.0,
+        0.0,
+        0.0,
+        1500.0,
+        600.0,
+        20.0,
+        13991487.8368,
+        1520489.49119
+       ],
+       "height_axis": "x",
+       "origin": [
+        750.0000000000001,
+        299.6699320862345,
+        10.0
+       ],
+       "x_axis": "z",
+       "x_span": [
+        -10.0,
+        10.0
+       ],
+       "y_axis": "y",
+       "y_span": [
+        -174.6699320862345,
+        175.3300679137655
+       ],
+       "z": 249.9999999999999
+      }
+     ],
+     "height_axis": "x",
+     "hi_at_envelope": false,
+     "lo_at_envelope": false,
+     "origin": [
+      750.0000000000001,
+      299.6699320862345,
+      10.0
+     ],
+     "other_axis": "z",
+     "other_positions": [],
+     "positions": [
+      200.33
+     ],
+     "tol": 0.5,
+     "vertical": true,
+     "z_hi": 224.9999999999999,
+     "z_lo": -225.0000000000001
+    },
+    "evidence_status": "verified"
+   }
+  ],
+  "face_accounting": [
+   {
+    "group": "body",
+    "reason": "stock_box_side"
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "plates/0"
+    ]
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_side"
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "plates/1"
+    ]
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_side"
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_side"
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "fillets/1"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "slots/0",
+     "risers/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "fillets/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "plates/0",
+     "slots/0",
+     "step_levels/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "fillets/2"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "slots/0",
+     "risers/1"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "fillets/3"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "plates/1",
+     "slots/0",
+     "step_levels/1"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "holes/0"
+    ]
+   }
+  ],
+  "source_sha256": "4ef9173421abc5fec9b255830b2b66e4601bbef9230b2577b256ea982c8798ef",
+  "run_mode": "strict"
+ }
+}

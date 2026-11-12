@@ -1,0 +1,377 @@
+{
+ "document": {
+  "schema_version": "quiddity-rust/recognition/6",
+  "package": {
+   "name": "quiddity-rust",
+   "version": "0.4.9"
+  },
+  "coordinate_space": "file",
+  "frame": {
+   "status": "inferred",
+   "origin": [
+    -2.06520823090877e-15,
+    2.4148248865148717e-15,
+    181.63934426229065
+   ],
+   "x": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "y": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "z": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "gauge": "axial"
+  },
+  "face_count": 9,
+  "records": [
+   {
+    "id": "bosses/0",
+    "family": "bosses",
+    "record_type": "BossRecord",
+    "faces": [
+     1
+    ],
+    "parameters": {
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "diameter": 120.0,
+     "height": 40.0,
+     "location": [
+      -2.06520823090877e-15,
+      2.4148248865148717e-15,
+      2.906404006353114e-10
+     ]
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "bosses/1",
+    "family": "bosses",
+    "record_type": "BossRecord",
+    "faces": [
+     5
+    ],
+    "parameters": {
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "diameter": 100.0,
+     "height": 30.0,
+     "location": [
+      -2.06520823090877e-15,
+      2.4148248865148717e-15,
+      330.00000000029064
+     ]
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "bosses/2",
+    "family": "bosses",
+    "record_type": "BossRecord",
+    "faces": [
+     7
+    ],
+    "parameters": {
+     "axis": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "diameter": 110.0,
+     "height": 20.0,
+     "location": [
+      -2.06520823090877e-15,
+      2.4148248865148717e-15,
+      380.00000000029064
+     ]
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "turned_bodies/0",
+    "family": "turned_bodies",
+    "record_type": "TurnedBody",
+    "faces": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8
+    ],
+    "parameters": {
+     "axis": "z",
+     "axis_point": [
+      0.0,
+      0.0,
+      190.0
+     ],
+     "body_key": [
+      -60.0,
+      -60.0,
+      0.0,
+      60.0,
+      60.0,
+      380.0,
+      2235766.7718,
+      128776.409572
+     ],
+     "bores": [],
+     "length": 380.0,
+     "od": 120.0,
+     "profile": [
+      {
+       "arc_center": null,
+       "arc_radius": null,
+       "arc_sweep": null,
+       "end": [
+        -190.0,
+        60.0
+       ],
+       "face": 0,
+       "kind": "plane_shoulder",
+       "side": "shoulder",
+       "start": [
+        -190.0,
+        0.0
+       ]
+      },
+      {
+       "arc_center": null,
+       "arc_radius": null,
+       "arc_sweep": null,
+       "end": [
+        -150.0,
+        60.0
+       ],
+       "face": 1,
+       "kind": "cylinder",
+       "side": "external",
+       "start": [
+        -190.0,
+        60.0
+       ]
+      },
+      {
+       "arc_center": null,
+       "arc_radius": null,
+       "arc_sweep": null,
+       "end": [
+        -139.99999999999818,
+        40.0000000000009
+       ],
+       "face": 2,
+       "kind": "cone",
+       "side": "external",
+       "start": [
+        -150.0,
+        60.0
+       ]
+      },
+      {
+       "arc_center": null,
+       "arc_radius": null,
+       "arc_sweep": null,
+       "end": [
+        110.00000000000003,
+        35.000000000000135
+       ],
+       "face": 3,
+       "kind": "cone",
+       "side": "external",
+       "start": [
+        -140.0,
+        40.0
+       ]
+      },
+      {
+       "arc_center": null,
+       "arc_radius": null,
+       "arc_sweep": null,
+       "end": [
+        140.0,
+        50.00000000000727
+       ],
+       "face": 4,
+       "kind": "cone",
+       "side": "external",
+       "start": [
+        110.0,
+        35.0
+       ]
+      },
+      {
+       "arc_center": null,
+       "arc_radius": null,
+       "arc_sweep": null,
+       "end": [
+        170.0,
+        50.0
+       ],
+       "face": 5,
+       "kind": "cylinder",
+       "side": "external",
+       "start": [
+        140.0,
+        50.0
+       ]
+      },
+      {
+       "arc_center": null,
+       "arc_radius": null,
+       "arc_sweep": null,
+       "end": [
+        170.0,
+        55.0
+       ],
+       "face": 6,
+       "kind": "plane_shoulder",
+       "side": "shoulder",
+       "start": [
+        170.0,
+        50.0
+       ]
+      },
+      {
+       "arc_center": null,
+       "arc_radius": null,
+       "arc_sweep": null,
+       "end": [
+        190.0,
+        55.0
+       ],
+       "face": 7,
+       "kind": "cylinder",
+       "side": "external",
+       "start": [
+        170.0,
+        55.0
+       ]
+      },
+      {
+       "arc_center": null,
+       "arc_radius": null,
+       "arc_sweep": null,
+       "end": [
+        190.0,
+        55.0
+       ],
+       "face": 8,
+       "kind": "plane_shoulder",
+       "side": "shoulder",
+       "start": [
+        190.0,
+        0.0
+       ]
+      }
+     ],
+     "profile_key": {
+      "axis": "z",
+      "axis_origin": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "body_bounds": [
+       -60.0,
+       60.0,
+       -60.0,
+       60.0,
+       0.0,
+       380.0
+      ],
+      "body_key": [
+       -60.0,
+       -60.0,
+       0.0,
+       60.0,
+       60.0,
+       380.0,
+       2235766.7718,
+       128776.409572
+      ]
+     }
+    },
+    "evidence_status": "verified"
+   }
+  ],
+  "face_accounting": [
+   {
+    "group": "feature",
+    "record_ids": [
+     "turned_bodies/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "bosses/0",
+     "turned_bodies/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "turned_bodies/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "turned_bodies/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "turned_bodies/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "bosses/1",
+     "turned_bodies/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "turned_bodies/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "bosses/2",
+     "turned_bodies/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "turned_bodies/0"
+    ]
+   }
+  ],
+  "source_sha256": "044e1e10aad8e51d1f97d2f783c249788527104f76607d738eb8cd50085b8db5",
+  "run_mode": "strict"
+ }
+}

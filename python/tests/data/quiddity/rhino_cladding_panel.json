@@ -1,0 +1,687 @@
+{
+ "document": {
+  "schema_version": "quiddity-rust/recognition/6",
+  "package": {
+   "name": "quiddity-rust",
+   "version": "0.4.9"
+  },
+  "coordinate_space": "file",
+  "frame": {
+   "status": "inferred",
+   "origin": [
+    300.0,
+    200.0,
+    15.004372604703313
+   ],
+   "x": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "y": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "z": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "gauge": "orthogonal"
+  },
+  "face_count": 24,
+  "records": [
+   {
+    "id": "holes/0",
+    "family": "holes",
+    "record_type": "HoleRecord",
+    "faces": [
+     6
+    ],
+    "parameters": {
+     "axis": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "bottom": "flat",
+     "cbore": null,
+     "csink": null,
+     "depth": 20.0,
+     "diameter": 10.0,
+     "location": [
+      100.0,
+      80.0,
+      0.0
+     ],
+     "spotface": null
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "holes/1",
+    "family": "holes",
+    "record_type": "HoleRecord",
+    "faces": [
+     8
+    ],
+    "parameters": {
+     "axis": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "bottom": "flat",
+     "cbore": null,
+     "csink": null,
+     "depth": 20.0,
+     "diameter": 10.0,
+     "location": [
+      100.0,
+      320.0,
+      0.0
+     ],
+     "spotface": null
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "holes/2",
+    "family": "holes",
+    "record_type": "HoleRecord",
+    "faces": [
+     10
+    ],
+    "parameters": {
+     "axis": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "bottom": "flat",
+     "cbore": null,
+     "csink": null,
+     "depth": 20.0,
+     "diameter": 10.0,
+     "location": [
+      500.0,
+      80.0,
+      0.0
+     ],
+     "spotface": null
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "holes/3",
+    "family": "holes",
+    "record_type": "HoleRecord",
+    "faces": [
+     12
+    ],
+    "parameters": {
+     "axis": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "bottom": "flat",
+     "cbore": null,
+     "csink": null,
+     "depth": 20.0,
+     "diameter": 10.0,
+     "location": [
+      500.0,
+      320.0,
+      0.0
+     ],
+     "spotface": null
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "hole_patterns/0",
+    "family": "hole_patterns",
+    "record_type": "RectangularHoleSet",
+    "faces": [
+     6,
+     8,
+     10,
+     12
+    ],
+    "parameters": {
+     "angle": 0.0,
+     "center": [
+      300.0,
+      200.0,
+      0.0
+     ],
+     "height": 240.0,
+     "holes": [
+      {
+       "axis": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "bottom": "flat",
+       "cbore": null,
+       "csink": null,
+       "depth": 20.0,
+       "diameter": 10.0,
+       "location": [
+        100.0,
+        80.0,
+        0.0
+       ],
+       "spotface": null
+      },
+      {
+       "axis": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "bottom": "flat",
+       "cbore": null,
+       "csink": null,
+       "depth": 20.0,
+       "diameter": 10.0,
+       "location": [
+        100.0,
+        320.0,
+        0.0
+       ],
+       "spotface": null
+      },
+      {
+       "axis": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "bottom": "flat",
+       "cbore": null,
+       "csink": null,
+       "depth": 20.0,
+       "diameter": 10.0,
+       "location": [
+        500.0,
+        320.0,
+        0.0
+       ],
+       "spotface": null
+      },
+      {
+       "axis": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "bottom": "flat",
+       "cbore": null,
+       "csink": null,
+       "depth": 20.0,
+       "diameter": 10.0,
+       "location": [
+        500.0,
+        80.0,
+        0.0
+       ],
+       "spotface": null
+      }
+     ],
+     "width": 400.0
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "pockets/0",
+    "family": "pockets",
+    "record_type": "Pocket",
+    "faces": [
+     19,
+     21,
+     22,
+     23
+    ],
+    "parameters": {
+     "body_key": [
+      0.0,
+      0.0,
+      0.0,
+      600.0,
+      400.0,
+      30.0,
+      7184716.81469,
+      548693.274123
+     ],
+     "corner_radius": null,
+     "d_hi": 15.0,
+     "d_lo": 0.0,
+     "depth": 15.0,
+     "edge_anchored": false,
+     "end_radius": null,
+     "hi": 350.0,
+     "length": 100.0,
+     "lo": 250.0,
+     "long_axis": "x",
+     "open_sign": -1,
+     "rectangular_boundary": true,
+     "w_center": 15.0,
+     "width": 3.0,
+     "width_axis": "z"
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "pockets/1",
+    "family": "pockets",
+    "record_type": "Pocket",
+    "faces": [
+     15,
+     16,
+     17,
+     18
+    ],
+    "parameters": {
+     "body_key": [
+      0.0,
+      0.0,
+      0.0,
+      600.0,
+      400.0,
+      30.0,
+      7184716.81469,
+      548693.274123
+     ],
+     "corner_radius": null,
+     "d_hi": 400.0,
+     "d_lo": 385.0,
+     "depth": 15.0,
+     "edge_anchored": false,
+     "end_radius": null,
+     "hi": 350.0,
+     "length": 100.0,
+     "lo": 250.0,
+     "long_axis": "x",
+     "open_sign": 1,
+     "rectangular_boundary": true,
+     "w_center": 15.0,
+     "width": 3.0,
+     "width_axis": "z"
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "section_recesses/0",
+    "family": "section_recesses",
+    "record_type": "SectionRecess",
+    "faces": [
+     15,
+     16,
+     17,
+     18
+    ],
+    "parameters": {
+     "body": 0,
+     "classification": {
+      "feature_kind": "pocket",
+      "section_shape": "rectangular"
+     },
+     "evidence": {
+      "constituent_faces": [
+       14,
+       15,
+       16,
+       17,
+       18
+      ],
+      "defining_faces": [
+       15,
+       16,
+       17,
+       18
+      ]
+     },
+     "geometry": {
+      "ends": {
+       "high": {
+        "condition": "open",
+        "surface": {
+         "gradient": [
+          0.0,
+          0.0
+         ],
+         "type": "plane"
+        }
+       },
+       "low": {
+        "condition": "capped",
+        "surface": {
+         "gradient": [
+          0.0,
+          0.0
+         ],
+         "type": "plane"
+        }
+       }
+      },
+      "frame": {
+       "origin": [
+        300.0,
+        0.0,
+        15.0
+       ],
+       "run": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "u": [
+        1.0,
+        0.0,
+        0.0
+       ],
+       "v": [
+        0.0,
+        0.0,
+        -1.0
+       ]
+      },
+      "profile": {
+       "boundary": [
+        {
+         "bulge": 0.0,
+         "point": [
+          -50.0,
+          -1.5
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          50.0,
+          -1.5
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          50.0,
+          1.5
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          -50.0,
+          1.5
+         ]
+        }
+       ],
+       "closure": "closed"
+      },
+      "run_interval": [
+       385.0,
+       400.0
+      ],
+      "type": "section_recess"
+     },
+     "index": 0
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "section_recesses/1",
+    "family": "section_recesses",
+    "record_type": "SectionRecess",
+    "faces": [
+     19,
+     21,
+     22,
+     23
+    ],
+    "parameters": {
+     "body": 0,
+     "classification": {
+      "feature_kind": "pocket",
+      "section_shape": "rectangular"
+     },
+     "evidence": {
+      "constituent_faces": [
+       19,
+       20,
+       21,
+       22,
+       23
+      ],
+      "defining_faces": [
+       19,
+       21,
+       22,
+       23
+      ]
+     },
+     "geometry": {
+      "ends": {
+       "high": {
+        "condition": "capped",
+        "surface": {
+         "gradient": [
+          0.0,
+          0.0
+         ],
+         "type": "plane"
+        }
+       },
+       "low": {
+        "condition": "open",
+        "surface": {
+         "gradient": [
+          0.0,
+          0.0
+         ],
+         "type": "plane"
+        }
+       }
+      },
+      "frame": {
+       "origin": [
+        300.0,
+        0.0,
+        15.0
+       ],
+       "run": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "u": [
+        1.0,
+        0.0,
+        0.0
+       ],
+       "v": [
+        0.0,
+        0.0,
+        -1.0
+       ]
+      },
+      "profile": {
+       "boundary": [
+        {
+         "bulge": 0.0,
+         "point": [
+          -50.0,
+          -1.5
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          50.0,
+          -1.5
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          50.0,
+          1.5
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          -50.0,
+          1.5
+         ]
+        }
+       ],
+       "closure": "closed"
+      },
+      "run_interval": [
+       0.0,
+       15.0
+      ],
+      "type": "section_recess"
+     },
+     "index": 1
+    },
+    "evidence_status": "verified"
+   }
+  ],
+  "face_accounting": [
+   {
+    "group": "body",
+    "reason": "stock_box_side"
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_side"
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_side"
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_side"
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_side"
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_side"
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "holes/0",
+     "hole_patterns/0"
+    ]
+   },
+   {
+    "group": "unexplained"
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "holes/1",
+     "hole_patterns/0"
+    ]
+   },
+   {
+    "group": "unexplained"
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "holes/2",
+     "hole_patterns/0"
+    ]
+   },
+   {
+    "group": "unexplained"
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "holes/3",
+     "hole_patterns/0"
+    ]
+   },
+   {
+    "group": "unexplained"
+   },
+   {
+    "group": "unexplained"
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/1",
+     "section_recesses/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/1",
+     "section_recesses/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/1",
+     "section_recesses/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/1",
+     "section_recesses/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/0",
+     "section_recesses/1"
+    ]
+   },
+   {
+    "group": "unexplained"
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/0",
+     "section_recesses/1"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/0",
+     "section_recesses/1"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/0",
+     "section_recesses/1"
+    ]
+   }
+  ],
+  "source_sha256": "20842cbac4f0029c05f97a5ce045e27c60ae31d07685d4c41a78fb26beb6048a",
+  "run_mode": "strict"
+ }
+}

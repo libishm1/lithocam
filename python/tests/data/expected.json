@@ -1,0 +1,7 @@
+{
+ "cladding_panel": "plate 600x400x30; 4 blind holes D10 depth 20 from the back (a 2x2 hole pattern); 2 edge kerf slots 3 wide, 15 deep, 100 long, one on each long edge",
+ "window_sill": "1200 long extruded profile; front top chamfer 5x5; drip groove 10x10 underneath, 20 from the front; rear top rebate (step) 20 deep x 15 high",
+ "worktop": "plate 1500x600x20; through sink cutout 500x400 with R25 corners; through tap hole D35",
+ "stair_tread": "block 1000x300x40; R10 fillet on the front top edge (nosing); 3 stopped grooves 5 wide x 3 deep x 900 long (a groove or slot pattern)",
+ "baluster": "turned body, height 380: base D120 x 40, cone to D80, taper D80 to D70, bead D100, cap D110"
+}

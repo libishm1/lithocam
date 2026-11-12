@@ -1,0 +1,9 @@
+build/
+build_*.log
+lean/.lake/
+*.user
+.vs/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+*.stepbak

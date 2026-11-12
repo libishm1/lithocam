@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lithocam"
+version = "0.0.1"
+description = "Verified CAM building blocks for stone: kerf, scallop, and stone feature input from quiddity"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.9"
+classifiers = ["License :: OSI Approved :: Apache Software License", "Programming Language :: Python :: 3"]
+
+[project.optional-dependencies]
+# quiddity's wheel needs Python 3.11+. On older Pythons (Rhino 8) point LITHOCAM_QUIDDITY at the quiddity executable.
+features = ["quiddity>=0.4.9; python_version >= '3.11'"]
+test = ["pytest>=7"]
+
+[project.scripts]
+lithocam-features = "lithocam.features:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

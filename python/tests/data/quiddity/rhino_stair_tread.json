@@ -1,0 +1,826 @@
+{
+ "document": {
+  "schema_version": "quiddity-rust/recognition/6",
+  "package": {
+   "name": "quiddity-rust",
+   "version": "0.4.9"
+  },
+  "coordinate_space": "file",
+  "frame": {
+   "status": "inferred",
+   "origin": [
+    500.0000000000109,
+    150.64728736861187,
+    19.90530116160931
+   ],
+   "x": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "y": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "z": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "gauge": "full"
+  },
+  "face_count": 22,
+  "records": [
+   {
+    "id": "fillets/0",
+    "family": "fillets",
+    "record_type": "Fillet",
+    "faces": [
+     6
+    ],
+    "parameters": {
+     "at": [
+      500.0,
+      2.929,
+      37.071
+     ],
+     "axis": "x",
+     "radius": 10.0,
+     "side": "convex",
+     "turned": false
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "pockets/0",
+    "family": "pockets",
+    "record_type": "Pocket",
+    "faces": [
+     17,
+     18,
+     19,
+     20
+    ],
+    "parameters": {
+     "body_key": [
+      0.0,
+      0.0,
+      0.0,
+      1000.0,
+      300.0,
+      40.0,
+      11938039.8163,
+      715955.042901
+     ],
+     "corner_radius": null,
+     "d_hi": 40.0,
+     "d_lo": 37.0,
+     "depth": 3.0,
+     "edge_anchored": false,
+     "end_radius": null,
+     "hi": 950.0,
+     "length": 900.0,
+     "lo": 50.0,
+     "long_axis": "x",
+     "open_sign": 1,
+     "rectangular_boundary": true,
+     "w_center": 52.5,
+     "width": 5.0,
+     "width_axis": "y"
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "pockets/1",
+    "family": "pockets",
+    "record_type": "Pocket",
+    "faces": [
+     12,
+     13,
+     14,
+     15
+    ],
+    "parameters": {
+     "body_key": [
+      0.0,
+      0.0,
+      0.0,
+      1000.0,
+      300.0,
+      40.0,
+      11938039.8163,
+      715955.042901
+     ],
+     "corner_radius": null,
+     "d_hi": 40.0,
+     "d_lo": 37.0,
+     "depth": 3.0,
+     "edge_anchored": false,
+     "end_radius": null,
+     "hi": 950.0,
+     "length": 900.0,
+     "lo": 50.0,
+     "long_axis": "x",
+     "open_sign": 1,
+     "rectangular_boundary": true,
+     "w_center": 37.5,
+     "width": 5.0,
+     "width_axis": "y"
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "pockets/2",
+    "family": "pockets",
+    "record_type": "Pocket",
+    "faces": [
+     7,
+     8,
+     9,
+     10
+    ],
+    "parameters": {
+     "body_key": [
+      0.0,
+      0.0,
+      0.0,
+      1000.0,
+      300.0,
+      40.0,
+      11938039.8163,
+      715955.042901
+     ],
+     "corner_radius": null,
+     "d_hi": 40.0,
+     "d_lo": 37.0,
+     "depth": 3.0,
+     "edge_anchored": false,
+     "end_radius": null,
+     "hi": 950.0,
+     "length": 900.0,
+     "lo": 50.0,
+     "long_axis": "x",
+     "open_sign": 1,
+     "rectangular_boundary": true,
+     "w_center": 22.5,
+     "width": 5.0,
+     "width_axis": "y"
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "pocket_patterns/0",
+    "family": "pocket_patterns",
+    "record_type": "PocketArray",
+    "faces": [
+     7,
+     8,
+     9,
+     10,
+     12,
+     13,
+     14,
+     15,
+     17,
+     18,
+     19,
+     20
+    ],
+    "parameters": {
+     "direction": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "pitch": 15.0,
+     "pockets": [
+      {
+       "body_key": [
+        0.0,
+        0.0,
+        0.0,
+        1000.0,
+        300.0,
+        40.0,
+        11938039.8163,
+        715955.042901
+       ],
+       "corner_radius": null,
+       "d_hi": 40.0,
+       "d_lo": 37.0,
+       "depth": 3.0,
+       "edge_anchored": false,
+       "end_radius": null,
+       "hi": 950.0,
+       "length": 900.0,
+       "lo": 50.0,
+       "long_axis": "x",
+       "open_sign": 1,
+       "rectangular_boundary": true,
+       "w_center": 52.5,
+       "width": 5.0,
+       "width_axis": "y"
+      },
+      {
+       "body_key": [
+        0.0,
+        0.0,
+        0.0,
+        1000.0,
+        300.0,
+        40.0,
+        11938039.8163,
+        715955.042901
+       ],
+       "corner_radius": null,
+       "d_hi": 40.0,
+       "d_lo": 37.0,
+       "depth": 3.0,
+       "edge_anchored": false,
+       "end_radius": null,
+       "hi": 950.0,
+       "length": 900.0,
+       "lo": 50.0,
+       "long_axis": "x",
+       "open_sign": 1,
+       "rectangular_boundary": true,
+       "w_center": 37.5,
+       "width": 5.0,
+       "width_axis": "y"
+      },
+      {
+       "body_key": [
+        0.0,
+        0.0,
+        0.0,
+        1000.0,
+        300.0,
+        40.0,
+        11938039.8163,
+        715955.042901
+       ],
+       "corner_radius": null,
+       "d_hi": 40.0,
+       "d_lo": 37.0,
+       "depth": 3.0,
+       "edge_anchored": false,
+       "end_radius": null,
+       "hi": 950.0,
+       "length": 900.0,
+       "lo": 50.0,
+       "long_axis": "x",
+       "open_sign": 1,
+       "rectangular_boundary": true,
+       "w_center": 22.5,
+       "width": 5.0,
+       "width_axis": "y"
+      }
+     ]
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "section_recesses/0",
+    "family": "section_recesses",
+    "record_type": "SectionRecess",
+    "faces": [
+     7,
+     8,
+     9,
+     10
+    ],
+    "parameters": {
+     "body": 0,
+     "classification": {
+      "feature_kind": "pocket",
+      "section_shape": "rectangular"
+     },
+     "evidence": {
+      "constituent_faces": [
+       7,
+       8,
+       9,
+       10,
+       11
+      ],
+      "defining_faces": [
+       7,
+       8,
+       9,
+       10
+      ]
+     },
+     "geometry": {
+      "ends": {
+       "high": {
+        "condition": "open",
+        "surface": {
+         "gradient": [
+          0.0,
+          0.0
+         ],
+         "type": "plane"
+        }
+       },
+       "low": {
+        "condition": "capped",
+        "surface": {
+         "gradient": [
+          0.0,
+          0.0
+         ],
+         "type": "plane"
+        }
+       }
+      },
+      "frame": {
+       "origin": [
+        500.0,
+        22.5,
+        0.0
+       ],
+       "run": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "u": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "v": [
+        1.0,
+        0.0,
+        0.0
+       ]
+      },
+      "profile": {
+       "boundary": [
+        {
+         "bulge": 0.0,
+         "point": [
+          -2.5,
+          -450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          2.5,
+          -450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          2.5,
+          450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          -2.5,
+          450.0
+         ]
+        }
+       ],
+       "closure": "closed"
+      },
+      "run_interval": [
+       37.0,
+       40.0
+      ],
+      "type": "section_recess"
+     },
+     "index": 0
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "section_recesses/1",
+    "family": "section_recesses",
+    "record_type": "SectionRecess",
+    "faces": [
+     12,
+     13,
+     14,
+     15
+    ],
+    "parameters": {
+     "body": 0,
+     "classification": {
+      "feature_kind": "pocket",
+      "section_shape": "rectangular"
+     },
+     "evidence": {
+      "constituent_faces": [
+       12,
+       13,
+       14,
+       15,
+       16
+      ],
+      "defining_faces": [
+       12,
+       13,
+       14,
+       15
+      ]
+     },
+     "geometry": {
+      "ends": {
+       "high": {
+        "condition": "open",
+        "surface": {
+         "gradient": [
+          0.0,
+          0.0
+         ],
+         "type": "plane"
+        }
+       },
+       "low": {
+        "condition": "capped",
+        "surface": {
+         "gradient": [
+          0.0,
+          0.0
+         ],
+         "type": "plane"
+        }
+       }
+      },
+      "frame": {
+       "origin": [
+        500.0,
+        37.5,
+        0.0
+       ],
+       "run": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "u": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "v": [
+        1.0,
+        0.0,
+        0.0
+       ]
+      },
+      "profile": {
+       "boundary": [
+        {
+         "bulge": 0.0,
+         "point": [
+          -2.5,
+          -450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          2.5,
+          -450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          2.5,
+          450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          -2.5,
+          450.0
+         ]
+        }
+       ],
+       "closure": "closed"
+      },
+      "run_interval": [
+       37.0,
+       40.0
+      ],
+      "type": "section_recess"
+     },
+     "index": 1
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "section_recesses/2",
+    "family": "section_recesses",
+    "record_type": "SectionRecess",
+    "faces": [
+     17,
+     18,
+     19,
+     20
+    ],
+    "parameters": {
+     "body": 0,
+     "classification": {
+      "feature_kind": "pocket",
+      "section_shape": "rectangular"
+     },
+     "evidence": {
+      "constituent_faces": [
+       17,
+       18,
+       19,
+       20,
+       21
+      ],
+      "defining_faces": [
+       17,
+       18,
+       19,
+       20
+      ]
+     },
+     "geometry": {
+      "ends": {
+       "high": {
+        "condition": "open",
+        "surface": {
+         "gradient": [
+          0.0,
+          0.0
+         ],
+         "type": "plane"
+        }
+       },
+       "low": {
+        "condition": "capped",
+        "surface": {
+         "gradient": [
+          0.0,
+          0.0
+         ],
+         "type": "plane"
+        }
+       }
+      },
+      "frame": {
+       "origin": [
+        500.0,
+        52.5,
+        0.0
+       ],
+       "run": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "u": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "v": [
+        1.0,
+        0.0,
+        0.0
+       ]
+      },
+      "profile": {
+       "boundary": [
+        {
+         "bulge": 0.0,
+         "point": [
+          -2.5,
+          -450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          2.5,
+          -450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          2.5,
+          450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          -2.5,
+          450.0
+         ]
+        }
+       ],
+       "closure": "closed"
+      },
+      "run_interval": [
+       37.0,
+       40.0
+      ],
+      "type": "section_recess"
+     },
+     "index": 2
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "section_recess_patterns/0",
+    "family": "section_recess_patterns",
+    "record_type": "SectionRecessArray",
+    "faces": [
+     7,
+     8,
+     9,
+     10,
+     12,
+     13,
+     14,
+     15,
+     17,
+     18,
+     19,
+     20
+    ],
+    "parameters": {
+     "direction": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "members": [
+      2,
+      1,
+      0
+     ],
+     "pitch": 14.999999999999993
+    },
+    "evidence_status": "verified"
+   }
+  ],
+  "face_accounting": [
+   {
+    "group": "body",
+    "reason": "stock_box_notched"
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_side"
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_notched"
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_side"
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_notched"
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_notched"
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "fillets/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/2",
+     "pocket_patterns/0",
+     "section_recesses/0",
+     "section_recess_patterns/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/2",
+     "pocket_patterns/0",
+     "section_recesses/0",
+     "section_recess_patterns/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/2",
+     "pocket_patterns/0",
+     "section_recesses/0",
+     "section_recess_patterns/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/2",
+     "pocket_patterns/0",
+     "section_recesses/0",
+     "section_recess_patterns/0"
+    ]
+   },
+   {
+    "group": "unexplained"
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/1",
+     "pocket_patterns/0",
+     "section_recesses/1",
+     "section_recess_patterns/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/1",
+     "pocket_patterns/0",
+     "section_recesses/1",
+     "section_recess_patterns/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/1",
+     "pocket_patterns/0",
+     "section_recesses/1",
+     "section_recess_patterns/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/1",
+     "pocket_patterns/0",
+     "section_recesses/1",
+     "section_recess_patterns/0"
+    ]
+   },
+   {
+    "group": "unexplained"
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/0",
+     "pocket_patterns/0",
+     "section_recesses/2",
+     "section_recess_patterns/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/0",
+     "pocket_patterns/0",
+     "section_recesses/2",
+     "section_recess_patterns/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/0",
+     "pocket_patterns/0",
+     "section_recesses/2",
+     "section_recess_patterns/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "pockets/0",
+     "pocket_patterns/0",
+     "section_recesses/2",
+     "section_recess_patterns/0"
+    ]
+   },
+   {
+    "group": "unexplained"
+   }
+  ],
+  "source_sha256": "e29f0cd40e8df2adac75e56393921c5786e2794d377e17b9c57ec4546d40a8ef",
+  "run_mode": "strict"
+ }
+}

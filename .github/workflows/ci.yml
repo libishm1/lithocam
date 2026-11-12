@@ -1,0 +1,41 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  cpp:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --config Release
+      - run: ctest --test-dir build -C Release --output-on-failure
+  python:
+    strategy:
+      matrix:
+        include:
+          - {os: ubuntu-latest, python: "3.9", extras: "test"}             # Rhino 8's Python: mapping only
+          - {os: ubuntu-latest, python: "3.12", extras: "test,features"}   # with quiddity: end to end
+          - {os: windows-latest, python: "3.12", extras: "test,features"}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e "python[${{ matrix.extras }}]"
+      - run: pytest -rs python
+  lean:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lean
+    steps:
+      - uses: actions/checkout@v4
+      - name: No sorry
+        run: "! grep -rnw --include=*.lean -e sorry Lithocam"
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: lean
+          use-mathlib-cache: true

@@ -1,0 +1,664 @@
+{
+ "document": {
+  "schema_version": "quiddity-rust/recognition/6",
+  "package": {
+   "name": "quiddity-rust",
+   "version": "0.4.9"
+  },
+  "coordinate_space": "file",
+  "frame": {
+   "status": "inferred",
+   "origin": [
+    500.0,
+    150.64728736861187,
+    19.90530116160931
+   ],
+   "x": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "y": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "z": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "gauge": "full"
+  },
+  "face_count": 22,
+  "records": [
+   {
+    "id": "fillets/0",
+    "family": "fillets",
+    "record_type": "Fillet",
+    "faces": [
+     2
+    ],
+    "parameters": {
+     "at": [
+      500.0,
+      2.929,
+      37.071
+     ],
+     "axis": "x",
+     "radius": 10.0,
+     "side": "convex",
+     "turned": false
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "prismatic_pockets/0",
+    "family": "prismatic_pockets",
+    "record_type": "PrismaticPocket",
+    "faces": [
+     15,
+     16,
+     17,
+     18
+    ],
+    "parameters": {
+     "at": [
+      500.0,
+      52.5,
+      38.5
+     ],
+     "axis": "z",
+     "depth": 3.0,
+     "open_sign": 1,
+     "section": [
+      [
+       50.0,
+       55.0
+      ],
+      [
+       50.0,
+       50.0
+      ],
+      [
+       950.0,
+       50.0
+      ],
+      [
+       950.0,
+       55.0
+      ]
+     ],
+     "sides": 4
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "prismatic_pockets/1",
+    "family": "prismatic_pockets",
+    "record_type": "PrismaticPocket",
+    "faces": [
+     11,
+     12,
+     13,
+     14
+    ],
+    "parameters": {
+     "at": [
+      500.0,
+      37.5,
+      38.5
+     ],
+     "axis": "z",
+     "depth": 3.0,
+     "open_sign": 1,
+     "section": [
+      [
+       50.0,
+       40.0
+      ],
+      [
+       50.0,
+       35.0
+      ],
+      [
+       950.0,
+       35.0
+      ],
+      [
+       950.0,
+       40.0
+      ]
+     ],
+     "sides": 4
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "prismatic_pockets/2",
+    "family": "prismatic_pockets",
+    "record_type": "PrismaticPocket",
+    "faces": [
+     7,
+     8,
+     9,
+     10
+    ],
+    "parameters": {
+     "at": [
+      500.0,
+      22.5,
+      38.5
+     ],
+     "axis": "z",
+     "depth": 3.0,
+     "open_sign": 1,
+     "section": [
+      [
+       50.0,
+       25.0
+      ],
+      [
+       50.0,
+       20.0
+      ],
+      [
+       950.0,
+       20.0
+      ],
+      [
+       950.0,
+       25.0
+      ]
+     ],
+     "sides": 4
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "section_recesses/0",
+    "family": "section_recesses",
+    "record_type": "SectionRecess",
+    "faces": [
+     7,
+     8,
+     9,
+     10
+    ],
+    "parameters": {
+     "body": 0,
+     "classification": {
+      "feature_kind": "pocket",
+      "section_shape": "rectangular"
+     },
+     "evidence": {
+      "constituent_faces": [
+       7,
+       8,
+       9,
+       10,
+       19
+      ],
+      "defining_faces": [
+       7,
+       8,
+       9,
+       10
+      ]
+     },
+     "geometry": {
+      "ends": {
+       "high": {
+        "condition": "open",
+        "surface": {
+         "gradient": [
+          0.0,
+          0.0
+         ],
+         "type": "plane"
+        }
+       },
+       "low": {
+        "condition": "capped",
+        "surface": {
+         "gradient": [
+          0.0,
+          0.0
+         ],
+         "type": "plane"
+        }
+       }
+      },
+      "frame": {
+       "origin": [
+        500.0,
+        22.5,
+        0.0
+       ],
+       "run": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "u": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "v": [
+        1.0,
+        0.0,
+        0.0
+       ]
+      },
+      "profile": {
+       "boundary": [
+        {
+         "bulge": 0.0,
+         "point": [
+          -2.5,
+          -450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          2.5,
+          -450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          2.5,
+          450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          -2.5,
+          450.0
+         ]
+        }
+       ],
+       "closure": "closed"
+      },
+      "run_interval": [
+       37.0,
+       40.0
+      ],
+      "type": "section_recess"
+     },
+     "index": 0
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "section_recesses/1",
+    "family": "section_recesses",
+    "record_type": "SectionRecess",
+    "faces": [
+     11,
+     12,
+     13,
+     14
+    ],
+    "parameters": {
+     "body": 0,
+     "classification": {
+      "feature_kind": "pocket",
+      "section_shape": "rectangular"
+     },
+     "evidence": {
+      "constituent_faces": [
+       11,
+       12,
+       13,
+       14,
+       20
+      ],
+      "defining_faces": [
+       11,
+       12,
+       13,
+       14
+      ]
+     },
+     "geometry": {
+      "ends": {
+       "high": {
+        "condition": "open",
+        "surface": {
+         "gradient": [
+          0.0,
+          0.0
+         ],
+         "type": "plane"
+        }
+       },
+       "low": {
+        "condition": "capped",
+        "surface": {
+         "gradient": [
+          0.0,
+          0.0
+         ],
+         "type": "plane"
+        }
+       }
+      },
+      "frame": {
+       "origin": [
+        500.0,
+        37.5,
+        0.0
+       ],
+       "run": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "u": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "v": [
+        1.0,
+        0.0,
+        0.0
+       ]
+      },
+      "profile": {
+       "boundary": [
+        {
+         "bulge": 0.0,
+         "point": [
+          -2.5,
+          -450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          2.5,
+          -450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          2.5,
+          450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          -2.5,
+          450.0
+         ]
+        }
+       ],
+       "closure": "closed"
+      },
+      "run_interval": [
+       37.0,
+       40.0
+      ],
+      "type": "section_recess"
+     },
+     "index": 1
+    },
+    "evidence_status": "verified"
+   },
+   {
+    "id": "section_recesses/2",
+    "family": "section_recesses",
+    "record_type": "SectionRecess",
+    "faces": [
+     15,
+     16,
+     17,
+     18
+    ],
+    "parameters": {
+     "body": 0,
+     "classification": {
+      "feature_kind": "pocket",
+      "section_shape": "rectangular"
+     },
+     "evidence": {
+      "constituent_faces": [
+       15,
+       16,
+       17,
+       18,
+       21
+      ],
+      "defining_faces": [
+       15,
+       16,
+       17,
+       18
+      ]
+     },
+     "geometry": {
+      "ends": {
+       "high": {
+        "condition": "open",
+        "surface": {
+         "gradient": [
+          0.0,
+          0.0
+         ],
+         "type": "plane"
+        }
+       },
+       "low": {
+        "condition": "capped",
+        "surface": {
+         "gradient": [
+          0.0,
+          0.0
+         ],
+         "type": "plane"
+        }
+       }
+      },
+      "frame": {
+       "origin": [
+        500.0,
+        52.5,
+        0.0
+       ],
+       "run": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "u": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "v": [
+        1.0,
+        0.0,
+        0.0
+       ]
+      },
+      "profile": {
+       "boundary": [
+        {
+         "bulge": 0.0,
+         "point": [
+          -2.5,
+          -450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          2.5,
+          -450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          2.5,
+          450.0
+         ]
+        },
+        {
+         "bulge": 0.0,
+         "point": [
+          -2.5,
+          450.0
+         ]
+        }
+       ],
+       "closure": "closed"
+      },
+      "run_interval": [
+       37.0,
+       40.0
+      ],
+      "type": "section_recess"
+     },
+     "index": 2
+    },
+    "evidence_status": "verified"
+   }
+  ],
+  "face_accounting": [
+   {
+    "group": "body",
+    "reason": "stock_box_notched"
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_notched"
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "fillets/0"
+    ]
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_side"
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_notched"
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_side"
+   },
+   {
+    "group": "body",
+    "reason": "stock_box_notched"
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "prismatic_pockets/2",
+     "section_recesses/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "prismatic_pockets/2",
+     "section_recesses/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "prismatic_pockets/2",
+     "section_recesses/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "prismatic_pockets/2",
+     "section_recesses/0"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "prismatic_pockets/1",
+     "section_recesses/1"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "prismatic_pockets/1",
+     "section_recesses/1"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "prismatic_pockets/1",
+     "section_recesses/1"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "prismatic_pockets/1",
+     "section_recesses/1"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "prismatic_pockets/0",
+     "section_recesses/2"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "prismatic_pockets/0",
+     "section_recesses/2"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "prismatic_pockets/0",
+     "section_recesses/2"
+    ]
+   },
+   {
+    "group": "feature",
+    "record_ids": [
+     "prismatic_pockets/0",
+     "section_recesses/2"
+    ]
+   },
+   {
+    "group": "unexplained"
+   },
+   {
+    "group": "unexplained"
+   },
+   {
+    "group": "unexplained"
+   }
+  ],
+  "source_sha256": "a2c3a28860b1a23d1bdfc4083f196b3c93a56add3e47a01a85ee2e485b7e6d5b",
+  "run_mode": "strict"
+ }
+}
