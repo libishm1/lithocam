@@ -74,4 +74,4 @@ The measured flat ripple is above the 1D prediction because of the finite lane c
 - Pass-through of the 4th move element in program.py and post.py, and a tool change per grit step.
 - Region selection on the part (a mask of triangles or a plan box) and a preview of the dwell or predicted removal map.
 - A way to give k_p per material and grit. No sourced values exist yet; leave it empty and the maps stay unavailable rather than guessed.
-- Visual validation by Libish: the coverage and removal maps on a real part before any pad path goes to a robot.
+- Visual validation by the cell owner: the coverage and removal maps on a real part before any pad path goes to a robot.
