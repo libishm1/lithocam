@@ -4,7 +4,8 @@
 The data is Quarra Stone's public Q-LAB repository (https://github.com/brnmsmith/Q-LAB, ROBOmove backups of their
 KUKA KR 480 MT and KR 500 cells). That repository has no licence file. lithocam therefore never contains a copy of
 its files or of their contents: every function here reads them at run time from a local clone, found through the
-environment variable LITHOCAM_QLAB or the default `D:/robot_ws/oss/external/Q-LAB`. Tests skip when it is absent.
+environment variable LITHOCAM_QLAB, else `external/Q-LAB` in the folder that holds the lithocam checkout. Tests skip
+when it is absent.
 
 Formats read
 - T_*.ini   tool tables (TOOL_LIST)
@@ -38,7 +39,8 @@ import numpy as np
 
 CREDIT = "Quarra Stone Q-LAB (ROBOmove backup)"
 QLAB_URL = "https://github.com/brnmsmith/Q-LAB"
-DEFAULT_QLAB = Path("D:/robot_ws/oss/external/Q-LAB")
+# <checkout>/python/src/lithocam/robomove.py -> <checkout>/../external/Q-LAB
+DEFAULT_QLAB = Path(__file__).resolve().parents[3].parent / "external" / "Q-LAB"
 
 
 def qlab_root() -> Optional[Path]:

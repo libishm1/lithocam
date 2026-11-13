@@ -2,7 +2,7 @@
 
 Credit: Quarra Stone published ROBOmove backups of their KUKA KR 480 MT and KR 500 cells in [Q-LAB](https://github.com/brnmsmith/Q-LAB). The owner of lithocam has approval to use them with credit.
 
-The Q-LAB repository has no licence file. lithocam therefore reads those files from a local clone at run time and does not redistribute them. No file or file content is in this repository. The clone is found through `LITHOCAM_QLAB`, else `D:/robot_ws/oss/external/Q-LAB`. Tests that need it skip when it is absent.
+The Q-LAB repository has no licence file. lithocam therefore reads those files from a local clone at run time and does not redistribute them. No file or file content is in this repository. The clone is found through `LITHOCAM_QLAB`, else `external/Q-LAB` in the folder that holds the lithocam checkout. Tests that need it skip when it is absent.
 
 Code: `python/src/lithocam/robomove.py`. Tests: `python/tests/test_robomove.py`.
 

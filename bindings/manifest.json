@@ -1,6 +1,6 @@
 {
   "user_include": "../include",
-  "rosetta_include": "/mnt/d/robot_ws/oss/ref_rosetta/rosetta/include",
+  "rosetta_include": "<rosetta checkout>/include",
   "generator_name": "lithocam_gen",
   "targets": [
     { "lang": "nanobind", "name": "_lithocam" }

@@ -1,6 +1,6 @@
 """Five typical dimension-stone parts as exact B-rep STEP files (OpenCascade via build123d), for a quiddity feature test.
 
-    D:/tools/quiddity_env/Scripts/python.exe -B make_parts.py
+    python -B make_parts.py      (in an environment with build123d)
 
 Units mm. EXPECTED is the ground truth the recognition is scored against.
 """

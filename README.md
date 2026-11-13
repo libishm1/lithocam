@@ -16,6 +16,9 @@ Status: **0.0.1, early.** Main pieces so far:
 - a tool library of 38 kinds and 63 stone and wood tools, from a sourced survey (`docs/TOOLING.md`);
 - post-processing to URScript, KRL, RAPID and a neutral CL text, with a read-back check (`docs/POSTPROCESSORS.md`);
 - **lithocam studio**, a Qt program for laying out, simulating and posting stone CAM programs on a robot (below);
+- studio operations: drill, core drill, tap and helical bore with dwell and spindle reverse; rest machining, pencil and curvature-adaptive raster; boundary-limited relief finishing; polishing by grit sequence; disc-saw cuts on ruled faces (`docs/STUDIO.md`, `docs/OPERATIONS_HOLES_REST.md`, `docs/POLISHING.md`);
+- a turntable driven by the operator, as a coordinated external axis (E1) on KUKA and ABB, or by a PLC over I/O, with the part turning per simulation sample;
+- material, feed-limit and tool-wear checks in the studio, each stating which sourced constant it used or lacked (`docs/MATERIALS.md`);
 - Python bindings generated with C++26 reflection.
 
 Planned and partial operations are listed in `docs/OPERATIONS.md`. The stock-simulation libraries are compared in `docs/STOCK_SIMULATION.md`.
@@ -38,7 +41,7 @@ One window for stone CAM and robot programming. The layout has the work tree and
 - **Work tree.** Station, then robot and tools, then work frame, part and stock, then programs and their steps. Drag steps to reorder them, or drop operations from the palette to insert them.
 - **Objects.** An operations palette with stone operations first, then 2.5-axis, 3-axis, 5-axis, holes and finishing. Each icon shows whether the operation is done, partial or planned. Next to it, the tool library, filtered by domain, kind and operation.
 - **Robot panel.** Joint sliders, TCP pose entry, Cartesian jog in the base, tool or work frame, the manipulability measure, and buttons to teach MoveJ and MoveL.
-- **Properties.** Parameters of the selected step. Its tool drop-down lists only the tools that fit the operation.
+- **Properties.** Parameters of the selected step. Its tool drop-down lists only the tools that fit the operation. The Station item holds the material, the table mode (operator, E1 or PLC I/O) and the E1 fields.
 - **Simulate and post.** The program expands to verified joint solutions in the background, plays on a simulation bar, and posts to URScript, KRL, RAPID or CL. Each post is checked by reading its joint targets back.
 
 ```sh
@@ -47,7 +50,7 @@ python -m lithocam.studio            # needs the _lithocam module from bindings/
 python -m lithocam.studio --smoke out.png   # simulate the demo, capture the window, exit (used for these docs)
 ```
 
-Toolpaths the studio generates today: face, plane (z-level) roughing and raster finishing, on any tool with a drop-cutter model. Wire, flank and pocket run from their own modules and examples.
+Toolpaths the studio generates today: face, plane (z-level) roughing, raster, waterline, steep and shallow and 5-axis surfacing, rest machining, pencil and adaptive raster on tools with a drop-cutter model; drill, core drill, tap and bore; polishing; saw cuts on outlines, combs and ruled faces; wire cuts on ruled faces. Flank and pocket run from their own modules and examples.
 
 Studio jogging does not check collisions. `lithocam.robot` (Tesseract) checks programs against the cell meshes. Robot programs are for simulators (URSim, KUKA.OfficeLite, RobotStudio) until a hardware gate is passed.
 
@@ -115,7 +118,7 @@ The C++ core is written once. Python bindings are generated with [rosetta](https
 
 ## Data and cells credited
 
-Quarra Stone published ROBOmove backups of their KUKA KR 480 MT and KR 500 stone-milling cells in the public repository [Q-LAB](https://github.com/brnmsmith/Q-LAB): tool tables, end effectors, work-table frames, parameter ranges, program fragments and meshes. lithocam reads those files from a local clone at run time (`LITHOCAM_QLAB`, default `D:/robot_ws/oss/external/Q-LAB`) and does not redistribute them. The repository has no licence file, so none of its files or contents is in this repository. Imported tools and spindle presets carry the source "Quarra Stone Q-LAB (ROBOmove backup)". The KR 480 R3330 MT and KR 500 R2830 MT cells (`cells/`) use dimensions from KUKA's public KR 500 FORTEC manual. See `docs/ROBOMOVE_IMPORT.md`.
+Quarra Stone published ROBOmove backups of their KUKA KR 480 MT and KR 500 stone-milling cells in the public repository [Q-LAB](https://github.com/brnmsmith/Q-LAB): tool tables, end effectors, work-table frames, parameter ranges, program fragments and meshes. lithocam reads those files from a local clone at run time (`LITHOCAM_QLAB`, default `external/Q-LAB` beside the checkout) and does not redistribute them. The repository has no licence file, so none of its files or contents is in this repository. Imported tools and spindle presets carry the source "Quarra Stone Q-LAB (ROBOmove backup)". The KR 480 R3330 MT and KR 500 R2830 MT cells (`cells/`) use dimensions from KUKA's public KR 500 FORTEC manual. See `docs/ROBOMOVE_IMPORT.md`.
 
 ## Licence
 
