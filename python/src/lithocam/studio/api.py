@@ -360,9 +360,13 @@ class Session:
              ) -> str:
         """Program text for the robot controller. Simulates first; refuses while errors stand or (unless
         allow_unreachable) any sample is unreachable or colliding. The joint read-back check must pass."""
-        dialect = dialect or program.ROBOTS[self.station.robot][2]
+        native = program.ROBOTS[self.station.robot][2]
+        dialect = dialect or native
         if dialect not in post.WRITERS:
             raise ApiError("unknown dialect '{}'. Valid: {}".format(dialect, ", ".join(post.WRITERS)))
+        if dialect not in (native, "cl"):
+            raise ApiError("the {} runs '{}' programs; '{}' is for another controller. Use '{}' or 'cl' (neutral "
+                           "text)".format(program.ROBOTS[self.station.robot][0], native, dialect, native))
         r = self.simulate(program_name)
         if r.errors:
             raise ApiError("not posted, fix first:\n  " + "\n  ".join(r.errors))
@@ -378,6 +382,65 @@ class Session:
         if path:
             Path(path).write_text(text, encoding="utf-8")
         return text
+
+
+WIRE_FRAMES = [("z", "y", "-x"), ("z", "x", "y"), ("z", "-y", "x"), ("z", "-x", "-y")]
+
+
+def export_wire_cnc(session: "Session", machine_path, out_dir, feed: float, faces: str = "all",
+                    frame: Optional[Sequence[str]] = None, offset: Sequence[float] = (200.0, 0.0, 1000.0),
+                    dxf: bool = True) -> Dict[str, object]:
+    """CNC diamond wire saw export (lithocam.wiresaw_cnc) of the station's ruled faces labelled 'wire': one job per
+    face group, ISO G-code files (+ DXF of the wire-centre path). The machine definition JSON names the layout
+    (xy, xyc, xyuv), axis letters, kerf mode (CAM offset or G41/G42) and M-codes. Every file is read back and
+    checked (wire start before the first cut, wire stop at the end, positive feeds)."""
+    from .. import wiresaw_cnc as wc
+    from ..wirepath import load_ruled_json
+    if not session.station.ruled_path:
+        raise ApiError("the station has no ruled-face JSON (Station.ruled_path)")
+    try:
+        mc = wc.MachineDef.load(machine_path)
+    except (OSError, ValueError) as e:
+        raise ApiError("machine definition {}: {}".format(machine_path, e)) from None
+    rep = load_ruled_json(session.station.ruled_path)
+    fs = [f for f in rep.faces if f.label == "wire" and len(f.rulings) >= 2]
+    if faces != "all":
+        keep = {int(s) for s in str(faces).replace(";", ",").split(",") if s.strip()}
+        fs = [f for f in fs if f.index in keep]
+    if not fs:
+        raise ApiError("no wire faces selected")
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    written, summaries, refused = [], [], []
+    for f in fs:
+        plan, why = None, []
+        # frame: which part axes become (trolley, depth, height); without one, the clamping orientations that make
+        # the rulings advance along the trolley are tried in turn (the part is re-clamped between faces)
+        for fr in ([tuple(frame)] if frame else WIRE_FRAMES):
+            try:
+                setup = wc.ruled_face_setup(f, mc, frame=fr, offset=tuple(offset), feed=float(feed),
+                                            name="face{}".format(f.index))
+                plan = wc.plan_job(wc.WireJob(name="face{}".format(f.index), setups=[setup], feed=float(feed)), mc)
+                summaries.append(dict(plan.summary(), face=f.index, clamped=",".join(fr)))
+                break
+            except wc.WireSawError as e:
+                why.append("{}: {}".format(",".join(fr), e))
+        if plan is None:
+            refused.append("face {}: {}".format(f.index, " | ".join(why)))
+            continue
+        try:
+            for k, text in enumerate(wc.gcode_files(plan)):
+                wc.check_program(text, mc, "face {}".format(f.index))
+                fn = out / "{}_face{}{}.nc".format(mc.name, f.index, "" if k == 0 else "_{}".format(k + 1))
+                fn.write_text(text, encoding="utf-8")
+                written.append(str(fn))
+            if dxf:
+                fn = out / "{}_face{}.dxf".format(mc.name, f.index)
+                fn.write_text(wc.write_dxf(plan), encoding="utf-8")
+                written.append(str(fn))
+        except wc.WireSawError as e:
+            refused.append("face {}: {}".format(f.index, e))
+    return {"files": written, "summary": summaries, "refused": refused}
 
 
 def _generators():

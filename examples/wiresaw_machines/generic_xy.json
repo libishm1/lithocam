@@ -1,0 +1,57 @@
+{
+  "name": "generic_xy",
+  "layout": "xy",
+  "axes": {
+    "trolley": "X",
+    "height": "Y"
+  },
+  "limits": {
+    "trolley": [
+      0.0,
+      4000.0
+    ],
+    "height": [
+      0.0,
+      2500.0
+    ]
+  },
+  "table_unwind": "continuous",
+  "table_axis_trolley": 0.0,
+  "feed_mode": "G94",
+  "rotary_feed_deg_min": null,
+  "arc_plane": "G17",
+  "arc_first": "trolley",
+  "arc_second": "height",
+  "arc_words": {
+    "trolley": "I",
+    "height": "J"
+  },
+  "chord_tol": 0.01,
+  "kerf_mode": "cam",
+  "d_register": 1,
+  "wire_diameter": 8.0,
+  "offset_join": "round",
+  "mitre_limit": 2.0,
+  "m_wire_start": 3,
+  "m_wire_stop": 5,
+  "m_coolant_on": 8,
+  "m_coolant_off": 9,
+  "m_program_end": 30,
+  "header": [
+    "(PLACEHOLDER definition: set every value from the real machine)"
+  ],
+  "footer": [],
+  "line_numbers": 10,
+  "max_lines": null,
+  "decimals": 3,
+  "corner_dwell_s": 0.0,
+  "dwell_in_ms": false,
+  "corner_angle_deg": 20.0,
+  "corner_slowdown_factor": 1.0,
+  "corner_slowdown_length": 10.0,
+  "lead_in": 60.0,
+  "lead_out": 60.0,
+  "carriage_spacing": null,
+  "max_wire_tilt_deg": null,
+  "notes": "Placeholder two-axis definition. Arcs in G17 with X trolley and Y height. Kerf offset in the exporter."
+}

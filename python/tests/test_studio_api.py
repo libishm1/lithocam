@@ -47,9 +47,12 @@ def test_program_from_code_simulates_posts_and_round_trips(tmp_path, robot):
     p.add("movej", target="approach")
     r = s.simulate("Main")
     assert r.ok, r.summary() + "\n" + "\n".join(r.messages)
-    for d in api.dialects():
-        text = s.post("Main", d)
-        assert text.strip()
+    native = program.ROBOTS[robot][2]
+    for d in (native, "cl"):
+        assert s.post("Main", d).strip()
+    other = "rapid"
+    with pytest.raises(api.ApiError, match="another controller"):
+        s.post("Main", other)
     f = s.save(tmp_path / "st.lcs.json")
     s2 = api.Session.open(f)
     assert s2.station.part_path and s2.part is not None       # relative part path resolves on open
@@ -96,6 +99,21 @@ def test_feed_error_blocks_posting(tmp_path):
     if r.errors:
         with pytest.raises(api.ApiError, match="no feed"):
             s.post("Main", "urscript")
+
+
+def test_wire_cnc_export_from_a_station(tmp_path):
+    from pathlib import Path
+    from lithocam import wiresaw_cnc as wc
+    root = Path(__file__).resolve().parents[2]
+    s = api.Session.open(root / "examples" / "studio" / "wire_turntable_ur10e.lcs.json")
+    res = api.export_wire_cnc(s, root / "examples" / "wiresaw_machines" / "generic_xyuv.json", tmp_path, feed=60.0)
+    assert len([f for f in res["files"] if f.endswith(".nc")]) >= 4, res     # the four twisted faces
+    mc = wc.MachineDef.load(root / "examples" / "wiresaw_machines" / "generic_xyuv.json")
+    for f in res["files"]:
+        if f.endswith(".nc"):
+            assert wc.gcode_positions(Path(f).read_text(), mc)
+    with pytest.raises(api.ApiError):
+        api.export_wire_cnc(s, tmp_path / "missing.json", tmp_path, feed=60.0)
 
 
 def test_catalogue_and_schema_are_complete():

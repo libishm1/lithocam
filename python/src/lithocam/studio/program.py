@@ -92,6 +92,7 @@ class Station:
     tool_length: float = 0.0                                                  # mm; 0 = from the tool
     spindle: Optional[Dict[str, object]] = None                               # None = the cell's default preset
     material: str = "granite"     # workpiece material class (lithocam.cutting_data.MATERIALS)
+    rapid_speed: float = 100.0    # mm/s for links and retracts near the stone (a cell setting; set it for your cell)
     robot_factor: float = 1.0     # feed factor for robot stiffness (user-set; no published value)
     ruled_path: str = ""          # ruled-face JSON of the part (python -m lithocam.ruled part.step --json)
     turntable: Optional[Dict[str, float]] = None   # {"diameter": m, "height": m}: the part sits on a rotary table
@@ -467,6 +468,25 @@ def _wire_step(i, st, p, station, robot, tools, backend, q, add, recs, msgs, yaw
     return q
 
 
+def _sample_links(moves, step_mm: float):
+    """Insert points every `step_mm` along rapid and plunge links (not before the first move), so a link is a
+    straight line in the simulation as it is in the posted program."""
+    out = list(moves[:1])
+    for a, b in zip(moves, moves[1:]):
+        if b[0] in ("rapid", "plunge"):
+            pa, pb = np.asarray(a[1], dtype=float), np.asarray(b[1], dtype=float)
+            n = int(math.ceil(np.linalg.norm(pb - pa) / step_mm))
+            for t in np.linspace(0, 1, n + 1)[1:-1]:
+                if len(b) > 2:
+                    aa = np.asarray(a[2] if len(a) > 2 else b[2], dtype=float)
+                    ax = aa + (np.asarray(b[2], dtype=float) - aa) * t
+                    out.append((b[0], pa + (pb - pa) * t, ax / np.linalg.norm(ax)))
+                else:
+                    out.append((b[0], pa + (pb - pa) * t))
+        out.append(b)
+    return out
+
+
 def _polygon(text: str):
     pts = [[float(v) for v in s.split(",")] for s in str(text).replace("\n", ";").split(";") if s.strip()]
     if len(pts) < 3 or any(len(p_) != 2 for p_ in pts):
@@ -760,12 +780,13 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
             except Exception as e:   # noqa: BLE001 - report generator errors in the program log
                 msgs.append("step {}: {} failed: {}".format(i + 1, spec.label, e))
                 continue
-            if len(moves) > max_feed_points:   # thin the robot path; the CL path stays full for display and posting
-                keep = np.unique(np.r_[np.linspace(0, len(moves) - 1, max_feed_points).astype(int),
-                                       [k for k, m in enumerate(moves) if m[0] == "rapid"]])
-                rmoves = [moves[k] for k in keep]
-            else:
-                rmoves = moves
+            # every posted point: the CL path simplified only within the step tolerance (never thinned by count),
+            # and the links between passes sampled as straight lines so the simulation shows what is posted
+            tol = max(float(p.get("tolerance", 0.01) or 0.01), 1e-4)
+            rmoves = _sample_links(cam.simplify(moves, tol), 5.0)
+            if len(rmoves) > max_feed_points:
+                msgs.append("step {}: {} robot points after simplification (tolerance {:g} mm); planning takes "
+                            "longer".format(i + 1, len(rmoves), tol))
             Rz = np.eye(4)
             Rz[:3, :3] = np.array([[math.cos(yaw[0]), -math.sin(yaw[0]), 0], [math.sin(yaw[0]), math.cos(yaw[0]), 0],
                                    [0, 0, 1.0]])
@@ -781,7 +802,7 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
                 spins = [2 * math.pi * k / ns for k in range(ns)]
                 qs, oks, chosen = _solve_five_axis(robot, backend, wk, rmoves, q, spins)
                 poses = [tool_pose(wk, m[1], m[2] if len(m) > 2 else None, s) for m, s in zip(rmoves, chosen)]
-                feeds = [m[0] == "feed" for m in rmoves]
+                feeds = [m[0] in ("feed", "plunge") for m in rmoves]
                 if qs:
                     q = qs[-1]
                 msgs.append("step {}: 5-axis: {} points, spin chosen per point from {} candidates ({})".format(
@@ -796,7 +817,7 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
                     T = down_pose(wk, m[1])
                     q, ok = robot.solve_pose(T, q)
                     qs.append(q)
-                    feeds.append(m[0] == "feed")
+                    feeds.append(m[0] in ("feed", "plunge"))
                     oks.append(ok)
                     poses.append(T)
                 if backend is not None and getattr(backend, "checks_collision", False):
@@ -828,12 +849,19 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
                 recs.append(post.Rec("speed", {"linear": feed / 60.0}))
             recs.append(post.Rec("comment", {"text": "{} with {} ({} points)".format(spec.label, tid or "tool",
                                                                                    len(rmoves))}))
-            for m, qq, T in zip(rmoves, qs, poses):
-                if m[0] == "feed":   # cutting: pose of the cutter tip in the robot base (URDF) frame
+            plunge = float(p.get("plunge_feed") or getattr(tool, "plunge_feed", 0) or 0) or feed / 2
+            if not (p.get("plunge_feed") or getattr(tool, "plunge_feed", 0)):
+                recs.append(post.Rec("comment", {"text": "plunge at half the feed (no plunge feed on the step or "
+                                                         "the tool)"}))
+            for k, (m, qq, T) in enumerate(zip(rmoves, qs, poses)):
+                if m[0] in ("feed", "plunge"):   # cutting: pose of the cutter tip in the robot base (URDF) frame
                     recs.append(post.Rec("movel", {"q": np.asarray(qq).tolist(), "pose": np.asarray(T).tolist(),
-                                                   "cut": True, "v": feed / 60.0}))
-                else:
+                                                   "cut": True, "v": (feed if m[0] == "feed" else plunge) / 60.0}))
+                elif k == 0:                     # the approach from wherever the robot is: a joint move
                     recs.append(post.Rec("movej", {"q": np.asarray(qq).tolist()}))
+                else:                            # links and retracts: straight lines at the cell's rapid speed
+                    recs.append(post.Rec("movel", {"q": np.asarray(qq).tolist(), "pose": np.asarray(T).tolist(),
+                                                   "v": float(station.rapid_speed)}))
             bad = len(oks) - sum(oks)
             if bad:
                 msgs.append("step {}: {} of {} points unreachable, at a singularity or colliding".format(

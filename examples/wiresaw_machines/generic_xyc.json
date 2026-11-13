@@ -1,0 +1,62 @@
+{
+  "name": "generic_xyc",
+  "layout": "xyc",
+  "axes": {
+    "trolley": "X",
+    "height": "Z",
+    "table": "C"
+  },
+  "limits": {
+    "trolley": [
+      0.0,
+      4000.0
+    ],
+    "height": [
+      0.0,
+      2500.0
+    ],
+    "table": [
+      -1440.0,
+      1440.0
+    ]
+  },
+  "table_unwind": "continuous",
+  "table_axis_trolley": 1000.0,
+  "feed_mode": "G93",
+  "rotary_feed_deg_min": 720.0,
+  "arc_plane": "G18",
+  "arc_first": "height",
+  "arc_second": "trolley",
+  "arc_words": {
+    "trolley": "I",
+    "height": "K"
+  },
+  "chord_tol": 0.01,
+  "kerf_mode": "cam",
+  "d_register": 1,
+  "wire_diameter": 8.0,
+  "offset_join": "round",
+  "mitre_limit": 2.0,
+  "m_wire_start": 3,
+  "m_wire_stop": 5,
+  "m_coolant_on": 8,
+  "m_coolant_off": 9,
+  "m_program_end": 30,
+  "header": [
+    "(PLACEHOLDER definition: set every value from the real machine)"
+  ],
+  "footer": [],
+  "line_numbers": 10,
+  "max_lines": null,
+  "decimals": 3,
+  "corner_dwell_s": 0.0,
+  "dwell_in_ms": false,
+  "corner_angle_deg": 20.0,
+  "corner_slowdown_factor": 1.0,
+  "corner_slowdown_length": 10.0,
+  "lead_in": 60.0,
+  "lead_out": 60.0,
+  "carriage_spacing": null,
+  "max_wire_tilt_deg": null,
+  "notes": "Placeholder three-axis definition. Table C turns about the vertical axis at trolley position 1000. Arcs in G18 (first axis height Z, second axis trolley X). Inverse-time feed. Kerf offset in the exporter."
+}

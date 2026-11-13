@@ -61,16 +61,77 @@ def _zigzag(tool, mesh, rect, stepover, tol, floor) -> List[np.ndarray]:
     return [np.array([[c.x, c.y, c.z if c.contact else floor] for c in ps]) for ps in passes if len(ps)]
 
 
+ENTRY_HEIGHT = 2.0   # mm above the pass start where the plunge at plunge feed begins
+
+
 def _link(passes: List[np.ndarray], clear_z: float) -> List[Move]:
-    """Rapid up to the clearance plane between passes, feed along each pass."""
+    """Links between passes: rapid at the clearance plane over the pass start, rapid down to ENTRY_HEIGHT above
+    it, plunge to the start at the plunge feed, feed along the pass, straight retract to the clearance plane.
+    Rapids are posted as straight lines (not joint moves), so the tool never sweeps sideways near the stone."""
     moves: List[Move] = []
     for ps in passes:
         if len(ps) == 0:
             continue
-        moves.append(("rapid", np.array([ps[0, 0], ps[0, 1], clear_z])))
-        moves += [("feed", p) for p in ps]
+        s = ps[0]
+        moves.append(("rapid", np.array([s[0], s[1], clear_z])))
+        entry = np.array([s[0], s[1], min(clear_z, s[2] + ENTRY_HEIGHT)])
+        if entry[2] > s[2] + 1e-9:
+            moves.append(("rapid", entry))
+        moves.append(("plunge", s))
+        moves += [("feed", p) for p in ps[1:]]
         moves.append(("rapid", np.array([ps[-1, 0], ps[-1, 1], clear_z])))
     return moves
+
+
+def simplify(moves: List[Move], tol: float, ang_tol_deg: float = 0.5) -> List[Move]:
+    """Drop feed points that lie within `tol` (mm) of the straight line between their kept neighbours, with the
+    tool axis within `ang_tol_deg` (Douglas-Peucker per feed run). Rapids, plunges and run ends are kept, so the
+    posted path stays within the step tolerance of the computed CL path."""
+    out: List[Move] = []
+    run: List[Move] = []
+
+    def flush():
+        if len(run) <= 2:
+            out.extend(run)
+            return
+        P = np.array([m[1] for m in run], dtype=float)
+        A = np.array([m[2] for m in run], dtype=float) if len(run[0]) > 2 else None
+        keep = np.zeros(len(P), bool)
+        keep[0] = keep[-1] = True
+        stack = [(0, len(P) - 1)]
+        ca = math.cos(math.radians(ang_tol_deg))
+        while stack:
+            a, b = stack.pop()
+            if b <= a + 1:
+                continue
+            d = P[b] - P[a]
+            L = float(d @ d)
+            seg = P[a + 1:b] - P[a]
+            t = np.clip(seg @ d / L, 0, 1) if L > 0 else np.zeros(len(seg))
+            dist = np.linalg.norm(seg - t[:, None] * d, axis=1)
+            if A is not None:   # interpolated axis vs the actual axis
+                Ai = A[a] + (A[b] - A[a]) * t[:, None]
+                Ai /= np.linalg.norm(Ai, axis=1, keepdims=True)
+                bad = np.einsum("ij,ij->i", Ai, A[a + 1:b]) < ca
+                dist = np.where(bad, np.inf, dist)
+            k = int(np.argmax(dist))
+            if dist[k] > tol:
+                keep[a + 1 + k] = True
+                stack += [(a, a + 1 + k), (a + 1 + k, b)]
+        out.extend(m for m, kk in zip(run, keep) if kk)
+
+    for m in moves:
+        if m[0] == "feed":
+            run.append(m)
+        else:
+            flush()
+            run = []
+            out.append(m)
+            if m[0] == "plunge":
+                run = [m]          # a pass starts at its plunge point
+                out.pop()
+    flush()
+    return out
 
 
 def _clamp_runs(ps: np.ndarray, level: float, top: float) -> List[np.ndarray]:
@@ -214,7 +275,9 @@ def surfacing5(tris, mesh, tool, stock, stepover=2.0, lead=15.0, max_tilt=45.0, 
         C = C + N * allowance
         tips = C - R * A
         moves.append(("rapid", np.array([tips[0, 0], tips[0, 1], clear_z]), zax))
-        moves += [("feed", t, a) for t, a in zip(tips, A)]
+        moves.append(("rapid", tips[0] + A[0] * ENTRY_HEIGHT, A[0]))
+        moves.append(("plunge", tips[0], A[0]))
+        moves += [("feed", t, a) for t, a in zip(tips[1:], A[1:])]
         moves.append(("rapid", np.array([tips[-1, 0], tips[-1, 1], clear_z]), zax))
     return moves
 
@@ -227,7 +290,7 @@ def path_length(moves: List[Move]) -> Tuple[float, float]:
     feed = rapid = 0.0
     for (k0, p0, *_), (k1, p1, *_) in zip(moves, moves[1:]):
         d = float(np.linalg.norm(p1 - p0))
-        if k1 == "feed" and k0 == "feed":
+        if k1 == "feed" and k0 in ("feed", "plunge") or k1 == "plunge":
             feed += d
         else:
             rapid += d
@@ -239,7 +302,7 @@ def zmap_check(tris, mesh, tool, moves: List[Move], stock, cell: float = 1.0):
     zm = lc.make_stock(stock["xmin"], stock["xmax"], stock["ymin"], stock["ymax"], cell, stock["zmax"])
     passes, cur = [], []
     for k, p, *_ in moves:
-        if k == "feed":
+        if k in ("feed", "plunge"):
             c = lc.CLPoint()
             c.x, c.y, c.z, c.contact = float(p[0]), float(p[1]), float(p[2]), True
             cur.append(c)

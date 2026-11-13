@@ -64,7 +64,7 @@ def test_raster_program_expands_and_posts(robot_name, work, part, tools):
     seg = [s for s in ex.segments if s.feed.any()][0]
     # every robot sample puts the TCP on the CL point with the tool axis down
     moves = cam.raster(part[0], part[1], tools["W7"], st.stock, stepover=6.0, tolerance=0.05)
-    fm = [m for m in moves if m[0] == "feed"]
+    fm = [m for m in cam.simplify(moves, 0.05) if m[0] in ("feed", "plunge")]   # the step's tolerance is 0.05
     fq = seg.q[seg.feed]
     assert len(fq) == len(fm)                     # rapids are sampled finer; every cutting point is one sample
     W = st.work_frame()
@@ -189,7 +189,8 @@ def test_feed_gate_and_feed_reaches_every_cut(part, tools):
     assert not ex.errors
     text = post.write(ex.records, "urscript", **program.post_options("ur10e", "urscript"))
     cuts = [l for l in text.splitlines() if l.strip().startswith("movep(")]
-    assert cuts and all(re.search(r"v=0\.0100,", l) for l in cuts)
+    assert cuts and all(re.search(r"v=0\.0(100|050),", l) for l in cuts)    # feed, or plunge at half the feed
+    assert sum(1 for l in cuts if "v=0.0100," in l) > 10 * sum(1 for l in cuts if "v=0.0050," in l)
 
 
 def test_linear_moves_post_as_linear_with_step_speed_and_blend(part, tools):
@@ -277,6 +278,47 @@ def test_surfacing5_ball_centre_on_offset_surface_and_lead(part, tools):
     for dialect in ("urscript", "krl", "rapid"):
         back = post.joint_targets(post.write(ex.records, dialect), dialect)
         assert len(back) == len([r for r in ex.records if r.kind in ("movej", "movel")])
+
+
+def test_posted_path_within_tolerance_and_links_are_straight(part, tools):
+    """Every CL point the simplification drops lies within the step tolerance of the posted path; links and
+    retracts post as straight moves, and each pass starts with a plunge from just above the stone."""
+    tris, mesh = part
+    stock = cam.stock_box(tris, 3.0)
+    moves = cam.raster(tris, mesh, tools["W7"], stock, stepover=6.0, tolerance=0.01)
+    kept = cam.simplify(moves, 0.01)
+    assert len(kept) < len(moves)
+    feed_runs, cur = [], []
+    for m in kept:
+        if m[0] in ("feed", "plunge"):
+            cur.append(np.asarray(m[1]))
+        elif cur:
+            feed_runs.append(np.array(cur))
+            cur = []
+    polyline = [r for r in feed_runs if len(r) > 1]
+    for k, m in enumerate(moves):
+        if m[0] != "feed":
+            continue
+        p = np.asarray(m[1])
+        best = min(float(np.min([np.linalg.norm(np.cross(b - a, a - p)) / max(np.linalg.norm(b - a), 1e-12)
+                                 if 0 <= (p - a) @ (b - a) <= (b - a) @ (b - a) else
+                                 min(np.linalg.norm(p - a), np.linalg.norm(p - b))
+                                 for a, b in zip(r[:-1], r[1:])])) for r in polyline)
+        assert best <= 0.01 + 1e-6
+        if k > 400:
+            break
+    kinds = [m[0] for m in moves]
+    assert kinds.count("plunge") == sum(1 for a, b in zip(kinds, kinds[1:]) if b == "plunge")
+    for a, b in zip(moves, moves[1:]):
+        if b[0] == "plunge":
+            assert a[0] == "rapid" and abs(a[1][2] - b[1][2] - cam.ENTRY_HEIGHT) < 1e-9 or a[1][2] - b[1][2] < 1e-9
+    st = program.Station(robot="ur10e", work_xyz=[0.55, 0.15, 0.05], stock=stock)
+    prog = program.Program("P", [program.Step("raster", {"tool": "W7", "stepover": 6.0, "feed": 600.0,
+                                                         "tolerance": 0.01})])
+    ex = program.expand(st, program.load_robot("ur10e"), prog, tools, part)
+    recs = [r for r in ex.records if r.kind in ("movej", "movel")]
+    assert recs[0].kind == "movej" and all(r.kind == "movel" for r in recs[1:])
+    assert sum(1 for r in recs if r.data.get("cut")) == len([m for m in kept if m[0] in ("feed", "plunge")])
 
 
 def test_station_json_round_trip():
