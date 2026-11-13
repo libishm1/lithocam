@@ -1,7 +1,7 @@
 # Copyright 2026 The lithocam authors. SPDX-License-Identifier: Apache-2.0
 """lithocam studio: one window for stone CAM and robot programming.
 
-Layout (RoboDK's station tree and robot panel, RhinoCAM's machining browser and operation toolbars):
+Layout (work tree and objects browser, machining operation toolbars, 3D view, robot panel, output tabs):
 
   toolbars   Station (open, save, part, tools, views, teach, simulate, post) and Machining (setup and one
              drop-down per operation category, generate, stock check)
@@ -24,7 +24,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 from PySide6.QtCore import QMimeData, QObject, QSize, Qt, QThread, QTimer, Signal
-from PySide6.QtGui import QAction, QBrush, QColor, QFont, QIcon, QPainter, QPixmap
+from PySide6.QtGui import QAction, QBrush, QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QComboBox, QDockWidget, QDoubleSpinBox,
                                QFileDialog, QFormLayout, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
                                QListWidget, QListWidgetItem, QMainWindow, QMenu, QMessageBox, QPlainTextEdit,
@@ -274,6 +274,7 @@ class ToolPanel(QWidget):
 class RobotPanel(QWidget):
     moved = Signal(object)          # joint vector (rad)
     teach = Signal(str)             # "movej" or "movel"
+    save_target = Signal()
     robot_changed = Signal(str)
     spindle_changed = Signal(str)
 
@@ -371,7 +372,8 @@ class RobotPanel(QWidget):
         self.info.setWordWrap(True)
         v.addWidget(self.info)
         h = QHBoxLayout()
-        for text, slot in (("Home", self._home), ("Teach MoveJ", lambda: self.teach.emit("movej")),
+        for text, slot in (("Home", self._home), ("Save target", self.save_target.emit),
+                           ("Teach MoveJ", lambda: self.teach.emit("movej")),
                            ("Teach MoveL", lambda: self.teach.emit("movel"))):
             b = QPushButton(text)
             b.clicked.connect(slot)
@@ -470,6 +472,7 @@ class Properties(QWidget):
         self.form = QFormLayout(self)
         self.step: Optional[program.Step] = None
         self.tools: List = []
+        self.targets: List = []          # the station's named targets (list of dicts, shared)
 
     def show_step(self, step: Optional[program.Step]):
         while self.form.rowCount():
@@ -516,6 +519,13 @@ class Properties(QWidget):
                 w.addItems(kind[7:].split("|"))
                 w.setCurrentText(str(val))
                 w.currentTextChanged.connect(lambda v, k=key: self._set(k, v))
+            elif kind == "target":
+                w = QComboBox()
+                w.addItem("(none: use the stored values)", "")
+                for t in self.targets:
+                    w.addItem(t["name"], t["name"])
+                w.setCurrentIndex(max(w.findData(val or ""), 0))
+                w.currentIndexChanged.connect(lambda *_, k=key, ww=w: self._set(k, ww.currentData()))
             elif kind in ("joints", "pose"):
                 w = QWidget()
                 h = QHBoxLayout(w)
@@ -633,6 +643,8 @@ class Studio(QMainWindow):
         self.tree.request_add.connect(self._add_step_at)
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self._tree_menu)
+        self.tree.itemDoubleClicked.connect(
+            lambda it, _c: self._goto_target(it.data(0, ROLE + 2)) if it.data(0, ROLE + 1) == "target" else None)
         self.palette = QToolBox()
         for cat, _ in catalog.CATEGORIES:
             lst = PaletteList(catalog.steps_in(cat))
@@ -650,6 +662,9 @@ class Studio(QMainWindow):
         self.robot_panel.teach.connect(self._teach)
         self.robot_panel.robot_changed.connect(self._set_robot)
         self.robot_panel.spindle_changed.connect(self._set_spindle)
+        self.robot_panel.save_target.connect(lambda: self._save_target())
+        self.robot_panel.frame.currentIndexChanged.connect(lambda *_: self._robot_moved(self.robot_panel.q))
+        self.view.win.on_gizmo = self._gizmo_moved
         self.props = Properties()
         self.props.edited.connect(self._step_edited)
         self.props.teach_into.connect(self._teach_into)
@@ -720,6 +735,13 @@ class Studio(QMainWindow):
         self._act(tb, "Program", glyph_icon("+P", "#3d7bd9", 22), self._add_program, "Add program")
         self._act(tb, "MoveJ", glyph_icon("J", "#3d7bd9", 22), lambda: self._teach("movej"), "Teach a joint move")
         self._act(tb, "MoveL", glyph_icon("L", "#3d7bd9", 22), lambda: self._teach("movel"), "Teach a linear move")
+        self.act_gizmo = self._act(tb, "Move TCP", glyph_icon("✥", "#00897b", 22), self._toggle_gizmo,
+                                   "Drag the tool with the mouse (T)")
+        self.act_gizmo.setCheckable(True)
+        self.act_gizmo.setShortcut(QKeySequence("T"))
+        a = self._act(tb, "Save target", glyph_icon("+T", "#00897b", 22), lambda: self._save_target(),
+                      "Save the current position as a named target (Ctrl+T)")
+        a.setShortcut(QKeySequence("Ctrl+T"))
         tb.addSeparator()
         self._act(tb, "Simulate", st.standardIcon(QStyle.SP_MediaPlay), self._simulate, "Expand and simulate")
         self._act(tb, "Stop", st.standardIcon(QStyle.SP_MediaStop), self._stop)
@@ -786,7 +808,7 @@ class Studio(QMainWindow):
         self.robot_panel.combo.setCurrentIndex(self.robot_panel.combo.findData(name))
         self.robot_panel.combo.blockSignals(False)
         self.robot_panel.set_robot(self.robot, program.HOME.get(name, [0.0] * self.robot.dof))
-        if name == "kr120" and first is False:
+        if name.startswith("kr") and first is False:
             self.station.work_xyz = [1.6, 0.0, 0.3]
         elif name == "ur10e" and first is False:
             self.station.work_xyz = [0.7, 0.0, 0.0]
@@ -802,6 +824,8 @@ class Studio(QMainWindow):
 
     def _robot_moved(self, q):
         self.view.update_robot(self.robot.link_transforms(q), self.robot.tcp(q))
+        if self.view.win.gizmo_on and not self.view.win._dragging:
+            self.view.set_gizmo(self.robot.tcp(q), self._gizmo_axes())
 
     def _set_spindle(self, key):
         self.station.spindle = spindles.to_dict(spindles.PRESETS[key])
@@ -882,6 +906,7 @@ class Studio(QMainWindow):
         self.tree.blockSignals(True)
         self.tree.clear()
         st = self.station
+        self.props.targets = st.targets
         root = QTreeWidgetItem(["Station"])
         root.setIcon(0, glyph_icon("St", "#455a64", 20))
         self.tree.addTopLevelItem(root)
@@ -907,6 +932,16 @@ class Studio(QMainWindow):
             stock = QTreeWidgetItem(work, ["Stock {:.0f} x {:.0f} x {:.0f} mm".format(
                 s["xmax"] - s["xmin"], s["ymax"] - s["ymin"], s["zmax"] - s["zmin"])])
             stock.setIcon(0, glyph_icon("B", "#f2b705", 20))
+        tgs = QTreeWidgetItem(root, ["Targets ({})".format(len(st.targets))])
+        tgs.setIcon(0, glyph_icon("+", "#00897b", 20))
+        tgs.setToolTip(0, "Saved robot positions. Ctrl+T saves the current one; double-click moves the robot there")
+        for t in st.targets:
+            ti = QTreeWidgetItem(tgs, ["{}   {:.1f}, {:.1f}, {:.1f} mm".format(
+                t["name"], *(np.asarray(t["pose"])[:3, 3] * 1000))])
+            ti.setData(0, ROLE + 1, "target")
+            ti.setData(0, ROLE + 2, t["name"])
+            ti.setIcon(0, glyph_icon("T", "#00897b", 20))
+        tgs.setExpanded(True)
         progs = QTreeWidgetItem(root, ["Programs"])
         progs.setIcon(0, glyph_icon("Pg", "#3d7bd9", 20))
         sel_item = None
@@ -1011,13 +1046,23 @@ class Studio(QMainWindow):
         it = self.tree.itemAt(pos)
         m = QMenu(self)
         step = it.data(0, ROLE) if it is not None else None
+        if it is not None and it.data(0, ROLE + 1) == "target":
+            name = it.data(0, ROLE + 2)
+            m.addAction("Move robot here", lambda: self._goto_target(name))
+            m.addAction("Add joint move to it", lambda: self._target_step("movej", name))
+            m.addAction("Add linear move to it", lambda: self._target_step("movel", name))
+            m.addAction("Update from current position", lambda: self._save_target(name))
+            m.addAction("Rename", lambda: self._rename_target(name))
+            m.addAction("Delete target", lambda: self._delete_target(name))
+            m.exec(self.tree.viewport().mapToGlobal(pos))
+            return
         if isinstance(step, program.Step):
             m.addAction("Delete step", lambda: self._delete_step(step))
             m.addAction("Duplicate step", lambda: self._dup_step(step))
         if it is not None and it.data(0, ROLE + 1) == "program":
             p = it.data(0, ROLE + 2)
-            m.addAction("Simulate this program", lambda: (self.tree.setCurrentItem(it), self._simulate()))
-            m.addAction("Post this program", lambda: (self.tree.setCurrentItem(it), self._post()))
+            m.addAction("Simulate this program", lambda: self._simulate(prog=p))
+            m.addAction("Post this program", lambda: self._post(prog=p))
             m.addAction("Delete program", lambda: self._delete_program(p))
         m.addAction("Add program", self._add_program)
         m.exec(self.tree.viewport().mapToGlobal(pos))
@@ -1053,6 +1098,87 @@ class Studio(QMainWindow):
         step = self._current_step()
         if it is not None and step is not None:
             it.setText(0, step.title())
+
+    # ---------------------------------------------------------------- targets and the TCP handle
+    def _save_target(self, name=""):
+        tool = self._first_tool()
+        t = self.station.add_target(self.robot_panel.q, self.robot.tcp(self.robot_panel.q),
+                                    getattr(tool, "id", "") if tool is not None else "", name)
+        self.props.targets = self.station.targets
+        self._rebuild_tree()
+        self.say("Saved target {} at {:.1f}, {:.1f}, {:.1f} mm".format(t["name"], *(np.asarray(t["pose"])[:3, 3] *
+                                                                                    1000)))
+        return t
+
+    def _goto_target(self, name):
+        t = self.station.target(name)
+        if t is not None:
+            self.robot_panel.set_q(np.radians(np.asarray(t["joints"], dtype=float)))
+            self.say("Robot at target {}".format(name))
+
+    def _target_step(self, kind, name):
+        step = program.Step(kind, dict(catalog.default_params(catalog.BY_ID[kind]), target=name))
+        prog = self._current_program()
+        cur = self._current_step()
+        if cur is not None and cur in prog.steps:
+            prog.steps.insert(prog.steps.index(cur) + 1, step)
+        else:
+            prog.steps.append(step)
+        self._rebuild_tree(select=step)
+        self.say("Added {} to target {}".format(catalog.BY_ID[kind].label.lower(), name))
+
+    def _rename_target(self, name):
+        from PySide6.QtWidgets import QInputDialog
+        new, ok = QInputDialog.getText(self, "Rename target", "Name", text=name)
+        new = new.strip()
+        if not ok or not new or new == name:
+            return
+        if self.station.target(new) is not None:
+            self.say("A target named {} exists already".format(new))
+            return
+        self.station.target(name)["name"] = new
+        for p in self.station.programs:          # steps follow the rename
+            for s in p.steps:
+                if s.params.get("target") == name:
+                    s.params["target"] = new
+        self._rebuild_tree()
+
+    def _delete_target(self, name):
+        used = [s for p in self.station.programs for s in p.steps if s.params.get("target") == name]
+        if used and QMessageBox.question(self, "Delete target", "{} steps use {}. Delete it anyway? They will keep "
+                                         "their stored values.".format(len(used), name)) != QMessageBox.Yes:
+            return
+        t = self.station.target(name)
+        for s in used:                           # keep the motion: copy the values into the step
+            s.params.pop("target", None)
+            s.params["joints"], s.params["pose"] = t["joints"], t["pose"]
+        self.station.targets.remove(t)
+        self._rebuild_tree()
+
+    def _gizmo_axes(self):
+        f = self.robot_panel.frame.currentText().lower()
+        if f == "tool":
+            return self.robot.tcp(self.robot_panel.q)[:3, :3]
+        if f == "work":
+            return self.station.work_frame()[:3, :3]
+        return np.eye(3)
+
+    def _toggle_gizmo(self, on):
+        self.view.show_gizmo(on)
+        if on:
+            self.view.set_gizmo(self.robot.tcp(self.robot_panel.q), self._gizmo_axes())
+            self.say("Drag the arrows to move along an axis, the rings to rotate, the centre square to move in the "
+                     "screen plane. Hold Shift to snap to the jog step. Ctrl+T saves the position as a target.")
+
+    def _gizmo_moved(self, F, final):
+        q, ok = self.robot.solve_pose(F, self.robot_panel.q)
+        jump = float(np.max(np.abs(np.asarray(q) - self.robot_panel.q))) if ok else 0.0
+        if ok and jump < math.radians(30):         # refuse a branch flip in the middle of a drag
+            self.robot_panel.set_q(q)
+        elif final:
+            self.say("Out of reach or at a joint limit; the robot stays at the last reachable pose")
+        if final and self.view.win.gizmo_on:
+            self.view.set_gizmo(self.robot.tcp(self.robot_panel.q), self._gizmo_axes())
 
     # ---------------------------------------------------------------- teach
     def _teach(self, kind):
@@ -1148,8 +1274,9 @@ class Studio(QMainWindow):
         self.view.win.update_camera()
 
     # ---------------------------------------------------------------- simulate and post
-    def _simulate(self):
-        prog = self._current_program()
+    def _simulate(self, *_args, prog=None):
+        prog = prog or self._current_program()
+        self._expanded_prog = prog
         self.say("Expanding '{}' on the {} ...".format(prog.name, program.ROBOTS[self.station.robot][0]))
         th = QThread(self)
         wk = Expander(self.station, program.load_robot(self.station.robot), prog, self._tools(), self.part,
@@ -1211,6 +1338,41 @@ class Studio(QMainWindow):
             QApplication.quit()
         QTimer.singleShot(1500, grab)
 
+    def _teach_smoke(self, out):
+        """--teach-smoke: turn the TCP handle on, drag the z arrow 80 mm down and the z ring 30 deg through the same
+        code path as the mouse, save two targets, add a move to each, capture, quit."""
+        self.act_gizmo.setChecked(True)
+        self._toggle_gizmo(True)
+        win = self.view.win
+        QApplication.processEvents()
+        cam = win.camera_model()
+        g = win.gizmo
+        L = g.length(cam)
+        o = g.frame[:3, 3]
+        self._save_target("approach")
+        for k, delta in ((2, -0.08),):
+            a = g.handle_frame()[:3, k]
+            p0, _ = cam.project(o + a * L * 0.7)
+            p1, _ = cam.project(o + a * (L * 0.7 + delta))
+            assert g.begin(cam, *p0), "the z arrow was not picked"
+            F = g.drag(cam, *p1)
+            self._gizmo_moved(F, True)
+            g.end()
+        self._save_target("cut_start")
+        self._target_step("movej", "approach")
+        self._target_step("movel", "cut_start")
+        moved = np.linalg.norm(np.asarray(self.station.target("cut_start")["pose"])[:3, 3] -
+                               np.asarray(self.station.target("approach")["pose"])[:3, 3])
+        self.say("teach smoke: handle drag moved the TCP {:.1f} mm".format(moved * 1000))
+
+        def grab():
+            g2 = self.frameGeometry()
+            QApplication.primaryScreen().grabWindow(0, g2.x(), g2.y(), g2.width(), g2.height()).save(out)
+            Path(out).with_suffix(".log.txt").write_text(self.log.toPlainText())
+            Path(out).with_suffix(".lcs.json").write_text(self.station.to_json())
+            QApplication.quit()
+        QTimer.singleShot(1200, grab)
+
     def _play(self, on):
         self.btn_play.setIcon(self.style().standardIcon(QStyle.SP_MediaPause if on else QStyle.SP_MediaPlay))
         if on and len(self.sim_q):
@@ -1253,9 +1415,20 @@ class Studio(QMainWindow):
         self.btn_play.setChecked(False)
         self.sim.setValue(0)
 
-    def _post(self, show_only=False):
+    def _post(self, show_only=False, prog=None):
         if self.expansion is None:
             self.say("Simulate first: the post uses the verified joint solutions")
+            return
+        prog = prog or self._expanded_prog
+        if self.expansion.key != program.station_key(self.station, prog):
+            self.say("Not posted: '{}' changed (or is not the simulated program) since the last simulation. "
+                     "Simulate it again, then post.".format(prog.name))
+            self.output.setPlainText("; not posted: the program changed since it was simulated\n")
+            return
+        if self.expansion.errors:
+            self.say("Not posted: {} error(s) must be fixed first:\n  ".format(len(self.expansion.errors)) +
+                     "\n  ".join(self.expansion.errors))
+            self.output.setPlainText("; not posted:\n" + "\n".join("; " + e for e in self.expansion.errors) + "\n")
             return
         dialect = self.post_box.currentData()
         text = post.write(self.expansion.records, dialect, **program.post_options(self.station.robot, dialect))
@@ -1267,8 +1440,7 @@ class Studio(QMainWindow):
                                                                       "PASS" if same else "FAIL"))
         if show_only:
             return
-        fn, _ = QFileDialog.getSaveFileName(self, "Save robot program",
-                                            self._current_program().name + post.EXTENSIONS[dialect])
+        fn, _ = QFileDialog.getSaveFileName(self, "Save robot program", prog.name + post.EXTENSIONS[dialect])
         if fn:
             Path(fn).write_text(text)
             self.say("Saved {}".format(fn))
@@ -1356,7 +1528,10 @@ def main(argv=None) -> int:
         w.open_station(stations[0])
     w.show()
     w.showMaximized()
-    if "--smoke" in argv:
+    if "--teach-smoke" in argv:
+        out = argv[argv.index("--teach-smoke") + 1]
+        QTimer.singleShot(1500, lambda: w._teach_smoke(out))
+    elif "--smoke" in argv:
         k = argv.index("--smoke")
         frac = float(argv[k + 2]) if len(argv) > k + 2 and not argv[k + 2].startswith("--") else 0.6
         w.smoke = (argv[k + 1], frac)

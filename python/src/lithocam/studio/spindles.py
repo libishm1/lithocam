@@ -37,6 +37,9 @@ class Spindle:
     mass_kg: float = 0.0
     control: str = ""                 # how the robot program commands it (I/O, analog, URCap, VFD)
     source: str = "example"
+    # Side-mounted spindle whose end-effector TCP is given in the flange frame (x y z mm, a b c degrees): the cutter
+    # axis is the TCP frame z axis, not the flange axis. None = the coaxial stack above.
+    tcp_flange: Optional[Tuple[float, ...]] = None
 
     def gauge(self) -> float:
         """Flange face to collet face, mm."""
@@ -45,12 +48,20 @@ class Spindle:
     def tcp(self, tool_stickout_mm: float) -> np.ndarray:
         """TCP (cutter tip) in the flange frame, metres."""
         T = np.eye(4)
+        if self.tcp_flange is not None:
+            from lithocam.robomove import rpy_matrix
+            x, y, z, a, b, c = self.tcp_flange[:6]
+            T[:3, :3] = rpy_matrix(a, b, c)
+            T[:3, 3] = np.array([x, y, z]) / 1000 + T[:3, 2] * tool_stickout_mm / 1000
+            return T
         T[0, 3], T[1, 3] = self.axis_offset[0] / 1000, self.axis_offset[1] / 1000
         T[2, 3] = (self.gauge() + tool_stickout_mm) / 1000
         return T
 
     def parts(self) -> List[Tuple[str, float, float, float]]:
         """(name, diameter mm, z0 mm, length mm) of the coaxial cylinders, in the flange frame along z."""
+        if self.tcp_flange is not None:
+            return []   # side-mounted: the coaxial stack does not describe it; the cutter is still drawn
         z = 0.0
         out = [("plate", self.plate_diameter, z, self.plate_thickness)]
         z += self.plate_thickness
@@ -116,4 +127,43 @@ def to_dict(s: Spindle) -> Dict:
 def from_dict(d: Dict) -> Spindle:
     d = dict(d)
     d["axis_offset"] = tuple(d.get("axis_offset", (0.0, 0.0)))
+    if d.get("tcp_flange") is not None:
+        d["tcp_flange"] = tuple(d["tcp_flange"])
     return Spindle(**d)
+
+
+def register_qlab(root=None) -> List[str]:
+    """Add one preset per Quarra Stone Q-LAB spindle end effector (KR480MT-D, KR480MT-M, KR500), read at run time
+    from the local clone (LITHOCAM_QLAB or the default path; see lithocam.robomove). Nothing from the clone is
+    stored in this repository. Returns the keys added (empty when the clone is absent)."""
+    from lithocam import robomove as rm
+    added = []
+    for folder in rm.find_backups(root):
+        if folder.name.endswith("_Good"):
+            continue   # same spindle end effector in the _Good copy of the KR500 cell
+        cb = rm.read_cell_backup(folder)
+        ee = rm.spindle_end_effector(cb)
+        if ee is None or len(ee.tcp) < 6:
+            continue
+        key = "qlab_" + folder.name.lower().replace("-", "_").replace("cellkr500_quarrastone_00", "kr500")
+        words = ""
+        if cb.lang and cb.lang.apt:
+            words = "KRL words {} (Q-LAB L_ file); ".format(
+                ", ".join(v[0] + v[1] for v in cb.lang.apt.values() if v[0]))
+        PRESETS[key] = Spindle(
+            key, "Quarra Stone spindle, {} cell (Q-LAB end effector, side-mounted)".format(folder.name),
+            control=words + "start/stop and speed as the cell program sets them",
+            tcp_flange=tuple(ee.tcp[:6]),
+            source="{}, {}/{}: end effector '{}' TCP; body size, collet and speeds not stated".format(
+                rm.CREDIT, folder.parent.name, folder.name, ee.name))
+        added.append(key)
+    for robot, key in (("kr480_r3330_mt", "qlab_kr480mt_d"), ("kr500_r2830_mt", "qlab_kr500")):
+        if key in PRESETS:
+            DEFAULT_FOR_ROBOT[robot] = key
+    return added
+
+
+try:
+    register_qlab()
+except Exception:   # noqa: BLE001  (a missing or odd clone must never break the studio)
+    pass

@@ -1,6 +1,6 @@
 # Copyright 2026 The lithocam authors. SPDX-License-Identifier: Apache-2.0
-"""Catalogue of program steps for the studio palette: robot instructions (RoboDK-style) and machining operations
-(RhinoCAM / SprutCAM-style), stone operations first. Status follows docs/OPERATIONS.md:
+"""Catalogue of program steps for the studio palette: robot instructions and machining operations,
+stone operations first. Status follows docs/OPERATIONS.md:
 
   done      the studio generates a path for it now;
   partial   the kernel exists, the studio keeps the step and posts a comment until its generator lands;
@@ -49,9 +49,11 @@ _LINK = (("clearance", "Clearance height", "float", 20.0, "mm above stock"),
 STEPS: List[StepSpec] = [
     # ---------------------------------------------------------------- robot instructions
     StepSpec("movej", "Joint move", "Robot", "J", "done",
-             params=(("joints", "Joints", "joints", None, "deg"), ("speed", "Speed", "float", 50.0, "% of max"))),
+             params=(("target", "Target", "target", "", "name; overrides joints"),
+                     ("joints", "Joints", "joints", None, "deg"), ("speed", "Speed", "float", 50.0, "% of max"))),
     StepSpec("movel", "Linear move", "Robot", "L", "done",
-             params=(("pose", "TCP pose", "pose", None, "mm, deg"), ("speed", "Speed", "float", 100.0, "mm/s"),
+             params=(("target", "Target", "target", "", "name; overrides pose"),
+                     ("pose", "TCP pose", "pose", None, "mm, deg"), ("speed", "Speed", "float", 100.0, "mm/s"),
                      ("blend", "Blend radius", "float", 0.0, "mm"))),
     StepSpec("set_tool", "Set tool", "Robot", "T", "done", "any", params=(("tool", "Tool", "tool", "", ""),)),
     StepSpec("set_frame", "Set reference", "Robot", "F", "partial",
@@ -73,9 +75,37 @@ STEPS: List[StepSpec] = [
     StepSpec("tool_change", "Tool change", "Setup", "TC", "done", "any", params=(("tool", "Tool", "tool", "", ""),)),
     # ---------------------------------------------------------------- stone (the niche, first)
     StepSpec("wire_ruled", "Diamond wire: ruled surface", "Stone", "W", "partial", "wire_cut",
-             doc="lithocam.ruled + robot.wire_face_path; needs a STEP part (OCP)"),
+             params=(("feed", "Feed", "float", 0.0, "mm/min across the stone (0 = tool)"),
+                     ("faces", "Faces", "text", "all", "all, or face indices 1,4,7"),
+                     ("rolls", "Wire rolls tried", "text", ",".join(str(a) for a in range(-90, 91, 10)), "deg"),
+                     ("max_step_deg", "Largest joint step between rulings", "float", 30.0, "deg"),
+                     ("lead", "Lead-in and lead-out rulings", "bool", True, ""),
+                     ("auto_table", "Turn the table to face each face", "bool", True, "")),
+             doc="Sweeps the diamond wire over the part's ruled faces (Station.ruled_path, from lithocam.ruled)."),
     StepSpec("wire_planar", "Diamond wire: planar cut", "Stone", "W|", "partial", "wire_cut"),
-    StepSpec("disc_cut", "Disc saw cut", "Stone", "D", "planned", "disc_cut", _LINK),
+    StepSpec("disc_cut", "Disc saw: profile with kerf", "Stone", "D", "partial", "disc_cut",
+             (("outline", "Outline", "text", "", "x,y; x,y; ... mm, CCW, work frame (empty = stock box)"),
+              ("depth", "Depth", "float", 0.0, "mm along the blade (0 = through)"),
+              ("stepdown", "Step-down", "float", 10.0, "mm"),
+              ("bevel", "Bevel", "text", "0", "deg, one value or one per edge"),
+              ("flange_diameter", "Flange diameter", "float", 100.0, "mm"),
+              ("feed", "Feed", "float", 0.0, "mm/min (0 = tool / cutting data)"),
+              ("rpm", "Spindle", "float", 0.0, "rev/min (0 = tool / cutting data)"),
+              ("spins", "Blade spins tried", "int", 8, "per point (planner)")),
+             doc="Kerf-compensated saw cuts around a part outline (lithocam.discsaw): the blade's part-side face on "
+                 "each edge, full depth into convex corners, stops short of reflex corners and reports the uncut "
+                 "wedge."),
+    StepSpec("disc_comb", "Disc saw: comb roughing", "Stone", "Dc", "partial", "disc_cut",
+             (("region", "Region", "text", "", "x,y; x,y; ... mm, CCW, work frame"),
+              ("pitch", "Pitch", "float", 15.0, "mm"), ("depth", "Depth", "float", 10.0, "mm"),
+              ("stepdown", "Step-down", "float", 5.0, "mm"), ("angle", "Angle", "float", 0.0, "deg"),
+              ("cross_angle", "Cross angle", "text", "", "deg, empty = none"),
+              ("flange_diameter", "Flange diameter", "float", 40.0, "mm"),
+              ("feed", "Feed", "float", 0.0, "mm/min (0 = tool / cutting data)"),
+              ("rpm", "Spindle", "float", 0.0, "rev/min (0 = tool / cutting data)"),
+              ("spins", "Blade spins tried", "int", 8, "per point (planner)")),
+             doc="Parallel saw kerfs across a region (and an optional cross pass) to break out stone before "
+                 "finishing."),
     StepSpec("edge_profile", "Edge profile wheel", "Stone", "E", "planned", "edge_profile", _LINK),
     StepSpec("polish", "Polish (grit sequence)", "Stone", "P", "planned", "polish"),
     StepSpec("bush_hammer", "Bush-hammer texture", "Stone", "BH", "planned", "texture"),
@@ -106,7 +136,18 @@ STEPS: List[StepSpec] = [
              (("tilt", "Tilt", "float", 0.0, "deg"), ("yaw", "Turntable", "float", 0.0, "deg"))),
     StepSpec("flank", "Flank (swarf)", "5-axis", "Fl", "partial", "flank",
              doc="lithocam.flank; needs a STEP part with ruled faces (OCP)"),
-    StepSpec("surfacing5", "5-axis surfacing", "5-axis", "5D", "planned", "raster", _LINK),
+    StepSpec("surfacing5", "5-axis surfacing (ball, lead angle)", "5-axis", "5D", "partial", "raster",
+             (("stepover", "Stepover", "float", 2.0, "mm"), ("lead", "Lead angle", "float", 15.0,
+                                                              "deg, tool leans back from the surface normal"),
+              ("max_tilt", "Largest tilt from the setup axis", "float", 45.0, "deg"),
+              ("smooth", "Axis smoothing", "int", 7, "points"),
+              ("axis_rate", "Largest axis turn", "float", 2.0, "deg per mm of travel"),
+              ("allowance", "Stock to leave", "float", 0.0, "mm"),
+              ("spins", "Spindle spins tried", "int", 12, "per point (planner)"),
+              ("feed", "Feed", "float", 0.0, "mm/min"), ("rpm", "Spindle", "float", 0.0, "rev/min")) + _LINK,
+             doc="Simultaneous 5-axis ball finishing: the ball centre follows the drop-cutter offset surface (gouge "
+                 "free whatever the axis); the axis is the surface normal leaned back by the lead angle so the ball "
+                 "never cuts on its zero-speed tip; the planner picks the spin about the axis per point."),
     StepSpec("rotary4", "4-axis rotary", "5-axis", "4D", "planned", "raster", _LINK),
     # ---------------------------------------------------------------- holes
     StepSpec("drill", "Drill", "Holes", "Dr", "planned", "drill",

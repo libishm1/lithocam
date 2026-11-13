@@ -64,9 +64,11 @@ def test_raster_program_expands_and_posts(robot_name, work, part, tools):
     seg = [s for s in ex.segments if s.feed.any()][0]
     # every robot sample puts the TCP on the CL point with the tool axis down
     moves = cam.raster(part[0], part[1], tools["W7"], st.stock, stepover=6.0, tolerance=0.05)
-    assert len(seg.q) == len(moves)
+    fm = [m for m in moves if m[0] == "feed"]
+    fq = seg.q[seg.feed]
+    assert len(fq) == len(fm)                     # rapids are sampled finer; every cutting point is one sample
     W = st.work_frame()
-    for (kind, p), q in zip(moves[::25], seg.q[::25]):
+    for (kind, p), q in zip(fm[::25], fq[::25]):
         T = robot.tcp(q)
         want = program.down_pose(W, p)
         assert np.linalg.norm(T[:3, 3] - want[:3, 3]) < 1e-5
@@ -168,6 +170,113 @@ def test_spindle_stack_sets_the_tcp_and_checks_the_collet(part, tools):
     st2 = program.Station(robot="ur10e", work_xyz=[0.55, 0.15, 0.05], stock=cam.stock_box(part[0], 3.0),
                           spindle=spindles.to_dict(spindles.PRESETS["ur10e_example"]))
     assert program.Station.from_json(st2.to_json()).spindle_model() == st2.spindle_model()
+
+
+def test_feed_gate_and_feed_reaches_every_cut(part, tools):
+    """A cut with no feed is an error (never the writer's default speed); a set feed reaches every cutting move."""
+    import re
+    from lithocam import cutting_data
+    st = program.Station(robot="ur10e", work_xyz=[0.55, 0.15, 0.05], stock=cam.stock_box(part[0], 3.0),
+                         material="unobtainium")
+    robot = program.load_robot("ur10e")
+    tool = tools["W7"]
+    if float(getattr(tool, "feed", 0) or 0) <= 0 and cutting_data.lookup("unobtainium", "flat") == []:
+        prog = program.Program("NoFeed", [program.Step("raster", {"tool": "W7", "stepover": 12.0})])
+        ex = program.expand(st, robot, prog, tools, part)
+        assert ex.errors and "no feed" in ex.errors[0]
+    prog = program.Program("Feed", [program.Step("raster", {"tool": "W7", "stepover": 12.0, "feed": 600.0})])
+    ex = program.expand(st, robot, prog, tools, part)
+    assert not ex.errors
+    text = post.write(ex.records, "urscript", **program.post_options("ur10e", "urscript"))
+    cuts = [l for l in text.splitlines() if l.strip().startswith("movep(")]
+    assert cuts and all(re.search(r"v=0\.0100,", l) for l in cuts)
+
+
+def test_linear_moves_post_as_linear_with_step_speed_and_blend(part, tools):
+    st = program.Station(robot="kr120", work_xyz=[1.6, 0.0, 0.3], stock=cam.stock_box(part[0], 3.0))
+    robot = program.load_robot("kr120")
+    q0 = np.asarray(program.HOME["kr120"])
+    T = robot.tcp(q0)
+    T2 = T.copy()
+    T2[:3, 3] += [0.0, 0.05, -0.05]
+    prog = program.Program("Lin", [program.Step("movej", {"joints": list(np.degrees(q0)), "speed": 5.0}),
+                                   program.Step("movel", {"pose": T2.tolist(), "speed": 7.0, "blend": 3.0}),
+                                   program.Step("raster", {"tool": "W7", "stepover": 12.0, "feed": 600.0})])
+    ex = program.expand(st, robot, prog, tools, part)
+    krl = post.write(ex.records, "krl")
+    assert "$VEL_AXIS[1] = 5" in krl
+    assert "$VEL.CP = 0.0070" in krl and "$VEL.CP = 0.0100" in krl
+    assert krl.count("LIN {X") > 10 and "PTP {AXIS" in krl
+    rapid = post.write(ex.records, "rapid")
+    assert rapid.count("MoveL [[") > 10 and "ConfL \\Off;" in rapid and "[7.000, 500" in rapid
+    ur = post.write(ex.records, "urscript")
+    assert "v=0.0070, r=0.0030" in ur
+    # the LIN targets are the forward kinematics of the verified joints
+    import re
+    lins = list(re.finditer(r"LIN \{X ([^,]*), Y ([^,]*), Z ([^,]*),[^}]*\}[^;]*; q \[([^\]]*)\]", krl))
+    for m in lins[1:][::30]:          # lins[0] is the taught move, made before the cutter was mounted
+        q = [float(v) for v in m.group(4).split(",")]
+        robot.tcp_offset = np.asarray([r.data["tcp"] for r in ex.records if r.kind == "tool"][-1])
+        assert np.allclose(robot.tcp(q)[:3, 3] * 1000, [float(m.group(k)) for k in (1, 2, 3)], atol=2e-3)
+    for dialect in ("urscript", "krl", "rapid"):
+        back = post.joint_targets(post.write(ex.records, dialect), dialect)
+        rec_q = [r.data["q"] for r in ex.records if r.kind in ("movej", "movel")]
+        assert len(back) == len(rec_q) and np.max(np.abs(np.asarray(back) - np.asarray(rec_q))) < 1e-5
+
+
+def test_transitions_are_simulated_motions(part, tools):
+    st = program.Station(robot="ur10e", work_xyz=[0.55, 0.15, 0.05], stock=cam.stock_box(part[0], 3.0))
+    ex = program.expand(st, program.load_robot("ur10e"), raster_program(), tools, part)
+    q = ex.joints()
+    assert np.max(np.abs(np.diff(q, axis=0))) <= math.radians(2) + 1e-6 or \
+        any(s.label.startswith("transition") for s in ex.segments)
+    steps = []
+    for s in ex.segments:
+        if s.label.startswith("transition"):
+            steps.append(np.max(np.abs(np.diff(s.q, axis=0))) if len(s.q) > 1 else 0.0)
+    assert all(v <= math.radians(2) + 1e-9 for v in steps)
+    # no jump between consecutive segments larger than 2 deg
+    ends = [(a.q[-1], b.q[0]) for a, b in zip(ex.segments, ex.segments[1:]) if len(a.q) and len(b.q)]
+    assert all(np.max(np.abs(y - x)) <= math.radians(2) + 1e-6 for x, y in ends)
+
+
+def test_surfacing5_ball_centre_on_offset_surface_and_lead(part, tools):
+    """5-axis ball finishing: the ball centre (tip + R*axis) lies on the drop-cutter offset surface whatever the
+    axis; the axis leans from the surface normal by the lead angle (until the tilt clamp); the robot follows it."""
+    tris, mesh = part
+    st = program.Station(robot="ur10e", work_xyz=[0.55, 0.15, 0.05], stock=cam.stock_box(tris, 3.0))
+    ball = [t for t in tools.values() if t.kind == lc.ToolKind.BallEndMill and 4 <= t.diameter <= 12][0]
+    moves = cam.surfacing5(tris, mesh, ball, st.stock, stepover=6.0, lead=15.0, max_tilt=45.0, smooth=1)
+    feed = [m for m in moves if m[0] == "feed"]
+    assert len(feed) > 50
+    R = ball.diameter / 2
+    c = lc.cutter_of(ball)
+    leads = []
+    for _, tip, a in feed[::7]:
+        centre = tip + R * a
+        h = lc.drop_cutter(c, mesh, float(centre[0]), float(centre[1]))
+        if not math.isfinite(h):
+            continue                                                 # beyond the part: no contact
+        assert abs(centre[2] - (h + R)) < 1e-6                      # on the offset surface: no gouge
+        assert math.degrees(math.acos(min(1.0, a[2]))) <= 45.0 + 1e-6
+    prog = program.Program("F5", [program.Step("raster", {"tool": ball.id, "stepover": 20.0, "feed": 600.0}),
+                                  program.Step("surfacing5", {"tool": ball.id, "stepover": 6.0, "feed": 600.0,
+                                                              "spins": 8})])
+    robot = program.load_robot("ur10e")
+    ex = program.expand(st, robot, prog, tools, part)
+    seg = [s for s in ex.segments if s.label.startswith("5-axis") or "5-axis" in s.label][-1]
+    assert seg.ok.mean() > 0.95, ex.messages
+    # the robot TCP z axis is minus the tool axis at every solved feed point
+    recs = [r for r in ex.records if r.kind == "movel" and r.data.get("cut")]
+    robot.tcp_offset = np.asarray([r.data["tcp"] for r in ex.records if r.kind == "tool"][-1])
+    for r in recs[-200::23]:
+        T = robot.tcp(r.data["q"])
+        P = np.asarray(r.data["pose"])
+        assert np.linalg.norm(T[:3, 3] - P[:3, 3]) < 1e-5
+        assert P[:3, 2] @ T[:3, 2] > 1 - 1e-6
+    for dialect in ("urscript", "krl", "rapid"):
+        back = post.joint_targets(post.write(ex.records, dialect), dialect)
+        assert len(back) == len([r for r in ex.records if r.kind in ("movej", "movel")])
 
 
 def test_station_json_round_trip():

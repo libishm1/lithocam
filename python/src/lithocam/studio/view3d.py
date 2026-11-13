@@ -1,7 +1,7 @@
 # Copyright 2026 The lithocam authors. SPDX-License-Identifier: Apache-2.0
 """Qt3D view of the cell: robot (official visual meshes, decimated), part, stock box, toolpath, tool, frames.
 
-Mouse: left drag rotates about the view centre, right or middle drag pans, wheel zooms (RoboDK-like).
+Mouse: left drag rotates about the view centre, right or middle drag pans, wheel zooms.
 World units are metres, z up. Parts are given in mm in their work frame.
 """
 from __future__ import annotations
@@ -17,6 +17,7 @@ from PySide6.QtCore import QByteArray, QPoint, Qt
 from PySide6.QtGui import QColor, QMatrix4x4, QVector3D
 
 from .. import viz
+from .gizmo import Camera, Gizmo, ring_points
 from .kinematics import Robot
 
 
@@ -175,7 +176,28 @@ class CellWindow(Qt3DExtras.Qt3DWindow):
             le.addComponent(light)
         self._last: Optional[QPoint] = None
         self._button = None
+        self.gizmo = Gizmo()
+        self.gizmo_on = False
+        self.on_gizmo = None             # callback(frame 4x4, final: bool)
+        self.on_gizmo_hover = None       # callback(mode or None)
+        self.on_camera = None            # callback() after the camera moves
+        self.snap = (0.005, math.radians(5))
+        self._dragging = False
+        self._hover = None
         self.update_camera()
+
+    def camera_model(self) -> Camera:
+        cam = self.camera()
+        p, c = cam.position(), cam.viewCenter()
+        return Camera(np.array([p.x(), p.y(), p.z()]), np.array([c.x(), c.y(), c.z()]), np.array([0, 0, 1.0]),
+                      40.0, max(self.width(), 1), max(self.height(), 1))
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self.camera().lens().setPerspectiveProjection(40.0, max(self.width(), 1) / max(self.height(), 1), 0.01,
+                                                      200.0)
+        if self.on_camera:
+            self.on_camera()
 
     # camera
     def update_camera(self):
@@ -185,6 +207,8 @@ class CellWindow(Qt3DExtras.Qt3DWindow):
         cam.setPosition(QVector3D(*eye))
         cam.setViewCenter(QVector3D(*self.center))
         cam.setUpVector(QVector3D(0, 0, 1))
+        if getattr(self, "on_camera", None):
+            self.on_camera()
 
     def view(self, which: str, bbox: Optional[Tuple[np.ndarray, np.ndarray]] = None):
         if bbox is not None:
@@ -203,12 +227,36 @@ class CellWindow(Qt3DExtras.Qt3DWindow):
 
     def mousePressEvent(self, e):
         self._last, self._button = e.position().toPoint(), e.button()
+        if e.button() == Qt.LeftButton and self.gizmo_on:
+            shift = bool(e.modifiers() & Qt.ShiftModifier)
+            self.gizmo.snap_m, self.gizmo.snap_rad = (self.snap if shift else (0.0, 0.0))
+            pos = e.position()
+            if self.gizmo.begin(self.camera_model(), pos.x(), pos.y()):
+                self._dragging = True
 
     def mouseReleaseEvent(self, e):
         self._last = None
+        if self._dragging:
+            self._dragging = False
+            if self.on_gizmo:
+                self.on_gizmo(self.gizmo.frame.copy(), True)
+            self.gizmo.end()
 
     def mouseMoveEvent(self, e):
+        if self._dragging:
+            pos = e.position()
+            F = self.gizmo.drag(self.camera_model(), pos.x(), pos.y())
+            if F is not None and self.on_gizmo:
+                self.on_gizmo(F, False)
+            return
         if self._last is None:
+            if self.gizmo_on:
+                pos = e.position()
+                h = self.gizmo.pick(self.camera_model(), pos.x(), pos.y())
+                if h != self._hover:
+                    self._hover = h
+                    if self.on_gizmo_hover:
+                        self.on_gizmo_hover(h)
             return
         p = e.position().toPoint()
         dx, dy = p.x() - self._last.x(), p.y() - self._last.y()
@@ -237,6 +285,9 @@ class CellView:
         self.robot_links: Dict[str, Qt3DCore.QTransform] = {}
         self.robot_entities: List = []
         self._ents: Dict[str, List] = {}
+        self._gizmo_tf = None
+        self.win.on_camera = self._place_gizmo
+        self.win.on_gizmo_hover = self.highlight_gizmo
         self._grid()
 
     def _replace(self, key: str, ents: List):
@@ -292,6 +343,79 @@ class CellView:
             self._tcp_tf.setMatrix(qmatrix(tcp))
             if getattr(self, "_tool_tf", None) is not None:
                 self._tool_tf.setMatrix(qmatrix(self._tool_flange(tcp)))
+
+    # TCP handle (studio.gizmo): arrows translate, rings rotate, the centre square moves in the screen plane
+    AXIS_RGB = ((0.92, 0.25, 0.22), (0.3, 0.8, 0.3), (0.3, 0.5, 1.0))
+
+    def show_gizmo(self, on: bool):
+        self.win.gizmo_on = on
+        if not on:
+            self._replace("gizmo", [])
+            self._gizmo_tf = None
+            return
+        self._draw_gizmo(None)
+
+    def set_gizmo(self, frame: np.ndarray, axes: np.ndarray):
+        g = self.win.gizmo
+        g.frame = np.asarray(frame, dtype=float).copy()
+        g.axes = np.asarray(axes, dtype=float).copy()
+        self._place_gizmo()
+
+    def _place_gizmo(self):
+        if not self.win.gizmo_on or getattr(self, "_gizmo_tf", None) is None:
+            return
+        g = self.win.gizmo
+        T = g.handle_frame()
+        T[:3, :3] = T[:3, :3] * g.length(self.win.camera_model())
+        self._gizmo_tf.setMatrix(qmatrix(T))
+
+    def _draw_gizmo(self, hot):
+        """Unit-size handle in its own frame; the transform scales it to a constant size on screen."""
+        holder = Qt3DCore.QEntity(self.root)
+        tf = Qt3DCore.QTransform(holder)
+        holder.addComponent(tf)
+        Rk = [np.array([[0, 0, 1], [0, 1, 0], [-1, 0, 0]], float),     # z -> x
+              np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]], float),     # z -> y
+              np.eye(3)]
+        for k in range(3):
+            rgb = (1.0, 0.85, 0.2) if hot == ("axis", k) else self.AXIS_RGB[k]
+            shaft = cylinder_tris(0.018, 0.62, 10, z0=0.22)
+            tip = cylinder_tris(0.05, 0.16, 12, z0=0.84)
+            tip[:, :, :2] *= ((tip[:, :, 2:3] - 0.84) / -0.16 + 1.0)    # taper to a cone
+            for t in (shaft, tip):
+                mesh_entity(holder, (t.reshape(-1, 3) @ Rk[k].T).reshape(-1, 3, 3), rgb)
+        segs, cols = [], []
+        for k in range(3):
+            pts = ring_points(np.eye(4), k, Gizmo.RING, 72)
+            rgb = (1.0, 0.85, 0.2) if hot == ("ring", k) else self.AXIS_RGB[k]
+            segs += [[a, b] for a, b in zip(pts[:-1], pts[1:])]
+            cols += [rgb] * (len(pts) - 1)
+        s = 0.09
+        sq = np.array([[-s, -s, 0], [s, -s, 0], [s, s, 0], [-s, s, 0]])
+        rgb = (1.0, 0.85, 0.2) if hot == ("plane", -1) else (0.95, 0.95, 0.95)
+        segs += [[sq[i], sq[(i + 1) % 4]] for i in range(4)]
+        cols += [rgb] * 4
+        e2, _ = lines_entity(holder, np.array(segs), np.array(cols))
+        self._on_top(holder)
+        self._replace("gizmo", [holder])
+        self._gizmo_tf = tf
+        self._place_gizmo()
+
+    @staticmethod
+    def _on_top(entity):
+        """Draw an entity over everything (no depth test), so the handle is never hidden inside the tool."""
+        for e in [entity] + entity.findChildren(Qt3DCore.QEntity):
+            for comp in e.components():
+                if isinstance(comp, Qt3DRender.QMaterial) and comp.effect() is not None:
+                    for tech in comp.effect().techniques():
+                        for rp in tech.renderPasses():
+                            dt = Qt3DRender.QDepthTest(rp)
+                            dt.setDepthFunction(Qt3DRender.QDepthTest.Always)
+                            rp.addRenderState(dt)
+
+    def highlight_gizmo(self, hot):
+        if self.win.gizmo_on:
+            self._draw_gizmo(hot)
 
     # spindle and cutter on the flange, drawn in the flange frame
     SPINDLE_RGB = {"plate": (0.35, 0.36, 0.4), "body": (0.78, 0.8, 0.84), "nose": (0.3, 0.3, 0.33),

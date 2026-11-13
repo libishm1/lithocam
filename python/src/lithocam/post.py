@@ -132,14 +132,18 @@ def _urscript(recs: List[Rec], opt: Dict) -> str:
             if d.get("joint"):
                 vj = opt.get("joint_speed_max", 1.0) * float(d["joint"])
         elif r.kind == "movej":
-            out.append("  movej({}, a={}, v={:.4f}, r={:.4f})".format(fmt(d["q"]), acc_j, vj, radii[k]))
+            v = opt.get("joint_speed_max", 1.0) * float(d["vj"]) if d.get("vj") else vj
+            rr = float(d["r"]) if d.get("r") is not None else radii[k]
+            out.append("  movej({}, a={}, v={:.4f}, r={:.4f})".format(fmt(d["q"]), acc_j, v, rr))
         elif r.kind == "movel":
+            v = float(d["v"]) / 1000 if d.get("v") else vl          # record speed in mm/s
+            rr = float(d["r"]) if d.get("r") is not None else radii[k]
             if cut_motion == "movep" and d.get("cut") and d.get("pose") is not None:
                 # constant tool speed through the cut; target pose in the controller base frame
-                out.append("  movep({}, a={}, v={:.4f}, r={:.4f})  # q {}".format(pose_p(d["pose"]), acc_l, vl,
-                                                                               radii[k], fmt(d["q"])))
+                out.append("  movep({}, a={}, v={:.4f}, r={:.4f})  # q {}".format(pose_p(d["pose"]), acc_l, v,
+                                                                               rr, fmt(d["q"])))
             else:   # joint target: linear in tool space, ends in the verified configuration
-                out.append("  movel({}, a={}, v={:.4f}, r={:.4f})".format(fmt(d["q"]), acc_l, vl, radii[k]))
+                out.append("  movel({}, a={}, v={:.4f}, r={:.4f})".format(fmt(d["q"]), acc_l, v, rr))
         elif r.kind == "pause":
             s = float(d.get("seconds", -1))
             out.append("  sleep({:.3f})".format(s) if s >= 0 else '  popup("lithocam: paused, press Continue", '
@@ -166,13 +170,16 @@ def _krl(recs: List[Rec], opt: Dict) -> str:
     out: List[str] = []
     deg = lambda q: ", ".join("A{} {:.4f}".format(i + 1, math.degrees(float(v))) for i, v in enumerate(q))  # noqa
     approx = " C_PTP" if opt.get("blend", 0.0) > 0 else ""
+    cur_cp = [None]
     for r in recs:
         d = r.data
         if r.kind == "start":
             out += ["&ACCESS RVP", "DEF {}()".format(d.get("name", "lithocam")), "  ;FOLD INI",
-                    "  BAS(#INITMOV, 0)", "  ;ENDFOLD"]
+                    "  BAS(#INITMOV, 0)", "  ;ENDFOLD",
+                    "  $BASE = {X 0, Y 0, Z 0, A 0, B 0, C 0}  ; LIN targets are in the robot root frame"]
             if opt.get("blend", 0.0) > 0:
                 out.append("  $APO.CPTP = {:.0f}".format(min(100.0, opt["blend"])))
+                out.append("  $APO.CDIS = {:.1f}".format(float(opt["blend"])))
         elif r.kind == "end":
             out.append("END")
         elif r.kind == "comment":
@@ -189,7 +196,25 @@ def _krl(recs: List[Rec], opt: Dict) -> str:
                 out += ["  $VEL_AXIS[{}] = {}".format(i, pct) for i in range(1, 7)]
             if d.get("linear"):
                 out.append("  $VEL.CP = {:.4f}".format(float(d["linear"]) / 1000))
+                cur_cp[0] = float(d["linear"]) / 1000
+        elif r.kind == "movel" and d.get("pose") is not None:
+            # straight line in Cartesian space. KRL evaluates Status and Turn only for PTP; a LIN keeps the
+            # configuration of its start point, which a PTP to verified joints set. Pose: TCP in the robot root.
+            T = np.asarray(d["pose"], dtype=float)
+            a, b, c = zyx_deg(T[:3, :3])
+            x, y, z = T[:3, 3] * 1000
+            if d.get("v"):
+                v = float(d["v"]) / 1000
+                if v != cur_cp[0]:
+                    out.append("  $VEL.CP = {:.4f}".format(v))
+                    cur_cp[0] = v
+            cdis = " C_DIS" if (d.get("r") or opt.get("blend", 0.0)) else ""
+            out.append("  LIN {{X {:.3f}, Y {:.3f}, Z {:.3f}, A {:.4f}, B {:.4f}, C {:.4f}}}{}  ; q [{}]".format(
+                x, y, z, a, b, c, cdis, ", ".join("{:.6f}".format(float(v)) for v in d["q"])))
         elif r.kind in ("movej", "movel"):   # joint targets: the verified configuration
+            if d.get("vj"):
+                pct = max(1, min(100, round(float(d["vj"]) * 100)))
+                out += ["  $VEL_AXIS[{}] = {}".format(i, pct) for i in range(1, 7)]
             out.append("  PTP {{AXIS: {}}}{}".format(deg(d["q"]), approx))
         elif r.kind == "pause":
             s = float(d.get("seconds", -1))
@@ -220,6 +245,8 @@ def _rapid(recs: List[Rec], opt: Dict) -> str:
     zone = "fine" if opt.get("blend", 0.0) <= 0 else "z{}".format(int(max(1, min(200, opt["blend"]))))
     deg = lambda q: ", ".join("{:.4f}".format(math.degrees(float(v))) for v in q)  # noqa: E731
     n_speed = 0
+    speeds: Dict[float, str] = {}
+    lin_conf = [False]
     for r in recs:
         d = r.data
         if r.kind == "start":
@@ -238,6 +265,28 @@ def _rapid(recs: List[Rec], opt: Dict) -> str:
             speed = "v_lc{}".format(n_speed)
             lin = float(d.get("linear") or 100.0)
             head.append("  VAR speeddata {} := [{:.1f}, 500, 5000, 1000];".format(speed, lin))
+        elif r.kind == "movel" and d.get("pose") is not None:
+            # straight line to a robtarget (TCP in the robot base, wobj0). Quadrants cf1, cf4, cf6 come from the
+            # verified joints; cfx is not derived, so configuration monitoring is off for linear moves and the
+            # move keeps the configuration that the joint move before it set.
+            if not lin_conf[0]:
+                body.append("    ConfL \\Off;")
+                lin_conf[0] = True
+            T = np.asarray(d["pose"], dtype=float)
+            qq = quat(T[:3, :3])
+            qd = [math.degrees(float(v)) for v in d["q"]]
+            cf = [int(math.floor(qd[j] / 90.0)) for j in (0, 3, 5)]
+            sp = speed
+            if d.get("v"):
+                key = round(float(d["v"]), 3)
+                if key not in speeds:
+                    speeds[key] = "v_lcf{}".format(len(speeds) + 1)
+                    head.append("  VAR speeddata {} := [{:.3f}, 500, 5000, 1000];".format(speeds[key], key))
+                sp = speeds[key]
+            body.append("    MoveL [[{:.3f}, {:.3f}, {:.3f}], [{:.6f}, {:.6f}, {:.6f}, {:.6f}], [{}, {}, {}, 0], "
+                        "[9E9, 9E9, 9E9, 9E9, 9E9, 9E9]], {}, {}, {};  ! q [{}]".format(
+                            *(T[:3, 3] * 1000), *qq, *cf, sp, zone, tool,
+                            ", ".join("{:.6f}".format(float(v)) for v in d["q"])))
         elif r.kind in ("movej", "movel"):
             body.append("    MoveAbsJ [[{}], [9E9, 9E9, 9E9, 9E9, 9E9, 9E9]], {}, {}, {};".format(
                 deg(d["q"]), speed, zone, tool))
@@ -303,12 +352,18 @@ def joint_targets(text: str, dialect: str) -> List[List[float]]:
     if dialect == "urscript":   # movej/movel joint targets, and the verified joints noted on each movep
         for m in re.finditer(r"move[jl]\(\[([^\]]*)\]|movep\(p\[[^\]]*\][^#\n]*# q \[([^\]]*)\]", text):
             out.append([float(v) for v in (m.group(1) or m.group(2)).split(",")])
-    elif dialect == "krl":
-        for m in re.finditer(r"PTP \{AXIS: ([^}]*)\}", text):
-            out.append([math.radians(float(p.split()[1])) for p in m.group(1).split(",")])
+    elif dialect == "krl":   # PTP axis targets, and the verified joints noted on each LIN
+        for m in re.finditer(r"PTP \{AXIS: ([^}]*)\}|LIN \{[^}]*\}[^;\n]*; q \[([^\]]*)\]", text):
+            if m.group(1):
+                out.append([math.radians(float(p.split()[1])) for p in m.group(1).split(",")])
+            else:
+                out.append([float(v) for v in m.group(2).split(",")])
     elif dialect == "rapid":
-        for m in re.finditer(r"MoveAbsJ \[\[([^\]]*)\]", text):
-            out.append([math.radians(float(v)) for v in m.group(1).split(",")])
+        for m in re.finditer(r"MoveAbsJ \[\[([^\]]*)\]|MoveL .*! q \[([^\]]*)\]", text):
+            if m.group(1):
+                out.append([math.radians(float(v)) for v in m.group(1).split(",")])
+            else:
+                out.append([float(v) for v in m.group(2).split(",")])
     elif dialect == "cl":
         out = [list(r.data["q"]) for r in parse_cl(text) if r.kind in ("movej", "movel")]
     return out

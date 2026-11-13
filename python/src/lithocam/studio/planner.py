@@ -21,6 +21,32 @@ from typing import List, Optional, Sequence
 import numpy as np
 
 
+def pruned_wraps(q, limits=None, hint=None) -> List[np.ndarray]:
+    """At most two of the configurations equal to q modulo 2 pi per joint: the one nearest the hint (the previous
+    path point) and the one nearest zero. Joints with +-360 degree ranges give up to 2^6 wrap variants per IK
+    branch; the ladder only ever uses the ones near its neighbours, so enumerating all of them is wasted work
+    (that enumeration made a two-view bunny wire plan run for hours)."""
+    q = np.asarray(q, dtype=float)
+    if limits is None:
+        return [q]
+    lo, hi = np.asarray(limits, dtype=float)[:, 0], np.asarray(limits, dtype=float)[:, 1]
+
+    def nearest(target):
+        w = q + 2 * math.pi * np.round((target - q) / (2 * math.pi))
+        for _ in range(2):                                   # pull back inside the limits
+            w = np.where(w > hi + 1e-9, w - 2 * math.pi, w)
+            w = np.where(w < lo - 1e-9, w + 2 * math.pi, w)
+        w = np.where((w < lo - 1e-9) | (w > hi + 1e-9), q, w)
+        return w
+
+    out = [nearest(np.zeros_like(q))]
+    if hint is not None:
+        h = nearest(np.asarray(hint, dtype=float))
+        if not np.allclose(h, out[0], atol=1e-9):
+            out.insert(0, h)
+    return out
+
+
 class NumpyBackend:
     name = "numpy (no collision checks)"
     checks_collision = False
@@ -52,7 +78,13 @@ class TesseractBackend:
     def ik(self, T: np.ndarray, seed: Optional[np.ndarray] = None) -> List[np.ndarray]:
         sols = self.cell.ik(T, seed)
         if self.wraps:
-            sols = [w for s in sols for w in self.cell.wrap_variants(s)]
+            lim = getattr(self.cell, "limits", None)
+            out = []
+            for s in sols:
+                for w in pruned_wraps(s, lim, seed):
+                    if not any(np.allclose(w, o, atol=1e-9) for o in out):
+                        out.append(w)
+            sols = out
         return sols
 
     def in_collision(self, q) -> bool:
@@ -128,18 +160,18 @@ class LadderResult:
 
 def ladder(rungs: Sequence[Sequence[np.ndarray]], backend, seed: Optional[Sequence[float]] = None,
            max_step: float = math.radians(25), check_collision: bool = True) -> LadderResult:
-    """rungs[k] = candidate tool0 poses (4x4) of path point k. Returns the least-motion joint path."""
+    """rungs[k] = candidate tool0 poses (4x4) of path point k. Returns the least-motion joint path.
+
+    Collision checks are lazy: the graph is built from IK alone, the least-motion path is found, only the nodes on
+    it are checked, colliding nodes are removed and the search repeats until the path is clear. A collision check
+    costs far more than a graph edge, and most nodes are never on the best path."""
     seed = None if seed is None else np.asarray(seed, dtype=float)
     layers = []                                          # per rung: (Q (n, dof), cand idx (n,))
-    rejected = 0
     prev_hint = seed
     for poses in rungs:
         qs, idx = [], []
         for c, T in enumerate(poses):
             for q in backend.ik(T, prev_hint):
-                if check_collision and backend.checks_collision and backend.in_collision(q):
-                    rejected += 1
-                    continue
                 qs.append(q)
                 idx.append(c)
         if qs:
@@ -148,8 +180,36 @@ def ladder(rungs: Sequence[Sequence[np.ndarray]], backend, seed: Optional[Sequen
             prev_hint = Q[0] if prev_hint is None else Q[np.argmin(np.abs(Q - prev_hint).max(1))]
         else:
             layers.append((None, None))
-    res = LadderResult([], [], [], nodes=sum(len(L[0]) for L in layers if L[0] is not None),
-                       collisions_rejected=rejected)
+    nodes = sum(len(L[0]) for L in layers if L[0] is not None)
+    lazy = check_collision and backend.checks_collision
+    checked = {}                                         # (rung, joint bytes) -> collides
+    rejected = 0
+    for _ in range(500):
+        res = _solve_layers(layers, seed, max_step)
+        if not lazy:
+            break
+        bad = {}
+        for r, q in zip(res.rungs, res.joints):
+            key = (r, np.asarray(q, dtype=float).tobytes())
+            if key not in checked:
+                checked[key] = bool(backend.in_collision(q))
+            if checked[key]:
+                Q = layers[r][0]
+                bad.setdefault(r, []).append(int(np.flatnonzero((Q == q).all(1))[0]))
+        if not bad:
+            break
+        for r, rows in bad.items():
+            Q, idx = layers[r]
+            keep = np.setdiff1d(np.arange(len(Q)), rows)
+            rejected += len(rows)
+            layers[r] = (Q[keep], idx[keep]) if len(keep) else (None, None)
+    res.nodes = nodes
+    res.collisions_rejected = rejected
+    return res
+
+
+def _solve_layers(layers, seed, max_step) -> LadderResult:
+    res = LadderResult([], [], [])
     k = 0
     start = seed
     while k < len(layers):

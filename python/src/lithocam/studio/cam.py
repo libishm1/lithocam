@@ -138,13 +138,94 @@ def face(tris, mesh, tool, stock, depth=1.0, stepover=0.0, allowance=0.0, tolera
     return _link(cut, stock["zmax"] + clearance)
 
 
-GENERATORS = {"raster": raster, "rough_plane": rough_plane, "face": face}
+def _limit_axis_rate(A: np.ndarray, C: np.ndarray, rate: float) -> np.ndarray:
+    """Turn the axis at most `rate` radians per mm of centre travel, forward then backward along the pass (the
+    ball centre path is unchanged, so this never gouges; it only spreads a sudden normal change, like the edge
+    of a part, over a length the robot can follow)."""
+    if rate <= 0 or len(A) < 2:
+        return A
+    A = A.copy()
+    ds = np.r_[0.0, np.linalg.norm(np.diff(C, axis=0), axis=1)]
+    for order in (range(1, len(A)), range(len(A) - 2, -1, -1)):
+        for k in order:
+            j = k - 1 if order.step == 1 else k + 1
+            lim = rate * max(ds[k] if order.step == 1 else ds[j], 1e-6)
+            c = float(np.clip(A[k] @ A[j], -1.0, 1.0))
+            ang = math.acos(c)
+            if ang > lim:
+                w = A[k] - A[j] * c
+                w /= max(np.linalg.norm(w), 1e-12)
+                A[k] = math.cos(lim) * A[j] + math.sin(lim) * w
+    return A
+
+
+def surfacing5(tris, mesh, tool, stock, stepover=2.0, lead=15.0, max_tilt=45.0, smooth=7, allowance=0.0,
+               tolerance=0.01, clearance=20.0, axis_rate=2.0, **_) -> List[Move]:
+    """Simultaneous 5-axis ball-end finishing. Moves are (kind, tip point mm, tool axis) in the setup frame; the
+    axis points from the tip to the holder.
+
+    The ball centre runs on the drop-cutter offset surface, so the cut surface does not depend on the axis: the
+    path is gouge free for the ball whatever the tilt. The axis is the offset surface's normal (equal to the part
+    normal at the contact) leaned back against the feed by `lead`, so the contact moves off the ball's tip where
+    the cutting speed is zero; then clamped to `max_tilt` from the setup z axis. Only the shank and holder change
+    with the axis: the robot planner checks them for collision."""
+    if tool.kind != lc.ToolKind.BallEndMill:
+        raise ValueError("5-axis surfacing needs a ball-end mill (got {})".format(lc.tool_kind_name(tool.kind)))
+    R = tool.diameter / 2
+    cutter = lc.cutter_of(tool)
+    lo, hi = tris.reshape(-1, 3).min(0), tris.reshape(-1, 3).max(0)
+    rect = (lo[0] - R, hi[0] + R, lo[1] - R, hi[1] + R)
+    passes = _zigzag(tool, mesh, rect, max(stepover, 0.05), tolerance, lo[2])
+    d = max(0.25, min(1.0, R / 4))
+    floor = lo[2]
+
+    def h(x, y):
+        z = lc.drop_cutter(cutter, mesh, float(x), float(y))
+        return z if math.isfinite(z) else floor
+
+    lam, tmax = math.radians(lead), math.radians(max_tilt)
+    zax = np.array([0.0, 0.0, 1.0])
+    moves: List[Move] = []
+    clear_z = stock["zmax"] + clearance
+    for ps in passes:
+        if len(ps) < 2:
+            continue
+        C = ps + np.array([0.0, 0.0, R])                                   # ball centres
+        N = np.array([[-(h(x + d, y) - h(x - d, y)) / (2 * d), -(h(x, y + d) - h(x, y - d)) / (2 * d), 1.0]
+                      for x, y, _ in ps])
+        N /= np.linalg.norm(N, axis=1, keepdims=True)
+        if smooth > 1:                                                     # moving average along the pass
+            k = int(smooth)
+            pad = np.pad(N, ((k // 2, k - 1 - k // 2), (0, 0)), mode="edge")
+            N = np.stack([np.convolve(pad[:, j], np.ones(k) / k, mode="valid") for j in range(3)], 1)
+            N /= np.linalg.norm(N, axis=1, keepdims=True)
+        F = np.gradient(C, axis=0)
+        A = []
+        for n, f in zip(N, F):
+            f = f - n * (f @ n)
+            nf = np.linalg.norm(f)
+            a = n if nf < 1e-9 else math.cos(lam) * n - math.sin(lam) * f / nf
+            ang = math.acos(max(-1.0, min(1.0, a @ zax)))
+            if ang > tmax:                                                 # pull back towards the setup axis
+                w = a - zax * (a @ zax)
+                a = math.cos(tmax) * zax + math.sin(tmax) * w / max(np.linalg.norm(w), 1e-12)
+            A.append(a / np.linalg.norm(a))
+        A = _limit_axis_rate(np.asarray(A), C, math.radians(axis_rate))
+        C = C + N * allowance
+        tips = C - R * A
+        moves.append(("rapid", np.array([tips[0, 0], tips[0, 1], clear_z]), zax))
+        moves += [("feed", t, a) for t, a in zip(tips, A)]
+        moves.append(("rapid", np.array([tips[-1, 0], tips[-1, 1], clear_z]), zax))
+    return moves
+
+
+GENERATORS = {"raster": raster, "rough_plane": rough_plane, "face": face, "surfacing5": surfacing5}
 
 
 def path_length(moves: List[Move]) -> Tuple[float, float]:
     """Feed and rapid lengths, mm."""
     feed = rapid = 0.0
-    for (k0, p0), (k1, p1) in zip(moves, moves[1:]):
+    for (k0, p0, *_), (k1, p1, *_) in zip(moves, moves[1:]):
         d = float(np.linalg.norm(p1 - p0))
         if k1 == "feed" and k0 == "feed":
             feed += d
@@ -157,7 +238,7 @@ def zmap_check(tris, mesh, tool, moves: List[Move], stock, cell: float = 1.0):
     """Cut the stock along the feed moves in a Z-map; return (deviation stats over the part's xy box, zmap)."""
     zm = lc.make_stock(stock["xmin"], stock["xmax"], stock["ymin"], stock["ymax"], cell, stock["zmax"])
     passes, cur = [], []
-    for k, p in moves:
+    for k, p, *_ in moves:
         if k == "feed":
             c = lc.CLPoint()
             c.x, c.y, c.z, c.contact = float(p[0]), float(p[1]), float(p[2]), True
