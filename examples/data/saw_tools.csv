@@ -1,0 +1,4 @@
+# lithocam tool library: mm, degrees, rev/min, m/s, mm/min, l/min, MPa, g/s, Hz; 0 = not set
+id,name,kind,material,bond,grit,profile,helix,point,rotation,thread,source,diameter,corner_radius,tip_angle,tip_diameter,taper_angle,flute_length,neck_diameter,pilot_diameter,spur_length,shank_diameter,stickout,holder_diameter,holder_length,thread_pitch,bore_diameter,segment_height,kerf,length,rake_angle,stroke,impact_rate,standoff,orifice_diameter,pressure,abrasive_flow,output_angle,flutes,spindle_rpm,surface_speed,feed,plunge_feed,max_stepdown,max_stepover,coolant_flow
+SAW350,Diamond blade 350 mm (example),disc_saw,diamond,,,,,,,,,350,0,0,0,0,0,0,0,0,0,0,0,0,0,50,0,3.2000000000000002,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+SAW125,Diamond blade 125 mm (example),disc_saw,diamond,,,,,,,,,125,0,0,0,0,0,0,0,0,0,0,0,0,0,22.23,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0

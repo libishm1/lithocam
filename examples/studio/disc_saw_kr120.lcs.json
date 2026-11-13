@@ -1,0 +1,86 @@
+{
+ "robot": "kr120",
+ "work_xyz": [
+  1.2,
+  -0.25,
+  0.3
+ ],
+ "work_rpy": [
+  0.0,
+  0.0,
+  0.0
+ ],
+ "part_path": "",
+ "stock": {
+  "xmin": -20,
+  "xmax": 620,
+  "ymin": -20,
+  "ymax": 520,
+  "zmin": 0,
+  "zmax": 30
+ },
+ "tool_library": "../data/saw_tools.csv",
+ "tool_length": 0.0,
+ "spindle": null,
+ "material": "granite",
+ "rapid_speed": 100.0,
+ "robot_factor": 1.0,
+ "ruled_path": "",
+ "turntable": null,
+ "cell_io": "",
+ "programs": [
+  {
+   "name": "Saw",
+   "steps": [
+    {
+     "kind": "comment",
+     "params": {
+      "text": "30 mm granite slab; feeds from the cutting data (lowest sourced granite values)"
+     },
+     "label": ""
+    },
+    {
+     "kind": "movej",
+     "params": {
+      "joints": [
+       0.0,
+       -90.0,
+       90.0,
+       0.0,
+       28.648,
+       0.0
+      ]
+     },
+     "label": ""
+    },
+    {
+     "kind": "disc_cut",
+     "params": {
+      "tool": "SAW350",
+      "outline": "0,0; 600,0; 600,300; 300,300; 300,500; 0,500",
+      "stepdown": 10.0,
+      "bevel": "-45,0,0,0,0,0",
+      "flange_diameter": 100.0
+     },
+     "label": ""
+    },
+    {
+     "kind": "movej",
+     "params": {
+      "joints": [
+       0.0,
+       -90.0,
+       90.0,
+       0.0,
+       28.648,
+       0.0
+      ]
+     },
+     "label": ""
+    }
+   ]
+  }
+ ],
+ "targets": [],
+ "title": "Disc saw: L-shaped tread with a mitre (KR120, 350 mm blade)"
+}

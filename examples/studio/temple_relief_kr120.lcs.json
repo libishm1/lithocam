@@ -1,0 +1,31 @@
+{
+ "robot": "kr120",
+ "work_xyz": [1.1, -0.3, 0.7],
+ "work_rpy": [0.0, 0.0, 0.0],
+ "part_path": "../data/padma_relief.npz",
+ "stock": {"xmin": 0.0, "xmax": 600.0, "ymin": 0.0, "ymax": 600.0, "zmin": 0.0, "zmax": 63.0},
+ "tool_library": "../data/temple_relief_tools.csv",
+ "tool_length": 0.0,
+ "spindle": null,
+ "material": "granite",
+ "robot_factor": 1.0,
+ "ruled_path": "",
+ "turntable": null,
+ "programs": [
+  {
+   "name": "Relief",
+   "steps": [
+    {"kind": "comment", "params": {"text": "Padma relief, Thanjavur (Depth Anything 3 reconstruction by Libish Murugesan), 600 x 600 mm, relief 25 mm on a 35 mm base"}, "label": ""},
+    {"kind": "comment", "params": {"text": "Feeds and spindle speeds on every cutting step are EXAMPLE values, not cutting data: set them for your tools, stone and robot"}, "label": "Example feeds"},
+    {"kind": "set_tool", "params": {"tool": "S1"}, "label": ""},
+    {"kind": "movej", "params": {"joints": [0.0, -90.0, 90.0, 0.0, 28.6, 0.0], "speed": 50.0}, "label": "Home"},
+    {"kind": "setup", "params": {"stock_margin": 0.0, "yaw": 0.0, "tilt": 0.0}, "label": "Setup top"},
+    {"kind": "face", "params": {"tool": "S1", "depth": 3.0, "stepover": 0.0, "feed": 1200.0, "rpm": 6000.0, "clearance": 10.0}, "label": "Face the sawn top S1 (example feed)"},
+    {"kind": "rough_plane", "params": {"tool": "S1", "stepdown": 4.0, "stepover": 9.0, "allowance": 1.0, "feed": 1000.0, "rpm": 6000.0, "clearance": 10.0}, "label": "Rough S1 z-levels, 1 mm allowance (example feed)"},
+    {"kind": "steep_shallow", "params": {"tool": "B8", "threshold_deg": 40.0, "overlap": 1.0, "stepover": 2.0, "allowance": 0.2, "feed": 1500.0, "rpm": 10000.0, "clearance": 10.0}, "label": "Semi-finish B8 steep / shallow, 0.2 mm allowance (example feed)"},
+    {"kind": "surfacing5", "params": {"tool": "B6", "stepover": 1.5, "lead": 15.0, "max_tilt": 30.0, "tolerance": 0.02, "feed": 1200.0, "rpm": 12000.0, "clearance": 10.0}, "label": "Finish B6 5-axis, lead 15 deg (example feed)"},
+    {"kind": "movej", "params": {"joints": [0.0, -90.0, 90.0, 0.0, 28.6, 0.0], "speed": 50.0}, "label": "Home"}
+   ]
+  }
+ ]
+}

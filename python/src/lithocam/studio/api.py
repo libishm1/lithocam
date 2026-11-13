@@ -196,12 +196,21 @@ class Session:
             raise ApiError("unknown material '{}'. Known: {}".format(material, ", ".join(known)))
         self.station.material = material
 
-    def load_part(self, path, stock_margin: float = 5.0, keep_stock: bool = False):
+    def load_part(self, path, stock_margin: float = 5.0, keep_stock: bool = False, stride: int = 1):
+        """Load the part: an STL (mm, z up) or a height-field .npz (a relief slab, see studio.cam.load_part;
+        stride > 1 plans on a coarser grid). The stock box follows the part unless keep_stock and one is set."""
         from . import cam
         p = Path(path)
         if not p.exists():
             raise ApiError("part file not found: {}".format(p))
-        tris = cam.load_stl(p)
+        if p.suffix.lower() not in (".stl", ".npz"):
+            raise ApiError("part file must be .stl or a height-field .npz (got '{}')".format(p.name))
+        if int(stride) < 1:
+            raise ApiError("stride must be an integer >= 1 (got {!r})".format(stride))
+        try:
+            tris = cam.load_part(p, stride=int(stride))
+        except ValueError as e:
+            raise ApiError(str(e)) from None
         self.part = (tris, cam.trimesh(tris))
         self.station.part_path = str(p.resolve())
         if not (keep_stock and self.station.stock):

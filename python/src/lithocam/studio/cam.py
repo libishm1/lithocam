@@ -27,6 +27,87 @@ def load_stl(path: str | Path) -> np.ndarray:
     return np.asarray(read_stl(str(path)), dtype=float).reshape(-1, 3, 3)
 
 
+# ------------------------------------------------------------------------------------------------------------------
+# Height fields: a relief stored as a regular grid of heights (examples/data/*.npz), turned into a closed slab.
+#
+# File format (.npz, numpy only): "heights" uint16 (rows, cols); row j is y = j * dy, column i is x = i * dx, row 0 at
+# y = 0 (an image view needs a vertical flip). Height in mm = heights * z_scale_mm (z_scale_mm = relief_mm / 65535).
+# Metadata: width_mm (x extent), height_mm (y extent), relief_mm, z_scale_mm, base_mm (slab under the relief),
+# source, credit, license (strings). Only plain arrays are stored, so np.load(..., allow_pickle=False) reads it.
+
+def _sampled(n: int, stride: int) -> np.ndarray:
+    """Every stride-th index of 0..n-1, always with the last one (the grid keeps its full extent)."""
+    idx = np.arange(0, n, max(int(stride), 1))
+    return idx if idx[-1] == n - 1 else np.r_[idx, n - 1]
+
+
+def heightfield_tris(H: np.ndarray, width_mm: float, depth_mm: float = 0.0, base_mm: float = 35.0,
+                     stride: int = 1) -> np.ndarray:
+    """A closed slab (n, 3, 3) from a height field: the relief top z = base_mm + H, four side walls and a flat
+    bottom at z = 0. H (rows, cols) holds heights in mm over the rectangle [0, width_mm] x [0, depth_mm] (depth_mm
+    is the plan extent along y; 0 = width_mm * (rows - 1) / (cols - 1), square pixels). stride > 1 keeps every
+    stride-th row and column (and the last), a coarser part for planning. Every edge is shared by exactly two
+    triangles and the normals point out."""
+    H = np.asarray(H, dtype=float)
+    if H.ndim != 2 or min(H.shape) < 2:
+        raise ValueError("height field must be a 2D grid of at least 2 x 2 (got shape {})".format(H.shape))
+    if not np.all(np.isfinite(H)):
+        raise ValueError("height field has non-finite values")
+    if base_mm <= 0:
+        raise ValueError("base_mm must be > 0 (got {})".format(base_mm))
+    ny0, nx0 = H.shape
+    depth_mm = float(depth_mm) if depth_mm and depth_mm > 0 else float(width_mm) * (ny0 - 1) / (nx0 - 1)
+    jj, ii = _sampled(ny0, stride), _sampled(nx0, stride)
+    Z = float(base_mm) + H[np.ix_(jj, ii)]
+    xs = ii * (float(width_mm) / (nx0 - 1))
+    ys = jj * (depth_mm / (ny0 - 1))
+    ny, nx = Z.shape
+    X, Y = np.meshgrid(xs, ys)
+    top = np.stack([X, Y, Z], axis=-1)                       # (ny, nx, 3)
+    a, b = top[:-1, :-1], top[:-1, 1:]                       # quad corners: a (j, i), b (j, i+1)
+    c, d = top[1:, 1:], top[1:, :-1]                         # c (j+1, i+1), d (j+1, i)
+    up = np.concatenate([np.stack([a, b, c], -2).reshape(-1, 3, 3),     # counter-clockwise seen from +z
+                         np.stack([a, c, d], -2).reshape(-1, 3, 3)])
+    # the boundary of the top, counter-clockwise seen from +z: y = 0, x = max, y = max (back), x = 0 (back)
+    ring = np.concatenate([top[0, :-1], top[:-1, -1], top[-1, :0:-1], top[:0:-1, 0]])
+    nxt = np.roll(ring, -1, axis=0)
+    lo_r, lo_n = ring.copy(), nxt.copy()
+    lo_r[:, 2] = lo_n[:, 2] = 0.0
+    walls = np.concatenate([np.stack([ring, lo_r, lo_n], 1), np.stack([ring, lo_n, nxt], 1)])
+    centre = np.array([xs[-1] / 2, ys[-1] / 2, 0.0])
+    bottom = np.stack([np.broadcast_to(centre, lo_r.shape), lo_n, lo_r], 1)   # clockwise from +z: faces down
+    return np.concatenate([up, walls, bottom])
+
+
+def load_heightfield(path: str | Path) -> Tuple[np.ndarray, Dict[str, object]]:
+    """(heights in mm (rows, cols), metadata) of a height-field .npz (format above)."""
+    with np.load(str(path), allow_pickle=False) as z:
+        if "heights" not in z:
+            raise ValueError("{}: no 'heights' array (keys: {})".format(path, ", ".join(z.files)))
+        q = np.asarray(z["heights"])
+        meta = {k: (z[k].item() if z[k].ndim == 0 else z[k]) for k in z.files if k != "heights"}
+    for k in ("width_mm", "relief_mm"):
+        if k not in meta:
+            raise ValueError("{}: metadata '{}' missing".format(path, k))
+    scale = float(meta.get("z_scale_mm", float(meta["relief_mm"]) / 65535.0))
+    H = q.astype(float) * scale if q.dtype.kind in "ui" else q.astype(float)
+    return H, meta
+
+
+def load_part(path: str | Path, stride: int = 1, base_mm: float = 0.0) -> np.ndarray:
+    """Triangles (n, 3, 3) mm of a part file: an STL as stored, or a height-field .npz as a closed slab (relief on
+    a base of base_mm, else the file's base_mm, else 35 mm). stride > 1 decimates the height-field grid."""
+    p = Path(path)
+    ext = p.suffix.lower()
+    if ext == ".stl":
+        return load_stl(p)
+    if ext == ".npz":
+        H, meta = load_heightfield(p)
+        base = float(base_mm) if base_mm and base_mm > 0 else float(meta.get("base_mm", 35.0))
+        return heightfield_tris(H, float(meta["width_mm"]), float(meta.get("height_mm", 0.0)), base, stride)
+    raise ValueError("unsupported part file '{}': use .stl or a height-field .npz".format(p.name))
+
+
 def trimesh(tris: np.ndarray):
     out = []
     for t in tris:
@@ -83,16 +164,50 @@ def _link(passes: List[np.ndarray], clear_z: float) -> List[Move]:
     return moves
 
 
-def simplify(moves: List[Move], tol: float, ang_tol_deg: float = 0.5) -> List[Move]:
+MAX_FEED_SEGMENT = 50.0   # mm: longest feed segment simplify merges points into
+MAX_FEED_TURN = 5.0       # deg: largest tool-axis turn over one merged feed segment (5-axis)
+
+
+def simplify(moves: List[Move], tol: float, ang_tol_deg: float = 0.5,
+             max_segment: float = MAX_FEED_SEGMENT, max_turn_deg: float = MAX_FEED_TURN) -> List[Move]:
     """Drop feed points that lie within `tol` (mm) of the straight line between their kept neighbours, with the
     tool axis within `ang_tol_deg` (Douglas-Peucker per feed run). Rapids, plunges and run ends are kept, so the
-    posted path stays within the step tolerance of the computed CL path."""
+    posted path stays within the step tolerance of the computed CL path. A merged segment is split (at its middle
+    point) while longer than `max_segment` mm or while the tool axis turns more than `max_turn_deg` over it: the
+    planner solves IK per kept point and treats a joint jump of more than 10 deg inside a cut as a break, and a
+    robot's joints turn that far over a few hundred mm of straight line or a large axis turn."""
     out: List[Move] = []
     run: List[Move] = []
 
+    cmax = math.cos(math.radians(max_turn_deg)) if max_turn_deg > 0 else -2.0
+
+    def densify(kept):
+        """Points on the straight move between kept neighbours (tip linear, axis interpolated, as the controller's
+        linear move runs it) wherever a move is longer than max_segment or turns the axis more than max_turn_deg:
+        where the CL path itself has no point in between, e.g. a ball rolling over a part's edge."""
+        res = kept[:1]
+        for m0, m1 in zip(kept, kept[1:]):
+            n = 1
+            L = float(np.linalg.norm(m1[1] - m0[1]))
+            if max_segment > 0:
+                n = max(n, int(math.ceil(L / max_segment - 1e-9)))
+            if len(m0) > 2 and len(m1) > 2 and max_turn_deg > 0 and float(m0[2] @ m1[2]) < cmax:
+                ang = math.degrees(math.acos(max(-1.0, min(1.0, float(m0[2] @ m1[2])))))
+                n = max(n, int(math.ceil(ang / max_turn_deg - 1e-9)))
+            for i in range(1, n):
+                f = i / n
+                p = m0[1] + (m1[1] - m0[1]) * f
+                if len(m0) > 2 and len(m1) > 2:
+                    a = m0[2] * (1 - f) + m1[2] * f
+                    res.append(("feed", p, a / np.linalg.norm(a)))
+                else:
+                    res.append(("feed", p))
+            res.append(m1)
+        return res
+
     def flush():
         if len(run) <= 2:
-            out.extend(run)
+            out.extend(densify(run))
             return
         P = np.array([m[1] for m in run], dtype=float)
         A = np.array([m[2] for m in run], dtype=float) if len(run[0]) > 2 else None
@@ -100,6 +215,7 @@ def simplify(moves: List[Move], tol: float, ang_tol_deg: float = 0.5) -> List[Mo
         keep[0] = keep[-1] = True
         stack = [(0, len(P) - 1)]
         ca = math.cos(math.radians(ang_tol_deg))
+        cturn = math.cos(math.radians(max_turn_deg)) if max_turn_deg > 0 else -2.0
         while stack:
             a, b = stack.pop()
             if b <= a + 1:
@@ -115,10 +231,15 @@ def simplify(moves: List[Move], tol: float, ang_tol_deg: float = 0.5) -> List[Mo
                 bad = np.einsum("ij,ij->i", Ai, A[a + 1:b]) < ca
                 dist = np.where(bad, np.inf, dist)
             k = int(np.argmax(dist))
+            too_long = max_segment > 0 and L > max_segment * max_segment
+            too_turned = A is not None and float(A[a] @ A[b]) < cturn
+            if dist[k] <= tol and (too_long or too_turned):
+                k = (b - a) // 2 - 1                      # split at the middle point
+                dist[k] = np.inf
             if dist[k] > tol:
                 keep[a + 1 + k] = True
                 stack += [(a, a + 1 + k), (a + 1 + k, b)]
-        out.extend(m for m, kk in zip(run, keep) if kk)
+        out.extend(densify([m for m, kk in zip(run, keep) if kk]))
 
     for m in moves:
         if m[0] == "feed":
@@ -148,13 +269,23 @@ def _clamp_runs(ps: np.ndarray, level: float, top: float) -> List[np.ndarray]:
     return runs
 
 
+_EDGE_INSET = 1e-3   # mm
+
+
+def _part_rect(lo, hi, R):
+    """The zigzag rectangle: the part's xy box grown by the cutter radius, less 1 micrometre. On the grown box itself
+    the first and last passes hold the cutter exactly tangent to the part's extreme edge, and the native zigzag
+    does not terminate there (seen on a slab's straight top edge, 2026-11-14); the inset cuts nothing."""
+    return (lo[0] - R + _EDGE_INSET, hi[0] + R - _EDGE_INSET, lo[1] - R + _EDGE_INSET, hi[1] + R - _EDGE_INSET)
+
+
 def raster(tris, mesh, tool, stock, stepover=2.0, scallop=0.0, allowance=0.0, tolerance=0.01, clearance=20.0,
            **_) -> List[Move]:
     R = tool.diameter / 2
     if scallop > 0 and tool.kind == lc.ToolKind.BallEndMill:
         stepover = min(stepover, lc.max_stepover(R, scallop)) if stepover > 0 else lc.max_stepover(R, scallop)
     lo, hi = tris.reshape(-1, 3).min(0), tris.reshape(-1, 3).max(0)
-    rect = (lo[0] - R, hi[0] + R, lo[1] - R, hi[1] + R)
+    rect = _part_rect(lo, hi, R)
     passes = _zigzag(tool, mesh, rect, max(stepover, 0.05), tolerance, lo[2])
     passes = [p + np.array([0, 0, allowance]) for p in passes]
     return _link(passes, stock["zmax"] + clearance)
@@ -166,13 +297,18 @@ def rough_plane(tris, mesh, tool, stock, stepdown=5.0, stepover=4.0, allowance=0
     rect = (stock["xmin"], stock["xmax"], stock["ymin"], stock["ymax"])
     base = _zigzag(tool, mesh, rect, max(stepover, 0.05), tolerance, lo[2])
     top = stock["zmax"]
+    # every tip is max(level, surface + allowance): at and below the lowest surface tip a level only repeats the
+    # surface-following pass, so the levels stop there (a slab on a base is not re-cut down to its bottom)
+    floor = lo[2]
+    if base:
+        floor = max(floor, min(float(ps[:, 2].min()) for ps in base) + allowance)
     levels = []
     z = top - stepdown
-    while z > lo[2] - 1e-9:
+    while z > floor + 1e-9:
         levels.append(z)
         z -= stepdown
-    if not levels or levels[-1] > lo[2] + 1e-9:
-        levels.append(lo[2])
+    if not levels or levels[-1] > floor + 1e-9:
+        levels.append(floor)
     moves: List[Move] = []
     for level in levels:
         cut = []
@@ -235,7 +371,7 @@ def surfacing5(tris, mesh, tool, stock, stepover=2.0, lead=15.0, max_tilt=45.0, 
     R = tool.diameter / 2
     cutter = lc.cutter_of(tool)
     lo, hi = tris.reshape(-1, 3).min(0), tris.reshape(-1, 3).max(0)
-    rect = (lo[0] - R, hi[0] + R, lo[1] - R, hi[1] + R)
+    rect = _part_rect(lo, hi, R)
     passes = _zigzag(tool, mesh, rect, max(stepover, 0.05), tolerance, lo[2])
     d = max(0.25, min(1.0, R / 4))
     floor = lo[2]
@@ -310,6 +446,10 @@ def _offset_cutter(cutter, a: float):
     the tool `a` clear of the part: exact for a ball (offset sphere), conservative-approximate for the others."""
     if a == 0:
         return cutter
+    if cutter.kind not in (lc.CutterKind.Flat, lc.CutterKind.Ball, lc.CutterKind.Bull, lc.CutterKind.Cone):
+        # profile and disc cutters carry segments, thickness and heading; a field-by-field copy would drop them
+        raise ValueError("stock to leave (allowance) is supported for flat, ball, bull and cone cutters only; "
+                         "use allowance 0 with a {} cutter".format(str(cutter.kind).split(".")[-1]))
     c = lc.Cutter()
     c.kind = cutter.kind
     c.radius = cutter.radius + a
@@ -610,7 +750,7 @@ def steep_shallow_paths(tris, mesh, tool, stock, threshold_deg=40.0, overlap=1.0
     shallow = _dilate(~steep, k)
     R = tool.diameter / 2
     lo, hi = fld.lo, fld.hi
-    passes = lc.zigzag(fld.cutter, mesh, lo[0] - R, hi[0] + R, lo[1] - R, hi[1] + R, max(stepover, 0.05),
+    passes = lc.zigzag(fld.cutter, mesh, *_part_rect(lo, hi, R), max(stepover, 0.05),
                        _params(tolerance, lo[2], fld.cutter.radius))
     ra = []
     for ps in passes:

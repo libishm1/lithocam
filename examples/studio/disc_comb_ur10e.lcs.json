@@ -1,0 +1,81 @@
+{
+ "robot": "ur10e",
+ "work_xyz": [
+  0.25,
+  -0.35,
+  0.0
+ ],
+ "work_rpy": [
+  0.0,
+  0.0,
+  0.0
+ ],
+ "part_path": "",
+ "stock": {
+  "xmin": -20,
+  "xmax": 620,
+  "ymin": -20,
+  "ymax": 520,
+  "zmin": 0,
+  "zmax": 30
+ },
+ "tool_library": "../data/saw_tools.csv",
+ "tool_length": 0.0,
+ "spindle": null,
+ "material": "granite",
+ "rapid_speed": 100.0,
+ "robot_factor": 1.0,
+ "ruled_path": "",
+ "turntable": null,
+ "cell_io": "",
+ "programs": [
+  {
+   "name": "Saw",
+   "steps": [
+    {
+     "kind": "movej",
+     "params": {
+      "joints": [
+       0.0,
+       -90.0,
+       90.0,
+       -90.0,
+       -90.0,
+       0.0
+      ]
+     },
+     "label": ""
+    },
+    {
+     "kind": "disc_comb",
+     "params": {
+      "tool": "SAW125",
+      "region": "320,20; 540,20; 540,240; 320,240",
+      "pitch": 15.0,
+      "depth": 12.0,
+      "stepdown": 4.0,
+      "cross_angle": "90",
+      "flange_diameter": 40.0
+     },
+     "label": ""
+    },
+    {
+     "kind": "movej",
+     "params": {
+      "joints": [
+       0.0,
+       -90.0,
+       90.0,
+       -90.0,
+       -90.0,
+       0.0
+      ]
+     },
+     "label": ""
+    }
+   ]
+  }
+ ],
+ "targets": [],
+ "title": "Disc saw: comb roughing of a rebate (UR10e, 125 mm blade)"
+}
