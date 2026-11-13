@@ -121,6 +121,47 @@ Read column: "page read" means the page text was fetched and read. "snippet" mea
 | UR5 (PROXY for UR10 / UR10e) | cartesian_stiffness |  |  | N/mm | https://webthesis.biblio.polito.it/7150/ | thesis | page read | the thesis reports no Cartesian stiffness; a user forum post reports several mm of movement when milling polycarbonate (forum.universal-robots.com/t/stiffness-adjustable/27583) |
 | industrial robots in general | stiffness_ratio | 0.01 | 0.01 | x CNC machine | https://arxiv.org/pdf/2101.04992.pdf | paper | snippet | stated as up to 100 times lower than a CNC machine, pose dependent; 0.01 is the inverse |
 
+## Item 2 additions. Specific cutting energy (2026-11-14 pass)
+
+| material | quantity | low | high | unit | source (link) | source type | read | note |
+|---|---|---|---|---|---|---|---|---|
+| granite (Lotus Red G3768) | specific_energy_disc_saw | 0.415 | 0.415 | J/mm3 | https://doi.org/10.1016/j.jclepro.2021.126922 | paper | page read | Bai et al. 2021, J. Clean. Prod. 300:126922, large-block circular diamond sawing, QJS1600 machine, sandwich silent-core blades R 900-1300 mm, 27 runs. Fitted constant l0 of Psc = l0 x MRR (Eq. 1-2, journal p.5; Table 7 p.9; validation table p.12). The paper gives l0 in kJ/cm3, which equals J/mm3. Psc is spindle power minus idle power (Table 4 p.9). Four validation runs at MRR 18-36.7 cm3/s matched measured energy within 9%. An average-MRR fit on machine power, not a force-based value; the only disc-saw energy number read, so treat it as a lower scale reference. |
+| granite (Karakurt 2014) | specific_energy_disc_saw |  |  | J/mm3 | https://link.springer.com/article/10.1007/s11771-014-1949-9 | paper | snippet | Karakurt 2014 J Cent South Univ 21:365-372 (Taguchi, one granite, circular diamond blade): optimum for minimum SE is 25 m/s peripheral speed, 70 cm/min traverse, 2 cm depth, 100 mL/s coolant. The SE value itself was not seen; the Springer page redirects to a sign-in, so it was not opened. |
+| marble | specific_energy_milling |  |  | J/mm3 | https://doi.org/10.1007/s00170-011-3717-4 | paper | page read | Turchetta 2012 IJAMT 61:441-448 (Coreno Perlato Royal marble, 20 mm electroplated diamond mill, 3000 rpm, depth 0.1-1.0 mm, feed 200-600 mm/min). The energy and force models are power laws in equivalent chip thickness with fitted constants shown only in figure legends (Figs 4-9, pp.4-6, labels garbled). No tabulated J/mm3. The parent paper Polini and Turchetta 2004 (E235, IJMTM 44:1189) is not in the pipeline and its page was not opened. |
+| granite | specific_energy_grinding |  |  | J/mm3 | https://doi.org/10.1016/s0301-679x(01)00039-1 | paper | page read | Xu 2001 Tribol Int 34:419-426, dry grinding of gray granite, resin diamond wheel 305 mm, 43 m/s. Reports net power about 90 W per pass (p.3) and energy partition: about 31% to the granite, about 70% to the wheel (p.5, Fig. 7). No specific energy in J/mm3. The related Xu and Malkin 2001 J Manuf Sci Eng 123 (E232, doi 10.1115/1.1344900) is the lead for that number; it is not in the pipeline and was not opened. |
+
+## Item 3 additions. Force ratios (2026-11-14 pass)
+
+| material | quantity | low | high | unit | source (link) | source type | read | note |
+|---|---|---|---|---|---|---|---|---|
+| marble (Coreno Perlato Royal, milling) | force_ratio | 2.3 | 4.3 | Fn/Ft | https://doi.org/10.1007/s00170-011-3717-4 | paper | page read | derived from Turchetta 2012 p.6: tangential Fc rises from about 30 to about 70 N and radial Ft from about 70 to about 300 N with tool wear at the largest chip thickness (feed 200 mm/min). Ratio radial/tangential is 70/30 to 300/70. Diamond mill, not a disc. The pairing of the quoted values is by wear stage and is an assumption. |
+| granite (Sardinian) | force_ratio_disc | 2.4 | 3.0 | Fz/Fy | https://doi.org/10.1016/j.diamond.2019.107579 | paper | page read | derived from the regression lines of Turchetta and Sorrentino 2019, Diamond Relat Mater 100:107579, Fig. 3 p.4, working stage 0: f 0.10 mm Fy=123.31-1.0275Vc, Fz=286-2.27Vc; f 0.05 mm Fy=69.70-0.6075Vc, Fz=160.75-1.065Vc, Vc 35-65 m/s. Ratio Fz/Fy is 2.36-2.45 at f 0.10 and 2.55-3.03 at f 0.05. Fz is vertical and Fy is the feed direction; the paper does not label them normal or tangential, so the mapping to Fn/Ft is an assumption. Disc 180 mm, 40/50 mesh, 15 kW CNC. Peak values: Fz about 220 N, Fy about 90 N at f 0.10 (p.3). |
+
+## Item 5. Diamond tool wear
+
+| material | quantity | low | high | unit | source (link) | source type | read | note |
+|---|---|---|---|---|---|---|---|---|
+| granite and marble (not separated) | wear_rate_saw_segment | 0.458 | 1.237 | mm3/s | https://doi.org/10.1016/j.matpr.2021.02.346 | paper | page read | Gupta and Pratap 2021, Mater Today Proc, Table 2 p.5: segment wear volume rate for tip speed 30-40 m/s and spindle 600-700 rpm, nine runs; lowest at 30 m/s and 600 rpm, highest at 40 m/s and 700 rpm. The paper says granite and marble were cut but does not give a stone per run, and gives no cut area per run (4000 sq ft cut in total, p.4), so it cannot be converted to wear per area. |
+| granite (Sardinian) | g_ratio |  |  | - | https://doi.org/10.1016/j.diamond.2019.107579 | paper | page read | no G-ratio or wear-per-area figure in the stone papers read. Turchetta 2019 reports grit states instead (p.6-7, Figs 7-12): at 35 m/s about 42-47% intact and 12-13% smoothed grains per 600 cm3 stage; above 45 m/s smoothed grains exceed 30% and the smoothed/intact index rises from about 0.4 to about 1.6 (f 0.05). Speed limit for good grit renewal is 45 m/s. |
+| granite, marble | wear_rate_wire |  |  | um/m2 | https://link.springer.com/article/10.1007/s00170-021-07577-3 | paper | snippet | no per-area bead wear value read. A secondary summary of Korman et al. 2023 defines specific bead wear as diameter change per sawn area in um/m2; the Korman 2023 e-Zbornik paper read earlier gives no numbers. |
+
+## Item 6. Polishing
+
+| material | quantity | low | high | unit | source (link) | source type | read | note |
+|---|---|---|---|---|---|---|---|---|
+| granite (white and black) | polish_speed | 250 | 2000 | rpm | https://doi.org/10.1016/j.procir.2018.08.254 | paper | page read | Songmene et al. 2018 Procedia CIRP 77:139-142, Table 1 p.2: diamond polishing tool 50.8 mm, spindle 250-2000 rpm, feed 254-2032 mm/min, grit 45-1800. Higher speed, higher feed and finer grit gave lower Ra (p.2). Test runs used 1000 rpm and 508 mm/min. |
+| granite (white and black) | polish_pressure | 20 | 20 | kPa | https://doi.org/10.1016/j.procir.2018.08.254 | paper | page read | Fig. 2 caption p.2 states pressure 0.2 bar (grit 60, 508 mm/min); it is not defined elsewhere in the paper (assumed tool contact or air pressure). 0.2 bar = 20 kPa. |
+| granite (white) | grit_sequence |  |  | - | https://doi.org/10.1016/j.procir.2018.08.254 | paper | page read | range 45 to 1800 grit tested one grit per run, no sequence prescribed. Ra at grit 80, 1000 rpm, 508 mm/min: linear path 1.344 um, arc 1.025 um, spiral 0.982 um (Fig. 13, p.4). Ra per grit is plotted only (Fig. 5, p.3, no numbers in the text). Semi-wet and dry tests; dust data not used here. |
+| marble and granite (vendor guide) | grit_sequence |  |  | - | https://www.mkdiamond.com/pdf/Tec_Library/Tile_Stone/Resin_Pad_Guidelines.pdf | vendor | page read | ordered list: 50, 150 or 300 (coarse, remove cut marks), then 500, 1000, 2000, 3000 (fine), then buffing pads. MK Diamond resin pad guide p.1: never skip a grit; water only. Mirror finish: cerium oxide or tin oxide paste on a felt wheel. No separate sequence for marble versus granite, no pad pressure or rpm, no Ra per grit. |
+| marble (Han white, robotic) | preston_coefficient |  |  | - | https://www.mdpi.com/2076-3417/15/1/318 | paper | page read | Appl Sci 15:318 (2025), sol-gel flexible diamond tool, 20 um diamond, 100 mm, robot, constant force. The removal model is the Preston equation (Eq. 2, p.9-10) with kp left symbolic; no value, no removal rate, no pressure or rpm in the text read. Result: Ra 0.0233 um and gloss 102.5 (60 deg) robotic, against Ra 0.2843 um and gloss 63.25 by hand (p.16-17). Read from the pipeline Markdown (K4094), not the MDPI page. |
+| marble | polish_removal_rate |  |  | um/min | https://www.mdpi.com/2076-3417/15/1/318 | paper | page read | no removal rate in the text of Appl Sci 15:318. The 2024 Huang et al. Appl Sci 14:8314 (six marbles, sol-gel diamond pad) was seen only as an abstract; MDPI refused the fetch. |
+
+## Item 4 addition. Robot stiffness (2026-11-14 pass)
+
+| material | quantity | low | high | unit | source (link) | source type | read | note |
+|---|---|---|---|---|---|---|---|---|
+| KUKA LBR iiwa 14 R820 (PROXY, a 14 kg cobot; not a UR10 or KR120) | joint_stiffness | 3800 | 42000 | Nm/rad | https://doi.org/10.1016/j.ifacol.2017.08.2108 | paper | page read | 'Task-oriented rigidity optimization for 7 DOF redundant manipulators', IFAC-PapersOnLine 50(1) 2017 (pipeline ID L10099), Table 2 p.3. MEASURED with the joint torque sensors, position control mode: k1-k7 = 4.2e4, 3.96e4, 1.22e4, 2.02e4, 0.8e4, 0.38e4, 0.48e4 Nm/rad. Joint 2 loading and unloading fits gave 3.96e4 and 4.19e4 (Fig. 5). Impedance mode would give lower values. The only measured set found for a collaborative arm; no UR10 or UR10e set found. |
+
 ## Missing
 
 - Granite density and UCS, sandstone Poisson ratio, limestone and wood tensile strength: no clean source in this pass.
@@ -129,3 +170,11 @@ Read column: "page read" means the page text was fetched and read. "snippet" mea
 - Specific cutting force for wood routing: two conflicting numbers, one paper snippet and one unattributed web page.
 - Measured Fn/Ft for diamond disc sawing: no number seen. The wire ratio is derived from per-bead forces in one paper.
 - Joint or Cartesian stiffness for UR10, UR10e and KUKA KR120: no measured value found. The only number set is the KR240-2 joint stiffness 0.36-1.41 MNm/rad (Nm/rad, not kNm/rad) from Dumas et al. 2011, which are assumed simulation inputs and a proxy for a KR120-class arm. The UR5 thesis gives only log plots, so there is no UR5 proxy value.
+
+2026-11-14 pass, still missing:
+
+- Specific cutting energy in J/mm3 for diamond milling and grinding of granite, marble, limestone and sandstone: no tabulated value read. Leads not opened: Polini and Turchetta 2004 (E235), Xu and Malkin 2001 (E232), Karakurt 2014 (value behind a sign-in). The only disc-saw value is 0.415 J/mm3 for Lotus Red granite (Bai 2021), a machine-power fit.
+- Limestone and sandstone: no energy, force, wear or polishing value at all.
+- G-ratio for diamond grinding, wear per cut area for saw segments and for wire: none. The only wear rate is 0.458-1.237 mm3/s (Gupta 2021), stone per run not given.
+- Preston coefficient, polish removal rate, pad pressure and Ra per grit for marble: none. Granite polishing gives speed, feed and grit ranges only (Songmene 2018). The grit sequence comes from a vendor guide with no stone split.
+- Joint stiffness for a UR10, UR10e or KR120: none. Only a measured KUKA LBR iiwa 14 R820 set (3.8e3 to 4.2e4 Nm/rad), a 14 kg cobot, as a proxy. E001 and E005 gave no joint values; E001 has no pipeline Markdown.

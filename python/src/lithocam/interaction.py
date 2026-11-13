@@ -319,3 +319,30 @@ def part_check(
     flag = m.element_field_to_grid((pr > tensile_strength).astype(float), fill=0.0) > 0
     pk = tuple(int(v) for v in m.el_ijk[int(np.argmax(pr))])
     return PartCheck(float(r.von_mises.max()), mx, sf, flag, int(flag.sum()), pk, r, m)
+
+
+# ------------------------------------------------------- feed-limit helpers
+
+
+def power_limited_feed(power_w, specific_energy_j_mm3, ae_mm, ap_mm):
+    """Feed [mm/min] at which u * MRR equals the available power.
+
+    P [W] = u [J/mm^3] * ae * ap [mm^2] * vf [mm/min] / 60, so vf = 60 P / (u ae ap). Raises ValueError on a
+    non-positive argument. The power is taken at the cutter: no drive efficiency is applied here.
+    """
+    if power_w <= 0 or specific_energy_j_mm3 <= 0 or ae_mm <= 0 or ap_mm <= 0:
+        raise ValueError("power, specific energy, ae and ap must be > 0")
+    return 60.0 * power_w / (specific_energy_j_mm3 * ae_mm * ap_mm)
+
+
+def tangential_force_per_feed(specific_energy_j_mm3, area_mm2, cutting_speed_m_s):
+    """Ft [N] per unit feed [mm/min] for a cut of cross-section `area_mm2`: Ft = P / vc with P = u A vf / 60."""
+    if cutting_speed_m_s <= 0:
+        raise ValueError("cutting speed must be > 0")
+    return specific_energy_j_mm3 * area_mm2 / 60.0 / cutting_speed_m_s
+
+
+def robot_linear_compliance(J, joint_stiffness):
+    """3x3 linear block of C = J Kq^-1 J^T. J rows 0-2 are the linear rows, in m per rad; result in m/N."""
+    C = cartesian_compliance(np.asarray(J, float), joint_stiffness)
+    return C[:3, :3]

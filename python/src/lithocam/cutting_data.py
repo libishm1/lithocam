@@ -264,3 +264,23 @@ def suggest(tool, material: str, depth_mm: float = 0.0, max_rpm: float = 0.0,
         out.notes.append("robots are less stiff than machine tools; no published derating, set one after a test")
     out.sources = list(dict.fromkeys(out.sources))
     return out
+
+
+def tool_kind_label(tool) -> str:
+    """Kind name of a tool: a str, an object with `kind_name`, or a lithocam Tool (via the native module)."""
+    if isinstance(tool, str):
+        return tool
+    if isinstance(getattr(tool, "kind", None), str):
+        return tool.kind
+    if getattr(tool, "kind_name", None):
+        return tool.kind_name
+    from .studio.core import lc
+    return lc.tool_kind_name(tool.kind)
+
+
+def pick(material: str, tool_kind: str, quantity: str, diameter_mm: float = 0.0) -> Optional[Entry]:
+    """The entry `suggest` would use: nearest sized entry first, then unsized; page-read before snippet. None if
+    no source covers it. diameter_mm 0 matches any size."""
+    es = [e for e in lookup(material, tool_kind, quantity) if diameter_mm <= 0 or _fits(e, diameter_mm)]
+    es.sort(key=lambda e: (e.size == "", abs((_size_mm(e.size) or diameter_mm) - diameter_mm), e.confidence != "page"))
+    return es[0] if es else None
