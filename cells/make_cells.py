@@ -12,11 +12,14 @@ Robots
 Collision geometry is primitive (cylinders and boxes) sized to enclose each link roughly. It is for reachability
 and gross collision checks, not for clearance work near the robot; swap in the vendor meshes for that.
 
-Cells
-- ur10e:           the arm on a fixed base
-- kr120:           the arm on a fixed base
-- kr120_track:     the arm on a 4 m linear track along x (prismatic joint `track`)
-- kr120_turntable: the arm on a fixed base, plus a turntable (revolute `turntable`) carrying the part 1.6 m away
+Cells (each arm on a fixed base, with its diamond-wire bow on tool0)
+- ur10e, kr120, kr480_r3330_mt, kr500_r2830_mt
+
+The turntable is not in these files: its place is the station's work frame, so it is added at run time. With the
+table driven as a coordinated external axis E1 (KUKA, ABB) lithocam.robot.Cell.add_rotary_table puts it into the
+Tesseract scene graph as a revolute joint `turntable_e1` about world z, carrying the table top and the part
+(lithocam.studio.planner.CellBackend); otherwise the part is a fixed obstacle turned per setup. A UR10e has no
+external axis.
 """
 import math
 from pathlib import Path

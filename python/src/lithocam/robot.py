@@ -16,8 +16,14 @@ the analytic solvers agree with KDL on most poses but not all (UR10e about 83 pe
 rotation about the wire is sampled (`roll_deg`); a ruling is reachable when some roll has an IK solution inside
 the joint limits.
 
-Not checked yet: collisions between the robot, the bow and the part; joint continuity along a sweep; external
-axes (track, turntable). Those are the next steps.
+**Turntable as an external axis.** `Cell.add_rotary_table` adds a revolute joint (about z) under the part to the
+Tesseract scene graph; obstacles added with `parent=` that link turn with it, and `in_collision(q, ext=[angle])`
+sets the table joint with the arm joints. The joint is built as in the upstream tesseract_python scene-graph test
+(tesseract_python/tests/tesseract_scene_graph/test_tesseract_scene_graph.py: Joint, JointType_REVOLUTE,
+JointLimits) and added with AddLinkCommand like the static obstacles; the state is set by joint names as in
+tesseract_python/tests/tesseract_environment/test_tesseract_environment.py (setState(joint_names, values)).
+
+Sampled external axes (`Positioners`, `wire_reach_ext`) remain for reachability studies.
 
 Needs tesseract-robotics (`pip install tesseract-robotics`).
 """
@@ -67,10 +73,57 @@ class Cell:
         self.joint_names = list(self.kin.getJointNames())
         self.limits = np.asarray(self.kin.getLimits().joint_limits, dtype=np.float64)
         self.obstacles: List[str] = []
+        self.ext_joints: List[str] = []           # external-axis joints in the scene graph (a turntable)
+        self.ext_values = np.zeros(0)             # their values at the last collision check
         self._mgr = None
 
     # ------------------------------------------------------------ collision
-    def _add_static(self, name: str, geoms, xyz=(0.0, 0.0, 0.0), yaw: float = 0.0):
+    def add_rotary_table(self, name: str = "turntable_e1", xyz=(0.0, 0.0, 0.0), lower: float = -2 * math.pi,
+                         upper: float = 2 * math.pi, velocity: float = math.radians(30), disc=None) -> str:
+        """A turntable as a revolute joint about world z through xyz (metres), from the world to a link
+        `name + "_link"`. `disc` = (diameter, height) m adds the table top as a cylinder below xyz (2 mm gap), turning
+        with the joint. Obstacles added with parent=<returned link> turn with the table. Limits in radians and
+        velocity in rad/s are the cell's (placeholders unless the station sets them). Returns the link name."""
+        from tesseract_robotics.tesseract_common import Translation3d
+        from tesseract_robotics.tesseract_environment import AddLinkCommand
+        from tesseract_robotics.tesseract_geometry import Cylinder
+        from tesseract_robotics.tesseract_scene_graph import (Collision, Joint, JointLimits, JointType_REVOLUTE,
+                                                              Link, Visual)
+        lk = Link(name + "_link")
+        if disc is not None:
+            d, h = float(disc[0]), float(disc[1])
+            c, v = Collision(), Visual()
+            g = Cylinder(d / 2, h)
+            c.geometry, v.geometry = g, g
+            c.origin = Isometry3d.Identity() * Translation3d(0.0, 0.0, -h / 2 - 0.002)
+            v.origin = c.origin
+            lk.collision.push_back(c)
+            lk.visual.push_back(v)
+        j = Joint(name)
+        j.parent_link_name = "world"
+        j.child_link_name = name + "_link"
+        j.type = JointType_REVOLUTE
+        j.axis = np.array([0.0, 0.0, 1.0])
+        j.limits = JointLimits(float(lower), float(upper), 0.0, float(velocity), 1.0, 1.0)
+        j.parent_to_joint_origin_transform = Isometry3d.Identity() * Translation3d(*[float(v) for v in xyz])
+        if not self.env.applyCommand(AddLinkCommand(lk, j)):
+            raise RuntimeError("could not add the rotary table " + name)
+        self.ext_joints.append(name)
+        self.ext_values = np.zeros(len(self.ext_joints))
+        self._mgr = None
+        return name + "_link"
+
+    def allow_collision(self, a: str, b: str, reason: str = "touching"):
+        """No contact check between links a and b (a part standing on the table top)."""
+        from tesseract_robotics.tesseract_common import AllowedCollisionMatrix
+        from tesseract_robotics.tesseract_environment import (ModifyAllowedCollisionsCommand,
+                                                              ModifyAllowedCollisionsType_ADD)
+        acm = AllowedCollisionMatrix()
+        acm.addAllowedCollision(a, b, reason)
+        self.env.applyCommand(ModifyAllowedCollisionsCommand(acm, ModifyAllowedCollisionsType_ADD))
+        self._mgr = None
+
+    def _add_static(self, name: str, geoms, xyz=(0.0, 0.0, 0.0), yaw: float = 0.0, parent: str = "world"):
         from tesseract_robotics.tesseract_common import AngleAxisd, Translation3d
         from tesseract_robotics.tesseract_environment import AddLinkCommand
         from tesseract_robotics.tesseract_scene_graph import Collision, Joint, JointType_FIXED, Link, Visual
@@ -82,7 +135,7 @@ class Cell:
             link.collision.push_back(c)
             link.visual.push_back(v)
         j = Joint(name + "_joint")
-        j.parent_link_name = "world"
+        j.parent_link_name = parent
         j.child_link_name = name
         j.type = JointType_FIXED
         j.parent_to_joint_origin_transform = (Isometry3d.Identity() * Translation3d(*[float(v) for v in xyz]) *
@@ -93,17 +146,18 @@ class Cell:
         self._mgr = None
 
     def add_mesh_obstacle(self, name: str, stl_path: str, scale: float = 1e-3, xyz=(0.0, 0.0, 0.0),
-                          yaw: float = 0.0):
+                          yaw: float = 0.0, parent: str = "world"):
         """A static obstacle (the part, a fixture) from an STL file; scale converts its units to metres; the mesh is
-        turned by `yaw` (radians, about z through its origin) and placed at xyz (a turntable position)."""
+        turned by `yaw` (radians, about z through its origin) and placed at xyz in the parent link (the world, or a
+        turntable link from add_rotary_table)."""
         from tesseract_robotics.tesseract_geometry import createMeshFromPath
         meshes = createMeshFromPath(str(stl_path), np.array([scale, scale, scale], dtype=np.float64))
-        self._add_static(name, [meshes[i] for i in range(len(meshes))], xyz, yaw)
+        self._add_static(name, [meshes[i] for i in range(len(meshes))], xyz, yaw, parent)
 
-    def add_box_obstacle(self, name: str, size, center, yaw: float = 0.0):
+    def add_box_obstacle(self, name: str, size, center, yaw: float = 0.0, parent: str = "world"):
         """A static box (a table, a wall, a blank) in metres, turned by yaw about z through its centre."""
         from tesseract_robotics.tesseract_geometry import Box
-        self._add_static(name, [Box(*[float(v) for v in size])], center, yaw)
+        self._add_static(name, [Box(*[float(v) for v in size])], center, yaw, parent)
 
     def attach_tool(self, name: str, cylinders, allow_with=("tool0", "flange", "wrist_3_link", "link_6")):
         """A tool on tool0 as collision geometry: cylinders [(diameter m, z0 m, length m, x m, y m)] along tool0 z
@@ -146,8 +200,9 @@ class Cell:
                 self.env.applyCommand(ChangeLinkCollisionEnabledCommand(str(n), bool(enabled)))
         self._mgr = None
 
-    def in_collision(self, q, margin: float = 0.0) -> bool:
-        """True when any robot link touches an obstacle (or another link not excluded in the SRDF) at q."""
+    def in_collision(self, q, margin: float = 0.0, ext=None) -> bool:
+        """True when any robot link touches an obstacle (or another link not excluded in the SRDF) at q. `ext`:
+        values of the external-axis joints (add_rotary_table), radians; None keeps their last values."""
         from tesseract_robotics.tesseract_collision import (ContactRequest, ContactResultMap,
                                                             ContactResultVector, ContactTestType_FIRST)
         from tesseract_robotics.tesseract_common import CollisionMarginData
@@ -157,8 +212,14 @@ class Cell:
             m.setActiveCollisionObjects(self.env.getActiveLinkNames())
             m.setCollisionMarginData(CollisionMarginData(margin))
             self._mgr = m
-        self._solver.setState(self.joint_names, np.asarray(q, dtype=np.float64))
-        state = self._solver.getState()           # keep the state alive while its transforms are used
+        if self.ext_joints:
+            if ext is not None:
+                self.ext_values = np.asarray(ext, dtype=np.float64).reshape(len(self.ext_joints))
+            self._solver.setState(self.joint_names + self.ext_joints,
+                                  np.concatenate([np.asarray(q, dtype=np.float64), self.ext_values]))
+        else:
+            self._solver.setState(self.joint_names, np.asarray(q, dtype=np.float64))
+        state = self._solver.getState()          # keep the state alive while its transforms are used
         self._mgr.setCollisionObjectsTransform(state.link_transforms)
         res = ContactResultMap()
         self._mgr.contactTest(res, ContactRequest(ContactTestType_FIRST))

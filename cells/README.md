@@ -36,11 +36,13 @@ Measured results:
 | UR10e, cladding panel | 85% of wire rulings | 100% with the turntable | 0° and 90° |
 | KR120, twisted column 3.6 m out | 0% | 100% on a 0 to 3 m track | 0.5, 1.5 and 2.0 m |
 
+### Turntable as a coordinated axis (E1)
+
+A station turntable has a `driven` mode: `operator` (default; the program stops for the operator), `e1` (KUKA and ABB cells: a coordinated external axis) or `io` (a PLC turns it on an output request and reports done on an input). With `e1` the studio adds the table to the Tesseract scene graph at run time as a revolute joint `turntable_e1` about world z through the work origin, carrying the table top and the part (`lithocam.robot.Cell.add_rotary_table`). Every collision check then turns the part to the sample's table angle. The E1 travel, speed and step per wire ruling in the station (`e1_limits_deg`, `e1_speed_deg_s`, `e1_max_step_deg`) are placeholders until set for the cell. The UR10e refuses `e1`.
+
 ## Planned
 
-- Track and turntable as URDF joints, for collision checking and visualisation.
-- The wire bow and spindle as tool links.
-- The table and the part as collision objects.
+- The linear track as a URDF joint.
 
 ## Using Tesseract with these files
 

@@ -8,6 +8,11 @@ free. Dynamic programming picks one node per rung minimising the summed squared 
 than `max_step` (a jump would sweep the tool through the part). Where no edge passes, the path breaks there and a
 new run starts, and the break is reported.
 
+External axis. A turntable driven as a coordinated axis (E1) adds one more free choice per rung: each candidate pose
+carries the table angle it was built for (`ext`), the graph nodes are (6 arm joints, table angle), and an edge also
+needs the table step within `ext_max_step`. `TableChain` is the 7-axis chain (arm + table rotary) the candidates
+come from: the part frame turns with the table angle about the work frame's z axis.
+
 Backends:
   TesseractBackend  analytic/numeric IK branches and collision checks on the cell meshes (lithocam.robot.Cell);
   NumpyBackend      the studio's damped least-squares IK from several seeds; no collision checks.
@@ -45,6 +50,55 @@ def pruned_wraps(q, limits=None, hint=None) -> List[np.ndarray]:
         if not np.allclose(h, out[0], atol=1e-9):
             out.insert(0, h)
     return out
+
+
+def rot_z4(a: float) -> np.ndarray:
+    c, s = math.cos(a), math.sin(a)
+    T = np.eye(4)
+    T[:2, :2] = [[c, -s], [s, c]]
+    return T
+
+
+class TableChain:
+    """Arm plus turntable: a 7-axis chain q7 = (q1..q6, e1) for planning, e1 in radians.
+
+    The turntable turns about the z axis of the work frame W (robot base frame, metres) through its origin; the part
+    frame at table angle e1 is P(e1) = W Rz(e1). The arm is `robot` (studio kinematics, tcp_offset used as set).
+    Forward kinematics give the TCP in the robot base (independent of e1) and in the part frame (dependent on it)."""
+
+    def __init__(self, robot, work: np.ndarray):
+        self.robot = robot
+        self.work = np.asarray(work, dtype=float)
+
+    @property
+    def dof(self) -> int:
+        return self.robot.dof + 1
+
+    def part_frame(self, e1: float) -> np.ndarray:
+        return self.work @ rot_z4(float(e1))
+
+    def fk(self, q7) -> np.ndarray:
+        """TCP in the robot base frame."""
+        return self.robot.tcp(np.asarray(q7, dtype=float)[:-1])
+
+    def fk_part(self, q7) -> np.ndarray:
+        """TCP in the part frame at the table angle q7[-1]."""
+        q7 = np.asarray(q7, dtype=float)
+        return np.linalg.inv(self.part_frame(q7[-1])) @ self.robot.tcp(q7[:-1])
+
+    def to_base(self, T_part: np.ndarray, e1: float) -> np.ndarray:
+        """A pose given in the part frame, in the robot base frame at table angle e1."""
+        return self.part_frame(e1) @ np.asarray(T_part, dtype=float)
+
+    def to_part(self, T_base: np.ndarray, e1: float) -> np.ndarray:
+        return np.linalg.inv(self.part_frame(e1)) @ np.asarray(T_base, dtype=float)
+
+
+def collides(backend, q, e1=None) -> bool:
+    """backend.in_collision with the table angle when the backend models the table as a joint."""
+    if e1 is not None and getattr(backend, "table_axis", False):
+        return bool(backend.in_collision(q, e1))
+    return bool(backend.in_collision(q))
 
 
 class NumpyBackend:
@@ -87,13 +141,20 @@ class TesseractBackend:
             sols = out
         return sols
 
-    def in_collision(self, q) -> bool:
-        return self.cell.in_collision(q)
+    def in_collision(self, q, e1=None) -> bool:
+        return self.cell.in_collision(q) if e1 is None else self.cell.in_collision(q, ext=[e1])
 
 
 class CellBackend(TesseractBackend):
     """A Tesseract cell set up for one station: the spindle stack on tool0 (collision geometry; the cutter itself is
-    not, it is meant to touch the stone), the part from its STL, and the turntable. Needs tesseract-robotics."""
+    not, it is meant to touch the stone), the part from its STL, and the turntable. Needs tesseract-robotics.
+
+    With the turntable driven as E1 (turntable["driven"] == "e1") the table is a revolute joint in the Tesseract
+    scene graph (lithocam.robot.Cell.add_rotary_table) carrying the table top and the part, so every collision
+    check turns the part to the sample's table angle (`table_axis` is True, in_collision takes the angle).
+    Otherwise the part is a fixed obstacle that place_part moves to each setup's angle."""
+
+    table_axis = False
 
     def __init__(self, robot_name: str, cells_dir, spindle=None, part_stl: str = "", work=None,
                  turntable=None):
@@ -106,12 +167,30 @@ class CellBackend(TesseractBackend):
             cell.attach_tool("spindle", [(d / 1000, z0 / 1000, ln / 1000, ox / 1000, oy / 1000)
                                          for _, d, z0, ln in spindle.parts() if d > 0 and ln > 0])
         self.has_part = bool(part_stl)
+        self.e1 = 0.0
+        if turntable and str(turntable.get("driven", "operator")) == "e1":
+            from .program import table_settings
+            ts = table_settings(turntable)
+            d, h = float(turntable.get("diameter", 0.8)), float(turntable.get("height", 0.04))
+            lo, hi = (math.radians(v) for v in ts["e1_limits_deg"])
+            link = cell.add_rotary_table("turntable_e1", tuple(self.work[:3, 3]), lo, hi,
+                                         math.radians(ts["e1_speed_deg_s"]), disc=(d, h))
+            if part_stl:
+                cell.add_mesh_obstacle("part", part_stl, 1e-3, (0.0, 0.0, 0.0), 0.0, parent=link)
+                cell.allow_collision("part", link, "stands on the table")
+            self.table_axis = True
+            return
         if part_stl:
             cell.add_mesh_obstacle("part", part_stl, 1e-3, tuple(self.work[:3, 3]), 0.0)
         if turntable:
             d, h = float(turntable.get("diameter", 0.8)), float(turntable.get("height", 0.04))
             o = self.work[:3, 3]
             cell.add_box_obstacle("turntable", (d, d, h), (o[0], o[1], o[2] - h / 2 - 0.002))
+
+    def in_collision(self, q, e1=None) -> bool:
+        if self.table_axis:
+            return self.cell.in_collision(q, ext=[self.e1 if e1 is None else e1])
+        return self.cell.in_collision(q)
 
     def set_tool_mode(self, mode: str):
         """'wire': the bow collides, the spindle does not; 'spindle': the other way round."""
@@ -122,7 +201,10 @@ class CellBackend(TesseractBackend):
         self.cell._mgr = None
 
     def place_part(self, work, yaw: float):
-        """Turn the part obstacle with the turntable."""
+        """Turn the part obstacle with the turntable (with the table as a joint: set its angle)."""
+        if self.table_axis:
+            self.e1 = float(yaw)
+            return
         if not self.has_part:
             return
         from lithocam.robot import _iso
@@ -156,19 +238,28 @@ class LadderResult:
     max_step: float = 0.0
     nodes: int = 0
     collisions_rejected: int = 0
+    ext: List[float] = field(default_factory=list)     # external-axis value (table angle, rad) per solved rung
+    max_ext_step: float = 0.0
+    node: List[int] = field(default_factory=list)      # node row per solved rung in its layer (internal)
 
 
 def ladder(rungs: Sequence[Sequence[np.ndarray]], backend, seed: Optional[Sequence[float]] = None,
-           max_step: float = math.radians(25), check_collision: bool = True) -> LadderResult:
+           max_step: float = math.radians(25), check_collision: bool = True, ext=None, ext_seed=None,
+           ext_max_step: float = math.inf, ext_weight: float = 1.0) -> LadderResult:
     """rungs[k] = candidate tool0 poses (4x4) of path point k. Returns the least-motion joint path.
+
+    `ext[k][c]`: the external-axis value (turntable angle, radians) candidate c of rung k was built for; None = no
+    external axis. With it a node is (arm joints, table angle): an edge needs the arm step <= max_step and the table
+    step <= ext_max_step, and costs the summed squared arm steps plus ext_weight times the squared table step.
+    `ext_seed` is the table angle before the first rung.
 
     Collision checks are lazy: the graph is built from IK alone, the least-motion path is found, only the nodes on
     it are checked, colliding nodes are removed and the search repeats until the path is clear. A collision check
     costs far more than a graph edge, and most nodes are never on the best path."""
     seed = None if seed is None else np.asarray(seed, dtype=float)
-    layers = []                                          # per rung: (Q (n, dof), cand idx (n,))
+    layers = []                                          # per rung: (Q (n, dof), cand idx (n,), table (n,)|None)
     prev_hint = seed
-    for poses in rungs:
+    for k, poses in enumerate(rungs):
         qs, idx = [], []
         for c, T in enumerate(poses):
             for q in backend.ik(T, prev_hint):
@@ -176,42 +267,72 @@ def ladder(rungs: Sequence[Sequence[np.ndarray]], backend, seed: Optional[Sequen
                 idx.append(c)
         if qs:
             Q = np.asarray(qs)
-            layers.append((Q, np.asarray(idx)))
+            I = np.asarray(idx)
+            layers.append((Q, I, None if ext is None else np.asarray(ext[k], dtype=float)[I]))
             prev_hint = Q[0] if prev_hint is None else Q[np.argmin(np.abs(Q - prev_hint).max(1))]
         else:
-            layers.append((None, None))
+            layers.append((None, None, None))
     nodes = sum(len(L[0]) for L in layers if L[0] is not None)
     lazy = check_collision and backend.checks_collision
-    checked = {}                                         # (rung, joint bytes) -> collides
+    checked = {}                                         # (rung, joint bytes, table) -> collides
     rejected = 0
+    eseed = None if ext is None or ext_seed is None else float(ext_seed)
+    # edge weights between rungs j-1 and j, computed once on the full layers and sliced to the nodes still alive:
+    # the lazy collision loop re-solves the graph many times and the weights do not change
+    full = list(layers)
+    alive = [None if L[0] is None else np.arange(len(L[0])) for L in layers]
+    wcache = {}
+
+    def edge(j):
+        if j not in wcache:
+            wcache[j] = _edge_w(full[j - 1][0], full[j][0], full[j - 1][2], full[j][2], max_step, ext_max_step,
+                                ext_weight)
+        return wcache[j][np.ix_(alive[j - 1], alive[j])]
+
     for _ in range(500):
-        res = _solve_layers(layers, seed, max_step)
+        res = _solve_layers(layers, seed, max_step, eseed, ext_max_step, ext_weight, edge)
         if not lazy:
             break
         bad = {}
-        for r, q in zip(res.rungs, res.joints):
-            key = (r, np.asarray(q, dtype=float).tobytes())
+        for r, q, n in zip(res.rungs, res.joints, res.node):
+            e = None if ext is None else float(layers[r][2][n])
+            key = (r, np.asarray(q, dtype=float).tobytes(), e)
             if key not in checked:
-                checked[key] = bool(backend.in_collision(q))
+                checked[key] = collides(backend, q, e)
             if checked[key]:
-                Q = layers[r][0]
-                bad.setdefault(r, []).append(int(np.flatnonzero((Q == q).all(1))[0]))
+                bad.setdefault(r, []).append(n)
         if not bad:
             break
         for r, rows in bad.items():
-            Q, idx = layers[r]
+            Q, idx, E = layers[r]
             keep = np.setdiff1d(np.arange(len(Q)), rows)
             rejected += len(rows)
-            layers[r] = (Q[keep], idx[keep]) if len(keep) else (None, None)
+            layers[r] = (Q[keep], idx[keep], None if E is None else E[keep]) if len(keep) else (None, None, None)
+            alive[r] = alive[r][keep] if len(keep) else None
     res.nodes = nodes
     res.collisions_rejected = rejected
     return res
 
 
-def _solve_layers(layers, seed, max_step) -> LadderResult:
+def _edge_w(Qa, Qb, Ea, Eb, max_step, ext_max_step=math.inf, ext_weight=1.0) -> np.ndarray:
+    """(na, nb) cost of every edge between two rungs; inf where a step is above its limit."""
+    d = Qb[None, :, :] - Qa[:, None, :]
+    step = np.abs(d).max(axis=2)
+    if Ea is not None and Eb is not None:
+        de = Eb[None, :] - Ea[:, None]
+        return np.where((step <= max_step) & (np.abs(de) <= ext_max_step + 1e-12),
+                        np.sum(d * d, axis=2) + ext_weight * de * de, np.inf)
+    return np.where(step <= max_step, np.sum(d * d, axis=2), np.inf)
+
+
+def _solve_layers(layers, seed, max_step, ext_seed=None, ext_max_step=math.inf, ext_weight=1.0,
+                  edge=None) -> LadderResult:
+    """Least-cost runs over the layers. `edge(j)`: the weight matrix between layers j-1 and j (cached by the
+    caller); None = computed here."""
     res = LadderResult([], [], [])
     k = 0
     start = seed
+    estart = ext_seed
     while k < len(layers):
         if layers[k][0] is None:
             res.missing.append(k)
@@ -220,14 +341,15 @@ def _solve_layers(layers, seed, max_step) -> LadderResult:
         # one run of consecutive rungs connected by steps <= max_step
         Q0 = layers[k][0]
         cost = np.zeros(len(Q0)) if start is None else np.sum((Q0 - start) ** 2, axis=1)
+        if layers[k][2] is not None and estart is not None:
+            cost = cost + ext_weight * (layers[k][2] - estart) ** 2
         back = []
         run = [k]
         j = k + 1
         while j < len(layers) and layers[j][0] is not None:
-            Qa, Qb = layers[run[-1]][0], layers[j][0]
-            d = Qb[None, :, :] - Qa[:, None, :]
-            step = np.abs(d).max(axis=2)
-            w = np.where(step <= max_step, np.sum(d * d, axis=2), np.inf)
+            Qb = layers[j][0]
+            w = edge(j) if edge is not None else _edge_w(layers[run[-1]][0], Qb, layers[run[-1]][2], layers[j][2],
+                                                         max_step, ext_max_step, ext_weight)
             tot = cost[:, None] + w
             arg = np.argmin(tot, axis=0)
             new = tot[arg, np.arange(len(Qb))]
@@ -248,10 +370,17 @@ def _solve_layers(layers, seed, max_step) -> LadderResult:
             res.joints.append(layers[r][0][n])
             res.rungs.append(r)
             res.choice.append(int(layers[r][1][n]))
+            res.node.append(int(n))
+            if layers[r][2] is not None:
+                res.ext.append(float(layers[r][2][n]))
         start = res.joints[-1]
+        if res.ext:
+            estart = res.ext[-1]
         if j < len(layers) and layers[j][0] is not None:
             res.breaks.append(j)
         k = j
     steps = [float(np.max(np.abs(res.joints[i] - res.joints[i - 1]))) for i in range(1, len(res.joints))]
     res.max_step = max(steps) if steps else 0.0
+    if len(res.ext) > 1:
+        res.max_ext_step = float(np.max(np.abs(np.diff(res.ext))))
     return res

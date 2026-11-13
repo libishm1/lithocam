@@ -12,6 +12,14 @@ Record kinds (`Rec.kind`, data keys):
   process records, mapped through the cell I/O definition (lithocam.cell_io):
   spindle(rpm, on) water(on) air(on) wire(on, rpm) tool_change(id, mode: none|manual|changer) dwell(seconds)
   io_map(path, io): the cell I/O definition the expansion loaded (writers use it unless the `io` option is given)
+  table(deg; driven: absent = the operator turns it, "e1" = coordinated external axis, "io" = a PLC with `ops`)
+
+Turntable as external axis E1: with the table driven "e1" every movej/movel record carries "e1" (degrees). KRL writes
+it in the target aggregates (PTP {E6AXIS: A1 .., A6 .., E1 ..}, LIN {X .., C .., E1 ..}); RAPID in the external-axis
+part of jointtargets and robtargets ([e1, 9E9, 9E9, 9E9, 9E9, 9E9], eax_a). The table moves with the arm in the same
+motion; no stop. URScript has no external axis and refuses such records. The controller's external-axis setup (KUKA
+$EX_AX_NUM and $ETx machine data, ABB mechanical unit and its activation) is cell configuration that lithocam does not
+write: the programs say so in a PLACEHOLDER comment. `external_axes` reads E1 back.
 
 Dialects: "urscript" (Universal Robots), "krl" (KUKA KRC), "rapid" (ABB IRC5), "cl" (neutral text, one record per
 line; also the round-trip format for tests), "gcode" (ISO milling G-code for a 3-axis or 5-axis machine described
@@ -145,6 +153,16 @@ def _text(s) -> str:
     return str(s).replace("\n", " ").replace('"', "'")
 
 
+def _uses_e1(recs: List[Rec]) -> bool:
+    return any((r.kind in ("movej", "movel") and r.data.get("e1") is not None) or
+               (r.kind == "table" and r.data.get("driven") == "e1") for r in recs)
+
+
+def _e1(d) -> Optional[float]:
+    v = d.get("e1")
+    return None if v is None else float(v)
+
+
 def _ur_ops(ops) -> List[str]:
     out = []
     for op in ops:
@@ -234,6 +252,9 @@ def _urscript(recs: List[Rec], opt: Dict) -> str:
     cut_motion = opt.get("cut_motion", "movel")
     radii = blend_radii(recs, blend)
     proc, note = _process(recs, opt, "urscript")
+    if _uses_e1(recs):
+        raise ValueError("URScript has no external axis: these records drive the turntable as E1. A UR cell turns "
+                         "the table by the operator (table driven 'operator') or by a PLC through I/O ('io').")
 
     def pose_p(T):
         T = B_inv @ np.asarray(T, dtype=float)
@@ -289,6 +310,8 @@ def _urscript(recs: List[Rec], opt: Dict) -> str:
         elif r.kind == "io_wait":
             neg = "not " if d.get("value", True) else ""   # wait while the input differs from the wanted value
             out += ["  while {}get_standard_digital_in({}):".format(neg, int(d["port"])), "    sync()", "  end"]
+        elif r.kind == "table" and d.get("driven") == "io":   # a PLC turns it: request, wait for in position
+            out += _ur_ops(d.get("ops") or [])
         elif r.kind == "table":   # the UR has no table axis: the operator (or a PLC) turns it
             out.append('  popup("lithocam: turn the table to {:.1f} deg, then Continue", blocking=True)'.format(
                 float(d.get("deg", 0.0))))
@@ -306,12 +329,19 @@ def _krl(recs: List[Rec], opt: Dict) -> str:
     approx = " C_PTP" if opt.get("blend", 0.0) > 0 else ""
     cur_cp = [None]
     proc, note = _process(recs, opt, "krl")
+    e1 = _uses_e1(recs)
+    ext = lambda d: ", E1 {:.4f}".format(_e1(d)) if _e1(d) is not None else ""   # noqa: E731
     for r in recs:
         d = r.data
         if r.kind == "start":
             out += ["&ACCESS RVP", "DEF {}()".format(d.get("name", "lithocam")), "  ;FOLD INI",
                     "  BAS(#INITMOV, 0)", "  ;ENDFOLD",
                     "  $BASE = {X 0, Y 0, Z 0, A 0, B 0, C 0}  ; LIN targets are in the robot root frame"]
+            if e1:
+                out += ["  ; E1 = turntable angle (deg) about +z of the work frame, 0 = the part as loaded; it moves in",
+                        "  ; the same PTP/LIN as the arm. PLACEHOLDER: the external axis ($EX_AX_NUM, $ETx machine",
+                        "  ; data, E1 zero and direction) is cell configuration, set for your cell; LIN targets stay",
+                        "  ; in the robot root frame ($BASE not coupled to the table), sampled densely by lithocam"]
             if opt.get("blend", 0.0) > 0:
                 out.append("  $APO.CPTP = {:.0f}".format(min(100.0, opt["blend"])))
                 out.append("  $APO.CDIS = {:.1f}".format(float(opt["blend"])))
@@ -350,13 +380,16 @@ def _krl(recs: List[Rec], opt: Dict) -> str:
                     out.append("  $VEL.CP = {:.4f}".format(v))
                     cur_cp[0] = v
             cdis = " C_DIS" if (d.get("r") or opt.get("blend", 0.0)) else ""
-            out.append("  LIN {{X {:.3f}, Y {:.3f}, Z {:.3f}, A {:.4f}, B {:.4f}, C {:.4f}}}{}  ; q [{}]".format(
-                x, y, z, a, b, c, cdis, ", ".join("{:.6f}".format(float(v)) for v in d["q"])))
+            out.append("  LIN {{X {:.3f}, Y {:.3f}, Z {:.3f}, A {:.4f}, B {:.4f}, C {:.4f}{}}}{}  ; q [{}]".format(
+                x, y, z, a, b, c, ext(d), cdis, ", ".join("{:.6f}".format(float(v)) for v in d["q"])))
         elif r.kind in ("movej", "movel"):   # joint targets: the verified configuration
             if d.get("vj"):
                 pct = max(1, min(100, round(float(d["vj"]) * 100)))
                 out += ["  $VEL_AXIS[{}] = {}".format(i, pct) for i in range(1, 7)]
-            out.append("  PTP {{AXIS: {}}}{}".format(deg(d["q"]), approx))
+            if _e1(d) is not None:
+                out.append("  PTP {{E6AXIS: {}{}}}{}".format(deg(d["q"]), ext(d), approx))
+            else:
+                out.append("  PTP {{AXIS: {}}}{}".format(deg(d["q"]), approx))
         elif r.kind == "pause":
             s = float(d.get("seconds", -1))
             out.append("  WAIT SEC {:.3f}".format(s) if s >= 0 else "  HALT")
@@ -364,6 +397,11 @@ def _krl(recs: List[Rec], opt: Dict) -> str:
             out.append("  $OUT[{}] = {}".format(int(d["port"]), "TRUE" if d.get("value", True) else "FALSE"))
         elif r.kind == "io_wait":
             out.append("  WAIT FOR $IN[{}] == {}".format(int(d["port"]), "TRUE" if d.get("value", True) else "FALSE"))
+        elif r.kind == "table" and d.get("driven") == "e1":
+            out.append("  ; turntable E1 to {:.3f} deg with the next motion (coordinated, no stop)".format(
+                float(d.get("deg", 0.0))))
+        elif r.kind == "table" and d.get("driven") == "io":
+            out += _krl_ops(d.get("ops") or [])
         elif r.kind == "table":
             out.append("  ; turntable to {:.3f} deg (external axis E1 once the cell defines it)".format(
                 float(d.get("deg", 0.0))))
@@ -387,10 +425,20 @@ def _rapid(recs: List[Rec], opt: Dict) -> str:
     speeds: Dict[float, str] = {}
     lin_conf = [False]
     proc, note = _process(recs, opt, "rapid")
+    e1 = _uses_e1(recs)
+
+    def extax(d) -> str:
+        v = _e1(d)
+        return "[{}, 9E9, 9E9, 9E9, 9E9, 9E9]".format("9E9" if v is None else "{:.4f}".format(v))
+
     for r in recs:
         d = r.data
         if r.kind == "start":
             name = str(d.get("name", name))
+            if e1:
+                body += ["    ! eax_a = turntable angle (deg) about +z of the work frame, 0 = the part as loaded; it",
+                         "    ! moves in the same MoveAbsJ/MoveL as the arm. PLACEHOLDER: the table's mechanical unit,",
+                         "    ! its activation (ActUnit) and calibration are cell configuration, set for your cell"]
             body += _rapid_ops(_start_ops(proc, note))
         elif r.kind == "end":
             body += _rapid_ops(_end_ops(proc, opt))
@@ -431,12 +479,11 @@ def _rapid(recs: List[Rec], opt: Dict) -> str:
                     head.append("  VAR speeddata {} := [{:.3f}, 500, 5000, 1000];".format(speeds[key], key))
                 sp = speeds[key]
             body.append("    MoveL [[{:.3f}, {:.3f}, {:.3f}], [{:.6f}, {:.6f}, {:.6f}, {:.6f}], [{}, {}, {}, 0], "
-                        "[9E9, 9E9, 9E9, 9E9, 9E9, 9E9]], {}, {}, {};  ! q [{}]".format(
-                            *(T[:3, 3] * 1000), *qq, *cf, sp, zone, tool,
+                        "{}], {}, {}, {};  ! q [{}]".format(
+                            *(T[:3, 3] * 1000), *qq, *cf, extax(d), sp, zone, tool,
                             ", ".join("{:.6f}".format(float(v)) for v in d["q"])))
         elif r.kind in ("movej", "movel"):
-            body.append("    MoveAbsJ [[{}], [9E9, 9E9, 9E9, 9E9, 9E9, 9E9]], {}, {}, {};".format(
-                deg(d["q"]), speed, zone, tool))
+            body.append("    MoveAbsJ [[{}], {}], {}, {}, {};".format(deg(d["q"]), extax(d), speed, zone, tool))
         elif r.kind == "pause":
             s = float(d.get("seconds", -1))
             body.append("    WaitTime {:.3f};".format(s) if s >= 0 else "    Stop;")
@@ -444,6 +491,11 @@ def _rapid(recs: List[Rec], opt: Dict) -> str:
             body.append("    SetDO DO_{}, {};".format(int(d["port"]), 1 if d.get("value", True) else 0))
         elif r.kind == "io_wait":
             body.append("    WaitDI DI_{}, {};".format(int(d["port"]), 1 if d.get("value", True) else 0))
+        elif r.kind == "table" and d.get("driven") == "e1":
+            body.append("    ! turntable eax_a to {:.3f} deg with the next motion (coordinated, no stop)".format(
+                float(d.get("deg", 0.0))))
+        elif r.kind == "table" and d.get("driven") == "io":
+            body += _rapid_ops(d.get("ops") or [])
         elif r.kind == "table":
             body.append("    ! turntable to {:.3f} deg (external axis once the cell defines it)".format(
                 float(d.get("deg", 0.0))))
@@ -1497,10 +1549,11 @@ def joint_targets(text: str, dialect: str) -> List[List[float]]:
     if dialect == "urscript":   # movej/movel joint targets, and the verified joints noted on each movep
         for m in re.finditer(r"move[jl]\(\[([^\]]*)\]|movep\(p\[[^\]]*\][^#\n]*# q \[([^\]]*)\]", text):
             out.append([float(v) for v in (m.group(1) or m.group(2)).split(",")])
-    elif dialect == "krl":   # PTP axis targets, and the verified joints noted on each LIN
-        for m in re.finditer(r"PTP \{AXIS: ([^}]*)\}|LIN \{[^}]*\}[^;\n]*; q \[([^\]]*)\]", text):
+    elif dialect == "krl":   # PTP axis targets (E1 left out), and the verified joints noted on each LIN
+        for m in re.finditer(r"PTP \{(?:E6)?AXIS: ([^}]*)\}|LIN \{[^}]*\}[^;\n]*; q \[([^\]]*)\]", text):
             if m.group(1):
-                out.append([math.radians(float(p.split()[1])) for p in m.group(1).split(",")])
+                out.append([math.radians(float(p.split()[1])) for p in m.group(1).split(",")
+                            if p.split()[0].startswith("A")])
             else:
                 out.append([float(v) for v in m.group(2).split(",")])
     elif dialect == "rapid":
@@ -1511,4 +1564,28 @@ def joint_targets(text: str, dialect: str) -> List[List[float]]:
                 out.append([float(v) for v in m.group(2).split(",")])
     elif dialect == "cl":
         out = [list(r.data["q"]) for r in parse_cl(text) if r.kind in ("movej", "movel")]
+    return out
+
+
+def external_axes(text: str, dialect: str) -> List[Optional[float]]:
+    """E1 (degrees) of every motion read back from a posted program, in the order joint_targets reads the motions;
+    None where a motion has no E1 (KRL without E1, RAPID 9E9). URScript has no external axis: all None."""
+    import re
+    out: List[Optional[float]] = []
+    if dialect == "urscript":
+        return [None] * len(joint_targets(text, dialect))
+    if dialect == "krl":
+        for m in re.finditer(r"PTP \{(?:E6)?AXIS: ([^}]*)\}|LIN \{([^}]*)\}[^;\n]*; q \[[^\]]*\]", text):
+            body = m.group(1) if m.group(1) is not None else m.group(2)
+            e = [float(p.split()[1]) for p in body.split(",") if p.split() and p.split()[0] == "E1"]
+            out.append(e[0] if e else None)
+    elif dialect == "rapid":
+        pat = (r"MoveAbsJ \[\[[^\]]*\], \[([^\]]*)\]\]|"
+               r"MoveL \[\[[^\]]*\], \[[^\]]*\], \[[^\]]*\], \[([^\]]*)\]\].*! q \[[^\]]*\]")
+        for m in re.finditer(pat, text):
+            v = (m.group(1) if m.group(1) is not None else m.group(2)).split(",")[0].strip()
+            out.append(None if v.upper() == "9E9" else float(v))
+    elif dialect == "cl":
+        out = [None if r.data.get("e1") is None else float(r.data["e1"]) for r in parse_cl(text)
+               if r.kind in ("movej", "movel")]
     return out
