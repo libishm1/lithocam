@@ -1,0 +1,33 @@
+kinematic_plugins:
+  search_libraries:
+    - tesseract_kinematics_opw_factories
+    - tesseract_kinematics_kdl_factories
+  fwd_kin_plugins:
+    manipulator:
+      default: KDLFwdKinChain
+      plugins:
+        KDLFwdKinChain:
+          class: KDLFwdKinChainFactory
+          config: {base_link: base_link, tip_link: tool0}
+  inv_kin_plugins:
+    manipulator:
+      default: OPWInvKin
+      plugins:
+        KDLInvKinChainLMA:
+          class: KDLInvKinChainLMAFactory
+          config: {base_link: base_link, tip_link: tool0}
+        OPWInvKin:
+          class: OPWInvKinFactory
+          config:
+            base_link: base_link
+            tip_link: tool0
+            params:
+              a1: 0.500
+              a2: -0.055
+              b: 0.000
+              c1: 1.045
+              c2: 1.300
+              c3: 1.525
+              c4: 0.290
+              offsets: [0, -1.57079632679, 0, 0, 0, 0]
+              sign_corrections: [-1, 1, 1, -1, 1, -1]

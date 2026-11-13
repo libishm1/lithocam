@@ -142,6 +142,72 @@ def kr120_body(prefix=""):
 
 KR_LINKS = ["base_link", "link_1", "link_2", "link_3", "link_4", "link_5", "link_6"]
 
+# ---------------------------------------------------------------- KUKA KR 480 R3330 MT and KR 500 R2830 MT
+# Dimensions from the KUKA KR 500 FORTEC operating instructions (BA KR 500 FORTEC V2, 16.04.2014, section 4,
+# "Working envelope" figures, public PDF at
+# http://supportwop.com/IntegrationRobot/content/2-Robots/Charges_lourdes(300-1300kg)/Fortec/BA_KR_500_FORTEC_en.pdf):
+#   Fig. 4-2, KR 500 R2830:  A1-A2 offset 500, base to A2 1045, A2 to A3 1300, A3 to A4/A5 point 1025,
+#                            A4/A5 point to flange 290, A3-to-wrist offset 55, maximum reach 2826
+#   Fig. 4-27, KR 340 R3330: same except A3 to A4/A5 point 1525, maximum reach 3326
+# Axis ranges (same tables): A1 +-185, A2 +20/-130, A3 +144/-100, A4 +-350, A5 +-120, A6 +-350 degrees; speeds with
+# rated payload A1 90, A2 80, A3 75, A4 90, A5 83, A6 130 deg/s. Maximum reach is measured to the A4/A5
+# intersection (the working-envelope reference point), not to the flange.
+# The MT (machine tool) variants are not in that manual; the same manual and the KUKA product page state the
+# KR 500 R2830 MT has 500 kg and 2826 mm reach and the KR 480 R3330 MT has 480 kg and 3326 mm, the figures of the
+# R2830 and R3330 arms, so the arm dimensions above are used for them. The figure gives the 55 mm offset
+# without a visible sign; its sign (A4/A5 point 55 mm ABOVE the A3 axis in the L pose, opposite to the KR120) is
+# taken from the Q-LAB KR500 link meshes read at run time (tests/test_robomove.py checks it when the clone is
+# present). Link shapes are primitive boxes and cylinders (no public meshes).
+KR_FORTEC_LIMITS = [(-185, 185, 90), (-130, 20, 80), (-100, 144, 75), (-350, 350, 90), (-120, 120, 83),
+                    (-350, 350, 130)]
+KR_FORTEC = {
+    "kr500_r2830_mt": dict(label="KUKA KR 500 R2830 MT", a1=0.500, a2=0.055, c1=1.045, c2=1.300, c3=1.025,
+                           c4=0.290),
+    "kr480_r3330_mt": dict(label="KUKA KR 480 R3330 MT", a1=0.500, a2=0.055, c1=1.045, c2=1.300, c3=1.525,
+                           c4=0.290),
+}
+
+
+def fortec_body(p_):
+    """URDF body of a KR QUANTEC/FORTEC-class arm from the dimensions in KR_FORTEC[...] (joint layout as kr120)."""
+    a1, a2, c1, c2, c3, c4 = (p_[k] for k in ("a1", "a2", "c1", "c2", "c3", "c4"))
+    X = "0 {} 0".format(PI / 2)            # cylinder axis z -> x
+    Y = "{} 0 0".format(PI / 2)            # cylinder axis z -> y
+    geom = {
+        "base_link": cyl(0.50, 0.40, "0 0 0.20"),
+        "link_1": cyl(0.42, c1, "0 0 {}".format(-c1 / 2)) + cyl(0.33, 0.70, "{} 0 0".format(a1), Y),
+        "link_2": box(c2, 0.36, 0.40, "{} 0 0".format(c2 / 2)),
+        "link_3": box(c3, 0.30, 0.30, "{} 0 {}".format(c3 / 2, a2 / 2)) + cyl(0.26, 0.50, "0 0 0", Y),
+        "link_4": cyl(0.16, 0.30, "0 0 0", X),
+        "link_5": cyl(0.15, 0.24, "0 0 0", Y),
+        "link_6": cyl(0.13, 0.12, "0.06 0 0", X),
+    }
+    s = ""
+    for n in KR_LINKS:
+        s += link(n, geom[n])
+    s += link("flange") + link("tool0")
+    org = ["0 0 {}".format(c1), "{} 0 0".format(a1), "{} 0 0".format(c2), "{} 0 {}".format(c3, a2), "0 0 0", "0 0 0"]
+    axes = ["0 0 -1", "0 1 0", "0 1 0", "-1 0 0", "0 1 0", "-1 0 0"]
+    parents = ["base_link", "link_1", "link_2", "link_3", "link_4", "link_5"]
+    for i in range(6):
+        lo, hi, v = KR_FORTEC_LIMITS[i]
+        s += joint("joint_a{}".format(i + 1), "revolute", parents[i], "link_{}".format(i + 1), org[i], axis=axes[i],
+                   lo=math.radians(lo), hi=math.radians(hi), vel=math.radians(v))
+    s += joint("joint_a6-flange", "fixed", "link_6", "flange", "{} 0 0".format(c4))
+    s += joint("flange-tool0", "fixed", "flange", "tool0", rpy="0 {} 0".format(PI / 2))
+    return s
+
+
+def fortec_plugins(p_):
+    """OPW parameters for the same arm (same joint conventions as the KR120)."""
+    opw = KR_OPW
+    for k, old in (("a1", "0.350"), ("a2", "0.041"), ("c1", "0.675"), ("c2", "1.150"), ("c3", "1.000"),
+                   ("c4", "0.215")):
+        v = -p_[k] if k == "a2" else p_[k]   # OPW a2 is the negative of the wrist height above the A3 axis
+        opw = opw.replace("{}: {}".format(k, old), "{}: {:.3f}".format(k, v))
+    return KR_PLUGINS.replace(KR_OPW, opw)
+
+
 
 # ---------------------------------------------------------------- files
 
@@ -156,6 +222,8 @@ WIRE_TOOLS = {
     # KR120 (payload 120 kg): steel bow, 800 mm span, 180 mm pulleys, larger drive
     "kr120": dict(half=0.40, depth=0.60, rp=0.09, beam=0.07, plate=(0.22, 0.22, 0.03), motor=(0.16, 0.16, 0.20)),
 }
+# the KR 480 and KR 500 MT cells carry the same steel bow (480 and 500 kg payload)
+WIRE_TOOLS["kr480_r3330_mt"] = WIRE_TOOLS["kr500_r2830_mt"] = WIRE_TOOLS["kr120"]
 
 
 def wire_tool_parts(t):
@@ -326,6 +394,14 @@ def main():
     (HERE / "kr120.srdf").write_text(srdf("kr120", '  <group name="manipulator"><chain base_link="base_link" '
                                           'tip_link="tool0"/></group>\n', "kr120_plugins.yaml", KR_LINKS,
                                           tool_disable("link_6", ["link_5"])), encoding="utf-8")
+    # KR 480 R3330 MT and KR 500 R2830 MT with the same bow
+    for name, p_ in KR_FORTEC.items():
+        (HERE / (name + ".urdf")).write_text(urdf(name, joint("world-base", "fixed", "world", "base_link") +
+                                                  fortec_body(p_) + wire_tool_xml(name)), encoding="utf-8")
+        (HERE / (name + "_plugins.yaml")).write_text(fortec_plugins(p_), encoding="utf-8")
+        (HERE / (name + ".srdf")).write_text(srdf(name, '  <group name="manipulator"><chain base_link="base_link" '
+                                                  'tip_link="tool0"/></group>\n', name + "_plugins.yaml", KR_LINKS,
+                                                  tool_disable("link_6", ["link_5"])), encoding="utf-8")
     print("wrote", sorted(p.name for p in HERE.iterdir() if p.suffix in (".urdf", ".srdf", ".yaml")))
 
 
