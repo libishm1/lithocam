@@ -545,6 +545,48 @@ class Properties(QWidget):
                 w.textChanged.connect(lambda v, k=key: self._set(k, v))
             self.form.addRow("{}{}".format(label, " ({})".format(unit) if unit else ""), w)
 
+    def show_station(self, st, on_change):
+        """Station settings that change the posted program: work frame, material, robot factor, tool length,
+        rapid speed, turntable."""
+        while self.form.rowCount():
+            self.form.removeRow(0)
+        self.step = None
+        self.form.addRow(QLabel("<b>Station</b> <span style='color:#888'>(settings that change the posted "
+                                "program)</span>"))
+
+        def spin(val, lo, hi, dec, cb, suffix=""):
+            w = QDoubleSpinBox()
+            w.setRange(lo, hi)
+            w.setDecimals(dec)
+            w.setValue(float(val))
+            if suffix:
+                w.setSuffix(suffix)
+            w.valueChanged.connect(lambda v: (cb(v), on_change()))
+            return w
+        for k, axis in enumerate("xyz"):
+            self.form.addRow("Work frame {} (m)".format(axis),
+                             spin(st.work_xyz[k], -10, 10, 4, lambda v, k=k: st.work_xyz.__setitem__(k, v)))
+        for k, axis in enumerate(("roll", "pitch", "yaw")):
+            self.form.addRow("Work frame {} (deg)".format(axis),
+                             spin(st.work_rpy[k], -360, 360, 2, lambda v, k=k: st.work_rpy.__setitem__(k, v)))
+        from .. import cutting_data
+        mats = sorted({e.material for e in cutting_data.TABLE})
+        mc = QComboBox()
+        mc.addItems(mats if st.material in mats else mats + [st.material])
+        mc.setCurrentText(st.material)
+        mc.currentTextChanged.connect(lambda t: (setattr(st, "material", t), on_change()))
+        mc.setToolTip("Cutting data (feeds, speeds, wire sawing rate) are looked up for this material")
+        self.form.addRow("Material", mc)
+        self.form.addRow("Robot feed factor", spin(st.robot_factor, 0.01, 2.0, 2,
+                                                   lambda v: setattr(st, "robot_factor", v)))
+        self.form.addRow("Tool length override (mm, 0 = spindle + tool)",
+                         spin(st.tool_length, 0, 2000, 1, lambda v: setattr(st, "tool_length", v)))
+        self.form.addRow("Rapid speed near the stone (mm/s)",
+                         spin(st.rapid_speed, 1, 2000, 1, lambda v: setattr(st, "rapid_speed", v)))
+        if st.turntable:
+            self.form.addRow("Turntable diameter (m)", spin(st.turntable.get("diameter", 0.8), 0.05, 5, 3,
+                                                            lambda v: st.turntable.__setitem__("diameter", v)))
+
     def _tool_row(self, spec, key, label):
         w = QComboBox()
         w.addItem("(keep current)", "")
@@ -733,6 +775,7 @@ class Studio(QMainWindow):
         cv = QVBoxLayout(centre)
         cv.setContentsMargins(0, 0, 0, 0)
         self.view_container = QWidget.createWindowContainer(self.view.win)
+        self.view_container.setMinimumSize(480, 420)
         cv.addWidget(self.view_container, 1)
         bar = QHBoxLayout()
         st = self.style()
@@ -765,11 +808,7 @@ class Studio(QMainWindow):
         self.tree.customContextMenuRequested.connect(self._tree_menu)
         self.tree.itemDoubleClicked.connect(
             lambda it, _c: self._goto_target(it.data(0, ROLE + 2)) if it.data(0, ROLE + 1) == "target" else None)
-        self.palette = QToolBox()
-        for cat, _ in catalog.CATEGORIES:
-            lst = PaletteList(catalog.steps_in(cat))
-            lst.itemDoubleClicked.connect(lambda it: self._add_step(it.data(ROLE)))
-            self.palette.addItem(lst, cat)
+        self.palette = QToolBox()          # filled by _fill_operations
         self.tools_panel = ToolPanel()
         self.tools_panel.assign.connect(self._assign_tool)
         self.tools_panel.btn_load.clicked.connect(self._load_tools)
@@ -797,6 +836,9 @@ class Studio(QMainWindow):
         self.traj = TrajectoryPlot()
         self.traj.seek.connect(lambda i: self.sim.setValue(i))
         bottom = QTabWidget()
+        self.issues = QListWidget()
+        self.issues.setToolTip("Errors block posting; warnings need a look. Generate refreshes the list.")
+        bottom.addTab(self.issues, "Issues")
         bottom.addTab(self.traj, "Joint trajectory")
         bottom.addTab(self.log, "Log")
         bottom.addTab(self.output, "Posted program")
@@ -806,11 +848,21 @@ class Studio(QMainWindow):
         self.process_text.setPlainText("Process check: simulate, then press Process check on the Machining toolbar.")
         bottom.addTab(self.process_text, "Process")
         self.bottom_tabs = bottom
-        self._dock("Work tree", self.tree, Qt.LeftDockWidgetArea)
-        self._dock("Objects", objects, Qt.LeftDockWidgetArea)
-        self._dock("Robot panel", self.robot_panel, Qt.RightDockWidgetArea, scroll=True)
-        self._dock("Properties", self.props, Qt.RightDockWidgetArea, scroll=True)
-        self._dock("Output", bottom, Qt.BottomDockWidgetArea)
+        self.checklist = QListWidget()
+        self.checklist.setToolTip("Part to program, in order. Grey: to do; green: done; amber: needs a look.")
+        self.checklist.itemDoubleClicked.connect(self._checklist_go)
+        d_check = self._dock("Part to program", self.checklist, Qt.LeftDockWidgetArea)
+        d_tree = self._dock("Work tree", self.tree, Qt.LeftDockWidgetArea)
+        d_obj = self._dock("Objects", objects, Qt.LeftDockWidgetArea)
+        d_rob = self._dock("Robot panel", self.robot_panel, Qt.RightDockWidgetArea, scroll=True)
+        d_rob.widget().setMinimumHeight(380)
+        d_props = self._dock("Properties", self.props, Qt.RightDockWidgetArea, scroll=True)
+        d_out = self._dock("Output", bottom, Qt.BottomDockWidgetArea)
+        # the side columns run the full height; the output tabs sit only under the 3D view
+        self.setCorner(Qt.BottomLeftCorner, Qt.LeftDockWidgetArea)
+        self.setCorner(Qt.BottomRightCorner, Qt.RightDockWidgetArea)
+        self._dock_sizes = ([d_check, d_tree, d_obj], [200, 380, 320], [d_rob, d_props], [430, 520], d_out)
+        self._posted_key = None
         self._toolbars()
         self.statusBar().showMessage("Ready")
 
@@ -818,6 +870,19 @@ class Studio(QMainWindow):
         self._set_robot("ur10e", first=True)
         self._demo()
         self._view("iso")
+        self.tree.setCurrentItem(self.tree.topLevelItem(0))     # Station settings in Properties at start
+
+    def showEvent(self, e):
+        super().showEvent(e)
+        if getattr(self, "_dock_sizes", None):             # Qt applies dock sizes only once the window is shown
+            left, lsz, right, rsz, out = self._dock_sizes
+            self._dock_sizes = None
+            def apply():
+                h = max(self.height(), 600)
+                self.resizeDocks([out], [int(h * 0.2)], Qt.Vertical)        # the 3D view keeps most of the height
+                self.resizeDocks(left, [int(v * h / 1000) for v in lsz], Qt.Vertical)
+                self.resizeDocks(right, [int(v * h / 1000) for v in rsz], Qt.Vertical)
+            QTimer.singleShot(400, apply)
 
     # ---------------------------------------------------------------- ui scaffolding
     def _dock(self, title, w, area, scroll=False):
@@ -867,35 +932,49 @@ class Studio(QMainWindow):
         tb.addWidget(ex)
         self._act(tb, "Save", st.standardIcon(QStyle.SP_DialogSaveButton), self._save)
         tb.addSeparator()
-        self._act(tb, "Load part", glyph_icon("STL", "#8d6e63", 22), self._load_part, "Load a part (STL, mm)")
-        self._act(tb, "Tools", glyph_icon("T", "#455a64", 22), self._load_tools, "Load a tool library (CSV)")
+        self._act(tb, "Part", glyph_icon("STL", "#8d6e63", 22), self._load_part, "Load a part (STL, mm)")
+        vb = QToolButton()
+        vb.setText("View")
+        vb.setIcon(glyph_icon("3D", "#37474f", 22))
+        vb.setPopupMode(QToolButton.InstantPopup)
+        vm = QMenu(vb)
+        for name, label in (("iso", "3D"), ("top", "Top"), ("front", "Front"), ("right", "Right")):
+            vm.addAction(label, lambda *_, n=name: self._view(n))
+        vm.addAction("Fit all", lambda: self._view(None))
+        vb.setMenu(vm)
+        vb.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        ex.setIcon(glyph_icon("Ex", "#5c6bc0", 22))
+        ex.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        tb.addWidget(vb)
         tb.addSeparator()
-        for name, g in (("iso", "3D"), ("top", "Top"), ("front", "Fr"), ("right", "Rt")):
-            self._act(tb, name, glyph_icon(g, "#37474f", 22), lambda *_, n=name: self._view(n), "View " + name)
-        self._act(tb, "Fit", glyph_icon("[ ]", "#37474f", 22), lambda: self._view(None), "Fit all")
-        tb.addSeparator()
-        self._act(tb, "Program", glyph_icon("+P", "#3d7bd9", 22), self._add_program, "Add program")
-        self._act(tb, "MoveJ", glyph_icon("J", "#3d7bd9", 22), lambda: self._teach("movej"), "Teach a joint move")
-        self._act(tb, "MoveL", glyph_icon("L", "#3d7bd9", 22), lambda: self._teach("movel"), "Teach a linear move")
         self.act_gizmo = self._act(tb, "Move TCP", glyph_icon("✥", "#00897b", 22), self._toggle_gizmo,
-                                   "Drag the tool with the mouse (T)")
+                                   "Drag the tool with the mouse (T); Ctrl+T saves the position as a target")
         self.act_gizmo.setCheckable(True)
         self.act_gizmo.setShortcut(QKeySequence("T"))
-        a = self._act(tb, "Save target", glyph_icon("+T", "#00897b", 22), lambda: self._save_target(),
-                      "Save the current position as a named target (Ctrl+T)")
-        a.setShortcut(QKeySequence("Ctrl+T"))
         tb.addSeparator()
-        self._act(tb, "Simulate", st.standardIcon(QStyle.SP_MediaPlay), self._simulate, "Expand and simulate")
-        self._act(tb, "Stop", st.standardIcon(QStyle.SP_MediaStop), self._stop)
-        self._act(tb, "Post", glyph_icon("PP", "#2e7d32", 22), self._post, "Generate the robot program")
+        a = self._act(tb, "Generate", glyph_icon("G", "#ef6c00", 22), self._simulate,
+                      "Generate the program's toolpaths and robot motion (F5)")
+        a.setShortcut(QKeySequence("F5"))
+        self._act(tb, "Post", glyph_icon("PP", "#2e7d32", 22), self._post, "Write the robot program (Ctrl+P)"
+                  ).setShortcut(QKeySequence("Ctrl+P"))
+        tb.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        # teaching shortcuts without toolbar buttons (the robot panel has the buttons)
+        for key, slot in (("J", lambda: self._teach("movej")), ("L", lambda: self._teach("movel")),
+                          ("Ctrl+T", lambda: self._save_target())):
+            sc = QAction(self)
+            sc.setShortcut(QKeySequence(key))
+            sc.triggered.connect(slot)
+            self.addAction(sc)
 
         mt = QToolBar("Machining")
         mt.setObjectName("Machining")
         mt.setIconSize(QSize(22, 22))
+        mt.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self.addToolBarBreak()
         self.addToolBar(mt)
         self._act(mt, "Setup", glyph_icon("S", "#6c6f7d", 22), lambda: self._add_step("setup"),
-                  "Setup: work frame and stock from the part")
+                  "Setup: work frame, stock, table angle and tool tilt")
+        self._op_buttons = []
         for cat, colour in catalog.CATEGORIES:
             if cat in ("Robot", "Setup"):
                 continue
@@ -904,17 +983,14 @@ class Studio(QMainWindow):
             b.setIcon(glyph_icon(cat[:2], colour, 22))
             b.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
             b.setPopupMode(QToolButton.InstantPopup)
-            m = QMenu(b)
-            for s in catalog.steps_in(cat):
-                a = m.addAction(step_icon(s), "{}{}".format(s.label, "" if s.status == "done" else
-                                                            "  ({})".format(s.status)))
-                a.triggered.connect(lambda *_, sid=s.id: self._add_step(sid))
-            b.setMenu(m)
+            b.setMenu(QMenu(b))
             mt.addWidget(b)
+            self._op_buttons.append((cat, b))
+        self.roadmap_box = QCheckBox("Show roadmap")
+        self.roadmap_box.setToolTip("Also list operations that have no toolpath generator yet")
+        self.roadmap_box.toggled.connect(lambda *_: self._fill_operations())
+        mt.addWidget(self.roadmap_box)
         mt.addSeparator()
-        self._act(mt, "Generate", glyph_icon("G", "#ef6c00", 22), self._simulate, "Generate all toolpaths")
-        self._act(mt, "Stock check", glyph_icon("Z", "#ad1457", 22), self._stock_check,
-                  "Cut the stock in a Z-map along every 3-axis toolpath and report the leftover and gouge")
         self.stock_box = QCheckBox("Stock")
         self.stock_box.setToolTip("Cut a voxel (SDF) stock along the simulated robot motion after each simulation; "
                                   "the bar then shows the stock as cut up to that sample")
@@ -922,11 +998,12 @@ class Studio(QMainWindow):
         mt.addWidget(self.stock_box)
         self._act(mt, "Process check", glyph_icon("F", "#6a1b9a", 22), self._process_check,
                   "Forces, robot deflection, wire bow and a voxel FEA strength check of the cut stock")
-        self.collisions = QCheckBox("Collisions (Tesseract)")
+        self.collisions = QCheckBox("Check collisions")
         try:
             import tesseract_robotics  # noqa: F401
             self.collisions.setChecked(True)
-            self.collisions.setToolTip("Plan with Tesseract IK branches and check collisions on the cell meshes")
+            self.collisions.setToolTip("Plan with all IK branches and check collisions on the cell meshes "
+                                       "(Tesseract); slower")
         except ImportError:
             self.collisions.setEnabled(False)
             self.collisions.setToolTip("pip install tesseract-robotics to plan with collision checks")
@@ -934,12 +1011,56 @@ class Studio(QMainWindow):
         self.table_box = QCheckBox("Turntable")
         self.table_box.toggled.connect(self._toggle_table)
         mt.addWidget(self.table_box)
-        post_box = QComboBox()
-        for d in ("urscript", "krl", "rapid", "cl"):
-            post_box.addItem(d, d)
-        self.post_box = post_box
+        self.post_box = QComboBox()
+        self.post_box.setToolTip("Controller language of the posted program; only the cell's own controller and "
+                                 "the neutral CL text are offered")
         mt.addWidget(QLabel("  Post "))
-        mt.addWidget(post_box)
+        mt.addWidget(self.post_box)
+        self._fill_operations()
+
+    DIALECT_NAMES = {"urscript": "Universal Robots URScript", "krl": "KUKA KRL", "rapid": "ABB RAPID",
+                     "gcode": "ISO G-code", "cl": "Neutral CL (test)"}
+    GENERATING = {"wire_ruled", "disc_cut", "disc_comb"}
+
+    def _ready(self, spec) -> bool:
+        """An operation that produces motion or a real record (not only a comment)."""
+        if spec.status == "done":
+            return True
+        return spec.status == "partial" and (spec.id in cam.GENERATORS or spec.id in self.GENERATING)
+
+    def _fill_operations(self):
+        """Machining menus and the palette list the operations that work; the rest only with 'Show roadmap'."""
+        allp = self.roadmap_box.isChecked()
+        for cat, b in self._op_buttons:
+            m = b.menu()
+            m.clear()
+            for s in catalog.steps_in(cat):
+                if not (allp or self._ready(s)):
+                    continue
+                tag = "" if self._ready(s) else "  (roadmap)"
+                a = m.addAction(step_icon(s), s.label + tag)
+                a.triggered.connect(lambda *_, sid=s.id: self._add_step(sid))
+            b.setEnabled(not m.isEmpty())
+        while self.palette.count():
+            w = self.palette.widget(0)
+            self.palette.removeItem(0)
+            w.deleteLater()
+        for cat, _ in catalog.CATEGORIES:
+            specs = [s for s in catalog.steps_in(cat) if allp or self._ready(s)]
+            if not specs:
+                continue
+            lst = PaletteList(specs)
+            lst.itemDoubleClicked.connect(lambda it: self._add_step(it.data(ROLE)))
+            self.palette.addItem(lst, cat)
+
+    def _fill_dialects(self):
+        native = program.ROBOTS[self.station.robot][2]
+        self.post_box.blockSignals(True)
+        self.post_box.clear()
+        for d in (native, "cl"):
+            self.post_box.addItem(self.DIALECT_NAMES.get(d, d), d)
+        self.post_box.setCurrentIndex(0)
+        self.post_box.blockSignals(False)
 
     def say(self, text):
         self.log.appendPlainText(text)
@@ -952,7 +1073,7 @@ class Studio(QMainWindow):
         self.say("Loading {} visual meshes ...".format(program.ROBOTS[name][0]))
         QApplication.processEvents()
         self.view.set_robot(self.robot, link_meshes(self.robot))
-        self.post_box.setCurrentText(program.ROBOTS[name][2])
+        self._fill_dialects()
         self.robot_panel.combo.blockSignals(True)
         self.robot_panel.combo.setCurrentIndex(self.robot_panel.combo.findData(name))
         self.robot_panel.combo.blockSignals(False)
@@ -1103,12 +1224,18 @@ class Studio(QMainWindow):
                 si = QTreeWidgetItem(pi, [s.title()])
                 si.setData(0, ROLE, s)
                 si.setIcon(0, step_icon(s.spec))
+                why = self._feed_missing(s)
+                if why:                                            # visible before Generate
+                    si.setForeground(0, QBrush(QColor("#e0a020")))
+                    si.setText(0, s.title() + "   (no feed)")
+                    si.setToolTip(0, why)
                 if s is select:
                     sel_item = si
             pi.setExpanded(True)
         for it in (root, rob, work, progs):
             it.setExpanded(True)
         self.tree.blockSignals(False)
+        self._update_checklist()
         if sel_item is not None:
             self.tree.setCurrentItem(sel_item)
 
@@ -1240,7 +1367,120 @@ class Studio(QMainWindow):
             self._rebuild_tree()
 
     def _selected(self):
+        it = self.tree.currentItem()
+        if it is not None and it.parent() is None:                  # the Station root
+            self.props.show_station(self.station, self._station_edited)
+            return
         self.props.show_step(self._current_step())
+
+    CHECKLIST = (("cell", "1  Cell: robot, spindle, table"), ("part", "2  Part loaded"),
+                 ("frame", "3  Work frame within reach"), ("stock", "4  Stock defined"),
+                 ("feeds", "5  Material and feeds"), ("ops", "6  Operations added"),
+                 ("gen", "7  Generated (F5)"), ("check", "8  Reach and collisions checked"),
+                 ("post", "9  Posted (Ctrl+P)"))
+
+    def _update_checklist(self):
+        if not hasattr(self, "checklist"):
+            return
+        st = self.station
+        steps = [s for p in st.programs for s in p.steps]
+        cutting = [s for s in steps if s.kind in cam.GENERATORS or s.kind in self.GENERATING]
+        ex = self.expansion
+        fresh = ex is not None and getattr(self, "_expanded_prog", None) is not None and \
+            ex.key == program.station_key(st, self._expanded_prog)
+        frame_ok = None
+        if st.stock is not None:
+            s = st.stock
+            T = program.down_pose(st.work_frame(), [(s["xmin"] + s["xmax"]) / 2, (s["ymin"] + s["ymax"]) / 2,
+                                                    s["zmax"] + 20.0])
+            _, frame_ok = program.solve_start(self.robot, T, self.robot_panel.q, tries=4)
+        state = {"cell": True, "part": self.part is not None or bool(st.ruled_path),
+                 "frame": frame_ok, "stock": st.stock is not None,
+                 "feeds": (not any(self._feed_missing(s) for s in steps)) if cutting else None,
+                 "ops": bool(cutting), "gen": fresh,
+                 "check": (fresh and not ex.errors and ex.unreachable == 0) if fresh else None,
+                 "post": fresh and self._posted_key == ex.key}
+        tips = {"frame": "Select the Station item and move the work frame; the stock top centre must be reachable",
+                "feeds": "A step marked 'no feed' needs a feed (or a material with cutting data)",
+                "check": "See the Issues tab", "part": "Part button on the toolbar, or open an example",
+                "ops": "Machining toolbar or the Operations palette", "gen": "Generate (F5) after every change",
+                "post": "Post (Ctrl+P) writes the controller program"}
+        self.checklist.clear()
+        for key, text in self.CHECKLIST:
+            v = state[key]
+            it = QListWidgetItem(("✔  " if v else ("!  " if v is False and key in ("frame", "feeds", "check")
+                                                      else "·  ")) + text)
+            it.setForeground(QBrush(QColor("#4caf50" if v else ("#e0a020" if v is False and key in
+                                                                   ("frame", "feeds", "check") else "#9aa0a6"))))
+            it.setData(ROLE, key)
+            it.setToolTip(tips.get(key, ""))
+            self.checklist.addItem(it)
+
+    def _checklist_go(self, it):
+        key = it.data(ROLE)
+        if key == "part":
+            self._load_part()
+        elif key in ("frame", "stock", "feeds"):
+            self.tree.setCurrentItem(self.tree.topLevelItem(0))
+        elif key == "gen":
+            self._simulate()
+        elif key in ("check",):
+            self.bottom_tabs.setCurrentWidget(self.issues)
+        elif key == "post":
+            self._post()
+
+    def _show_issues(self, ex):
+        self.issues.clear()
+        keys = ("unreachable", "collid", "did not", "uncut", "WARNING", "out of reach", "no feed", "missing",
+                "faces down", "left uncut", "exceeds")
+        n_err = 0
+        for e in ex.errors:
+            it = QListWidgetItem("Error   " + e)
+            it.setForeground(QBrush(QColor("#ef5350")))
+            self.issues.addItem(it)
+            n_err += 1
+        for m in ex.messages:
+            if m.startswith("ERROR"):
+                continue
+            if any(k in m for k in keys):
+                it = QListWidgetItem("Check   " + m)
+                it.setForeground(QBrush(QColor("#e0a020")))
+                self.issues.addItem(it)
+        if ex.unreachable:
+            self.issues.addItem(QListWidgetItem("Check   {} robot samples are unreachable or colliding (red in the "
+                                                "toolpath)".format(ex.unreachable)))
+        if not self.issues.count():
+            self.issues.addItem(QListWidgetItem("No issues"))
+        self.bottom_tabs.setTabText(0, "Issues ({})".format(self.issues.count() if self.issues.item(0).text() !=
+                                                             "No issues" else 0))
+        if n_err or ex.unreachable:
+            self.bottom_tabs.setCurrentWidget(self.issues)
+
+    def _feed_missing(self, s) -> str:
+        """Why a cutting step would be refused at post time for lack of a feed ('' when a feed exists)."""
+        if s.kind not in cam.GENERATORS and s.kind not in ("disc_cut", "disc_comb"):
+            return ""
+        if float(s.params.get("feed") or 0) > 0:
+            return ""
+        t = self._tools().get(str(s.params.get("tool") or ""))
+        if t is None:
+            return "no tool"
+        if float(getattr(t, "feed", 0) or 0) > 0:
+            return ""
+        try:
+            from .. import cutting_data
+            sp = self.station.spindle_model()
+            if cutting_data.suggest(t, self.station.material, float(s.params.get("stepdown", 0) or 0), sp.max_rpm,
+                                    self.station.robot_factor).feed > 0:
+                return ""
+        except Exception:   # noqa: BLE001
+            pass
+        return ("No feed: the step, tool {} and the cutting data for {} give none. Set the step's feed; "
+                "posting is refused until then.".format(t.id, self.station.material))
+
+    def _station_edited(self):
+        self._refresh_scene()
+        self._update_checklist()
 
     def _step_edited(self):
         it = self.tree.currentItem()
@@ -1476,6 +1716,9 @@ class Studio(QMainWindow):
         self._clear_stock()                 # the cut stock belongs to the previous expansion
         for m in ex.messages:
             self.say("  " + m)
+        self._show_issues(ex)
+        self._posted_key = None
+        self._update_checklist()
         q = ex.joints()
         self.sim_q = q
         self.sim_seg_end = np.cumsum([len(s.q) for s in ex.segments])
@@ -1675,6 +1918,9 @@ class Studio(QMainWindow):
                                                                       "PASS" if same else "FAIL"))
         if show_only:
             return
+        if same:
+            self._posted_key = self.expansion.key
+            self._update_checklist()
         fn, _ = QFileDialog.getSaveFileName(self, "Save robot program", prog.name + post.EXTENSIONS[dialect])
         if fn:
             Path(fn).write_text(text)
