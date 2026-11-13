@@ -96,6 +96,9 @@ class Station:
     robot_factor: float = 1.0     # feed factor for robot stiffness (user-set; no published value)
     ruled_path: str = ""          # ruled-face JSON of the part (python -m lithocam.ruled part.step --json)
     turntable: Optional[Dict[str, float]] = None   # {"diameter": m, "height": m}: the part sits on a rotary table
+    # cell I/O definition (lithocam.cell_io JSON): "" = none (process records post as comments, with a warning);
+    # "default" = the cell's shipped placeholder file cells/<robot>_io.json; else a path
+    cell_io: str = ""
     programs: List[Program] = field(default_factory=lambda: [Program()])
     # named robot positions: {"name", "joints" (deg), "pose" (4x4 tool pose, m, robot base), "tool" (id or "")}
     targets: List[Dict[str, object]] = field(default_factory=list)
@@ -141,12 +144,12 @@ class Station:
 
     @staticmethod
     def load(path) -> "Station":
-        """Read a station file; relative part, ruled and tool-library paths are relative to the file."""
+        """Read a station file; relative part, ruled, tool-library and cell I/O paths are relative to the file."""
         path = Path(path)
         st = Station.from_json(path.read_text(encoding="utf-8"))
-        for k in ("part_path", "ruled_path", "tool_library"):
+        for k in ("part_path", "ruled_path", "tool_library", "cell_io"):
             v = getattr(st, k)
-            if v and not Path(v).is_absolute():
+            if v and v != "default" and not Path(v).is_absolute():
                 setattr(st, k, str((path.parent / v).resolve()))
         return st
 
@@ -322,6 +325,85 @@ def solve_start(robot: Robot, target: np.ndarray, q_now: Sequence[float], tries:
     return (best, True) if best is not None else (q_now, False)
 
 
+class ProcessState:
+    """Spindle, wire motor, water and tool-change records of one expansion, mapped at post time through the
+    station's cell I/O definition (lithocam.cell_io; the expansion carries it in an io_map record).
+
+    The spindle (disc and milling steps) or the wire motor (wire steps) and the water go on before the first cut of
+    a step; a changed spindle speed posts as a new spindle record; drives and water go off before a tool change,
+    before an operator turns the table, and before the program end. A tool_change record (the cell's mode, manual
+    without a cell I/O) is emitted whenever the mounted tool changes, the first tool included."""
+
+    def __init__(self, station: "Station", recs: List[post.Rec], msgs: List[str], errors: List[str]):
+        from .. import cell_io
+        self.recs, self.msgs, self.robot = recs, msgs, station.robot
+        self.io = None
+        self.warned = False
+        self.tool: Optional[str] = None
+        self.on = {"spindle": False, "wire": False, "water": False}
+        self.rpm = 0.0
+        src = (station.cell_io or "").strip()
+        if not src:
+            return
+        path = cell_io.default_path(station.robot, CELLS) if src == "default" else Path(src)
+        try:
+            self.io = cell_io.load(path)
+        except (OSError, ValueError) as e:
+            errors.append("cell I/O {}: {}".format(path, e))
+            return
+        native = ROBOTS.get(station.robot, ("", "", ""))[2]
+        if self.io.controller != native:
+            msgs.append("WARNING: cell I/O {} is for {} programs; the {} posts {}: its process records post as "
+                        "comments".format(path, self.io.controller, station.robot, native))
+        recs.append(post.Rec("io_map", {"path": str(path), "io": self.io.data}))
+        msgs.extend("WARNING: " + w for w in self.io.warnings)
+
+    def _warn(self):
+        if self.io is None and not self.warned:
+            self.warned = True
+            self.msgs.append("WARNING: no cell I/O definition loaded (Station.cell_io): spindle, water and tool "
+                             "change post as comments and operator pauses. Select cells/{}_io.json (placeholder "
+                             "values) and set it for your cell.".format(self.robot))
+
+    def tool_change(self, tid: str):
+        if not tid or tid == self.tool:
+            return
+        self.all_off()
+        self._warn()
+        mode = self.io.tool_mode() if self.io is not None else "manual"
+        self.recs.append(post.Rec("tool_change", {"id": tid, "mode": mode}))
+        self.tool = tid
+
+    def drive_on(self, drive: str, rpm: float = 0.0, step: int = -1):
+        """`drive`: "spindle" or "wire"."""
+        self._warn()
+        other = "wire" if drive == "spindle" else "spindle"
+        if self.on[other]:
+            self.recs.append(post.Rec(other, {"rpm": 0.0, "on": False}))
+            self.on[other] = False
+        rpm = float(rpm or 0.0)
+        if not self.on[drive] or (drive == "spindle" and rpm and abs(rpm - self.rpm) > 1e-9):
+            self.recs.append(post.Rec(drive, {"rpm": rpm, "on": True}))
+            if drive == "spindle" and not rpm:
+                self.msgs.append("step {}: spindle on without a speed: set the rpm on the step or the tool".format(
+                    step + 1))
+            self.on[drive] = True
+            self.rpm = rpm if drive == "spindle" else self.rpm
+        if not self.on["water"]:
+            self.recs.append(post.Rec("water", {"on": True}))
+            self.on["water"] = True
+
+    def all_off(self):
+        for k in ("spindle", "wire"):
+            if self.on[k]:
+                self.recs.append(post.Rec(k, {"rpm": 0.0, "on": False}))
+                self.on[k] = False
+        if self.on["water"]:
+            self.recs.append(post.Rec("water", {"on": False}))
+            self.on["water"] = False
+        self.rpm = 0.0
+
+
 WIRE_BOW = {"ur10e": 0.25, "kr120": 0.6, "kr480_r3330_mt": 0.6, "kr500_r2830_mt": 0.6}   # wire depth along tool0 z of each cell's bow saw (cells/make_cells.py)
 
 
@@ -344,7 +426,7 @@ def wire_rungs(face, work: np.ndarray, yaw: float, wire_radius: float, bow: floa
     return [[wire_target(p0, p1, n, wire_radius, math.radians(rd), bow) for rd in rolls_deg] for p0, p1, n in lines]
 
 
-def _wire_step(i, st, p, station, robot, tools, backend, q, add, recs, msgs, yaw, errors):
+def _wire_step(i, st, p, station, robot, tools, backend, q, add, recs, msgs, yaw, errors, proc=None):
     """Diamond-wire sweep over the ruled faces labelled 'wire': per face the turntable turns the face towards the
     robot, then the ladder planner picks roll and IK branch per ruling."""
     from ..wirepath import facing_yaw, load_ruled_json
@@ -364,6 +446,8 @@ def _wire_step(i, st, p, station, robot, tools, backend, q, add, recs, msgs, yaw
     bow = WIRE_BOW.get(station.robot, 0.25)
     robot.tcp_offset = np.eye(4)                          # wire targets are tool0 poses (the bow is in the URDF)
     if tid:
+        if proc is not None:
+            proc.tool_change(tid)
         recs.append(post.Rec("tool", {"id": tid, "tcp": np.eye(4).tolist()}))
     be = backend or NumpyBackend(robot, [HOME.get(station.robot, [0.0] * robot.dof)])
     if hasattr(be, "set_tool_mode"):
@@ -381,6 +465,9 @@ def _wire_step(i, st, p, station, robot, tools, backend, q, add, recs, msgs, yaw
             msgs.append("step {}: wire face {} faces down onto the table; cut it before the part is set down".format(
                 i + 1, f.index))
             continue
+        if proc is not None and station.turntable is not None and (
+                getattr(f, "yaw_deg", None) is not None or (p.get("auto_table", True) and nz < 0.7)):
+            proc.all_off()                                    # the operator turns the table: drives off first
         if station.turntable is not None and getattr(f, "yaw_deg", None) is not None:   # the face names its angle
             yaw[0] = math.radians(float(f.yaw_deg))
             recs.append(post.Rec("table", {"deg": float(f.yaw_deg)}))
@@ -448,6 +535,8 @@ def _wire_step(i, st, p, station, robot, tools, backend, q, add, recs, msgs, yaw
         add(i, "{} face {}".format(st.title(), f.index), sq, scut, sok)
         recs.append(post.Rec("comment", {"text": "wire face {}: {} rulings, {} samples, table {:.1f} deg".format(
             f.index, len(qa), len(sq), math.degrees(yaw[0]))}))
+        if proc is not None:
+            proc.drive_on("wire", 0.0, i)                     # wire motor and water before the first cut
         recs.append(post.Rec("movej", {"q": sq[0].tolist()}))
         if wire_feed > 0:
             recs.append(post.Rec("speed", {"linear": wire_feed / 60.0}))
@@ -496,7 +585,7 @@ def _polygon(text: str):
     return P if a > 0 else P[::-1]                         # counter-clockwise
 
 
-def _disc_step(i, st, p, station, robot, tool, backend, q, add, recs, msgs, errors, yaw, sp):
+def _disc_step(i, st, p, station, robot, tool, backend, q, add, recs, msgs, errors, yaw, sp, proc=None):
     """Saw cuts from lithocam.discsaw, run by the robot: the blade centre is the TCP, the spindle axis is the
     blade normal; the blade is round, so the spin about its axis is left to the planner like a 5-axis spindle."""
     from .. import discsaw
@@ -547,7 +636,9 @@ def _disc_step(i, st, p, station, robot, tool, backend, q, add, recs, msgs, erro
         msgs.append("step {}: cutting data for {} in {}: {}".format(i + 1, tool.id, station.material, sg.text()))
     if feed <= 0:
         errors.append("step {}: the saw cut has no feed; set it on the step or the tool".format(i + 1))
-    if rpm:
+    if proc is not None:
+        proc.drive_on("spindle", rpm, i)                      # spindle and water before the first cut
+    elif rpm:
         recs.append(post.Rec("spindle", {"rpm": rpm}))
     if feed > 0:
         recs.append(post.Rec("speed", {"linear": feed / 60.0}))
@@ -602,6 +693,7 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
     msgs: List[str] = []
     errors: List[str] = []
     tool = None
+    proc = ProcessState(station, recs, msgs, errors)   # spindle, water and tool-change records via the cell I/O
 
     sp = station.spindle_model()
     yaw = [0.0]                     # turntable angle, radians (a list so the helpers can update it)
@@ -626,6 +718,7 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
         """Put the cutter in the spindle: TCP, tool record (with the spindle mass), collet check."""
         t = tools[tid]
         robot.tcp_offset = station.tool_tcp(t)
+        proc.tool_change(tid)                          # drives off, then the change (only when the tool changes)
         recs.append(post.Rec("tool", {"id": tid, "tcp": robot.tcp_offset.tolist(), "mass": sp.mass_kg}))
         shank = float(getattr(t, "shank_diameter", 0.0) or 0.0) or float(getattr(t, "diameter", 0.0) or 0.0)
         if sp.max_collet_mm and shank > sp.max_collet_mm + 1e-9 and t.kind not in (
@@ -742,6 +835,7 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
             recs.append(post.Rec("call", {"name": p["name"]}))
         elif st.kind == "setup":
             if station.turntable is not None:
+                proc.all_off()                         # the operator turns the table: drives and water off first
                 yaw[0] = math.radians(float(p.get("yaw", 0.0)))
                 recs.append(post.Rec("table", {"deg": math.degrees(yaw[0])}))
             tilt[0] = math.radians(float(p.get("tilt", 0.0)))
@@ -749,14 +843,14 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
                 recs.append(post.Rec("comment", {"text": "3+2 setup: tool tilted {:.1f} deg about the table x axis"
                                                  .format(math.degrees(tilt[0]))}))
         elif st.kind == "wire_ruled":
-            q = _wire_step(i, st, p, station, robot, tools, backend, q, add, recs, msgs, yaw, errors)
+            q = _wire_step(i, st, p, station, robot, tools, backend, q, add, recs, msgs, yaw, errors, proc)
         elif st.kind in ("disc_cut", "disc_comb"):
             tid = str(p.get("tool") or "")
             if tid not in tools:
                 msgs.append("step {}: disc saw needs a disc tool from the library".format(i + 1))
                 continue
             tool = mount(i, tid)
-            q = _disc_step(i, st, p, station, robot, tool, backend, q, add, recs, msgs, errors, yaw, sp)
+            q = _disc_step(i, st, p, station, robot, tool, backend, q, add, recs, msgs, errors, yaw, sp, proc)
         elif st.kind in cam.GENERATORS:
             tid = str(p.get("tool") or "")
             if tid:
@@ -839,8 +933,7 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
                     station.material, sg.text(), "; ".join(sg.notes) or "-", ", ".join(sg.sources) or "none")}))
                 msgs.append("step {}: cutting data for {} in {}: {} ({} source{})".format(
                     i + 1, tid, station.material, sg.text(), len(sg.sources), "" if len(sg.sources) == 1 else "s"))
-            if rpm:
-                recs.append(post.Rec("spindle", {"rpm": rpm}))
+            proc.drive_on("spindle", rpm, i)          # spindle and water before the first cut
             if feed <= 0:
                 errors.append("step {}: {} has no feed: the step, the tool {} and the cutting data for {} give none. "
                               "Set a feed on the step or the tool.".format(i + 1, spec.label, tid or "(none)",
@@ -872,6 +965,7 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
         else:
             recs.append(post.Rec("comment", {"text": "{} ({}): no generator yet".format(spec.label, spec.status)}))
             msgs.append("step {}: {} is {}; posted as a comment".format(i + 1, spec.label, spec.status))
+    proc.all_off()                                     # spindle, wire motor and water off before the program end
     recs.append(post.Rec("end"))
     for e in errors:
         msgs.append("ERROR " + e)

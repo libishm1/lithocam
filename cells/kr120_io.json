@@ -1,0 +1,46 @@
+{
+  "schema": "lithocam.cell_io/1",
+  "name": "kr120_io (PLACEHOLDER, set for your cell)",
+  "robot": "kr120",
+  "controller": "krl",
+  "placeholder": true,
+  "note": "PLACEHOLDER: set for your cell. Every $OUT, $IN and $ANOUT index, level, scaling and dwell is a slot to fill from your cell I/O configuration and your spindle drive manual. None comes from a real cell. A null value means not set: that output posts as a comment. A fieldbus speed reference uses speed kind register with the name of the mapped KRL variable.",
+  "ready_inputs": [
+    {"di": 1, "value": true, "note": "set for your cell: a cell-ready input (enclosure, drive ready)"}
+  ],
+  "fault_input": {"di": 2, "ok": false, "note": "set for your cell: drive fault input and its no-fault level"},
+  "spindle": {
+    "start": [{"do": 1, "value": true, "note": "set for your cell: spindle run output"}],
+    "stop": [{"do": 1, "value": false, "note": "set for your cell"}],
+    "speed": {"kind": "analog", "port": 1, "volts_per_rpm": null, "offset_volts": 0.0, "full_scale_volts": null,
+              "output": "fraction",
+              "note": "set for your cell: $ANOUT index, speed reference volts per rev/min and the full-scale volts"},
+    "ready": {"di": 3, "value": true, "note": "set for your cell: at-speed input, or null"},
+    "dwell_s": null,
+    "max_rpm": null,
+    "note": "dwell_s: wait after start, set for your cell; max_rpm: the drive limit, set for your cell"
+  },
+  "wire": {
+    "start": [{"do": 4, "value": true, "note": "set for your cell: bow saw wire motor run output"}],
+    "stop": [{"do": 4, "value": false, "note": "set for your cell"}],
+    "speed": null,
+    "ready": null,
+    "dwell_s": null,
+    "max_rpm": null
+  },
+  "water": {
+    "on": [{"do": 2, "value": true, "note": "set for your cell: water valve output"}],
+    "off": [{"do": 2, "value": false, "note": "set for your cell"}]
+  },
+  "air": {
+    "on": [{"do": 3, "value": true, "note": "set for your cell: air blow valve output"}],
+    "off": [{"do": 3, "value": false, "note": "set for your cell"}]
+  },
+  "tool_change": {
+    "mode": "manual",
+    "message": "Put tool {tool} in the spindle, then restart",
+    "actions": [],
+    "pockets": {},
+    "note": "manual change by default (HALT); a tool changer needs mode changer, its actions and pockets, set for your cell"
+  }
+}
