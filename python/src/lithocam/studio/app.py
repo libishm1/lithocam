@@ -545,7 +545,7 @@ class Properties(QWidget):
                 w.textChanged.connect(lambda v, k=key: self._set(k, v))
             self.form.addRow("{}{}".format(label, " ({})".format(unit) if unit else ""), w)
 
-    def show_station(self, st, on_change):
+    def show_station(self, st, on_change, app=None):
         """Station settings that change the posted program: work frame, material, robot factor, tool length,
         rapid speed, turntable."""
         while self.form.rowCount():
@@ -586,6 +586,47 @@ class Properties(QWidget):
         if st.turntable:
             self.form.addRow("Turntable diameter (m)", spin(st.turntable.get("diameter", 0.8), 0.05, 5, 3,
                                                             lambda v: st.turntable.__setitem__("diameter", v)))
+        # cell I/O: how the controller switches the spindle, water, wire motor and tool change
+        io = QComboBox()
+        io.addItem("None (posted as comments, with a warning)", "")
+        io.addItem("Cell default (cells/<robot>_io.json, placeholders)", "default")
+        if getattr(st, "cell_io", "") not in ("", "default"):
+            io.addItem(Path(st.cell_io).name, st.cell_io)
+        io.addItem("Choose a file ...", "?")
+        io.setCurrentIndex(max(0, io.findData(getattr(st, "cell_io", ""))))
+
+        def pick_io(_):
+            v = io.currentData()
+            if v == "?":
+                fn, _f = QFileDialog.getOpenFileName(self, "Cell I/O definition", "", "JSON (*.json)")
+                if not fn:
+                    io.setCurrentIndex(0)
+                    return
+                v = fn
+            st.cell_io = v
+            on_change()
+        io.currentIndexChanged.connect(pick_io)
+        io.setToolTip("Spindle, water, wire motor and tool change outputs of your cell (docs/CELL_IO.md)")
+        self.form.addRow("Cell I/O", io)
+        if app is not None:
+            gm = QComboBox()
+            gm.addItem("Generic 3-axis (placeholder)", "")
+            mdir = _examples_dir().parent / "gcode_machines"
+            for f in sorted(mdir.glob("*.json")):
+                gm.addItem(f.stem.replace("_", " "), str(f))
+            gm.addItem("Choose a file ...", "?")
+            gm.setCurrentIndex(max(0, gm.findData(app.gcode_machine)))
+
+            def pick_gm(_):
+                v = gm.currentData()
+                if v == "?":
+                    fn, _f = QFileDialog.getOpenFileName(self, "Milling machine definition", "", "JSON (*.json)")
+                    v = fn or ""
+                app.gcode_machine = v
+                on_change()
+            gm.currentIndexChanged.connect(pick_gm)
+            gm.setToolTip("Machine definition used when posting ISO G-code (docs/POSTPROCESSORS.md)")
+            self.form.addRow("G-code machine", gm)
 
     def _tool_row(self, spec, key, label):
         w = QComboBox()
@@ -769,6 +810,7 @@ class Studio(QMainWindow):
         self._after_stock = None         # callable run once the stock run is in (batch modes, process check)
         self._after_process = None
         self._constants_given = {}       # the dialog's last entries
+        self.gcode_machine = ""          # milling machine definition for the G-code post ("" = generic 3-axis)
 
         # centre: view + simulation bar
         centre = QWidget()
@@ -1019,7 +1061,7 @@ class Studio(QMainWindow):
         self._fill_operations()
 
     DIALECT_NAMES = {"urscript": "Universal Robots URScript", "krl": "KUKA KRL", "rapid": "ABB RAPID",
-                     "gcode": "ISO G-code", "cl": "Neutral CL (test)"}
+                     "gcode": "ISO G-code (CNC machine file)", "cl": "Neutral CL (test)"}
     GENERATING = {"wire_ruled", "disc_cut", "disc_comb"}
 
     def _ready(self, spec) -> bool:
@@ -1057,7 +1099,7 @@ class Studio(QMainWindow):
         native = program.ROBOTS[self.station.robot][2]
         self.post_box.blockSignals(True)
         self.post_box.clear()
-        for d in (native, "cl"):
+        for d in (native, "gcode", "cl"):
             self.post_box.addItem(self.DIALECT_NAMES.get(d, d), d)
         self.post_box.setCurrentIndex(0)
         self.post_box.blockSignals(False)
@@ -1369,7 +1411,7 @@ class Studio(QMainWindow):
     def _selected(self):
         it = self.tree.currentItem()
         if it is not None and it.parent() is None:                  # the Station root
-            self.props.show_station(self.station, self._station_edited)
+            self.props.show_station(self.station, self._station_edited, self)
             return
         self.props.show_step(self._current_step())
 
@@ -1909,13 +1951,37 @@ class Studio(QMainWindow):
             self.output.setPlainText("; not posted:\n" + "\n".join("; " + e for e in self.expansion.errors) + "\n")
             return
         dialect = self.post_box.currentData()
-        text = post.write(self.expansion.records, dialect, **program.post_options(self.station.robot, dialect))
-        self.output.setPlainText(text)
-        back = post.joint_targets(text, dialect)
-        rec_q = [r.data["q"] for r in self.expansion.records if r.kind in ("movej", "movel")]
-        same = len(back) == len(rec_q) and (not back or np.max(np.abs(np.asarray(back) - np.asarray(rec_q))) < 1e-5)
-        self.say("Posted {} lines ({}); read-back check: {}".format(text.count("\n"), dialect,
-                                                                      "PASS" if same else "FAIL"))
+        if dialect == "gcode":
+            # a CNC machine file: tip positions and tool axes read back from the G-code by forward kinematics
+            mfile = self.gcode_machine or str(_examples_dir().parent / "gcode_machines" / "generic_3axis.json")
+            warn = []
+            try:
+                texts = post.write_files(self.expansion.records, "gcode", machine=mfile,
+                                         work_frame=self.station.work_frame(), warnings=warn)
+            except ValueError as e:
+                self.say("Not posted (G-code, {}): {}".format(Path(mfile).name, e))
+                self.output.setPlainText("; not posted: {}\n".format(e))
+                return
+            text = "\n".join(texts)
+            chk = post.compare_gcode(self.expansion.records, texts, machine=mfile,
+                                     work_frame=self.station.work_frame())
+            same = chk.ok
+            for w in warn:
+                self.say("  " + w)
+            self.output.setPlainText(text)
+            self.say("Posted {} lines of G-code for {} in {} file(s); read-back: {} ({} of {} points, tip {:.4f} mm, "
+                     "axis {:.3f} deg)".format(text.count("\n"), Path(mfile).name, len(texts),
+                                               "PASS" if same else "FAIL", chk.matched, chk.n, chk.max_tip_err,
+                                               chk.max_axis_err))
+        else:
+            text = post.write(self.expansion.records, dialect, **program.post_options(self.station.robot, dialect))
+            self.output.setPlainText(text)
+            back = post.joint_targets(text, dialect)
+            rec_q = [r.data["q"] for r in self.expansion.records if r.kind in ("movej", "movel")]
+            same = len(back) == len(rec_q) and (not back or np.max(np.abs(np.asarray(back) -
+                                                                         np.asarray(rec_q))) < 1e-5)
+            self.say("Posted {} lines ({}); read-back check: {}".format(text.count("\n"), dialect,
+                                                                          "PASS" if same else "FAIL"))
         if show_only:
             return
         if same:
