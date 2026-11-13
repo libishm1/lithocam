@@ -86,4 +86,30 @@ try:
     raise AssertionError("expected an exception")
 except IndexError:
     pass
+# general profile cutters and the thin disc
+tb = lc.cutter_of(lc.find_tool(lib, "W8"))                 # tapered ball
+assert tb.kind == lc.CutterKind.Profile and len(tb.segs) == 2 and tb.segs[0].arc and not tb.segs[1].arc
+assert lc.validate_profile(tb) == "" and abs(lc.profile(tb, 0.0)) < 1e-15
+assert lc.has_cutter(lc.find_tool(lib, "S13")) and lc.cutter_of(lc.find_tool(lib, "S13")).kind == lc.CutterKind.Profile
+assert sum(lc.has_cutter(t) for t in lib.tools) == 22
+fc = lc.tapered_cutter(6.0, 1.0, 0.0, 0.5)                 # flat-tipped cone
+plane = T(P(-50, -50, 4), P(50, -50, 4), P(0, 50, 4))
+assert abs(lc.drop_triangle(fc, plane, 0, 0) - 4) < 1e-12
+ball = lc.burr_cutter("ball", 4.0, 0.0, 0.0)
+assert abs(lc.drop_triangle(ball, spike, -3, 0) - (5 + math.sqrt(7) - 4)) < 1e-12
+seg = lc.ProfileSeg()
+seg.arc, seg.r, seg.h, seg.cr, seg.ch = True, 4.0, 4.0, 0.0, 4.0
+assert lc.profile_cutter([seg]).radius == 4.0
+disc = lc.disc_cutter(5.0, 2.0, 0.0)
+vtx = T(P(3, 0.5, 10), P(40, 0.5, -100), P(3, 60, -100))
+assert abs(lc.drop_triangle(disc, vtx, 0, 0) - 9.0) < 1e-12
+assert disc.kind == lc.CutterKind.Disc and disc.thickness == 2.0 and disc.heading == 0.0
+saw = lc.disc_cutter_of(lc.find_tool(lib, "S15"), 0.5)     # bridge saw blade 400 mm, kerf 3.6
+assert saw.kind == lc.CutterKind.Disc and saw.radius == 200.0 and saw.thickness == 3.6 and saw.heading == 0.5
+for bad in (lambda: lc.disc_cutter(5.0, 0.0, 0.0), lambda: lc.profile(disc, 1.0), lambda: lc.burr_cutter("spoon", 3, 3, 0)):
+    try:
+        bad()
+        raise AssertionError("expected an exception")
+    except ValueError:
+        pass
 print("bindings OK")

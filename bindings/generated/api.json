@@ -22,6 +22,18 @@
        {"name": "c", "type": "P3", "readonly": false}
      ],
      "methods": []},
+    {"name": "lithocam::ProfileSeg", "expose": "ProfileSeg", "bases": [], "abstract": false, "final": false, "default_constructible": true,
+     "constructors": [
+       {"params": []}
+     ],
+     "fields": [
+       {"name": "arc", "type": "bool", "readonly": false},
+       {"name": "r", "type": "double", "readonly": false},
+       {"name": "h", "type": "double", "readonly": false},
+       {"name": "cr", "type": "double", "readonly": false},
+       {"name": "ch", "type": "double", "readonly": false}
+     ],
+     "methods": []},
     {"name": "lithocam::Cutter", "expose": "Cutter", "bases": [], "abstract": false, "final": false, "default_constructible": true,
      "constructors": [
        {"params": []}
@@ -30,7 +42,10 @@
        {"name": "kind", "type": "CutterKind", "readonly": false},
        {"name": "radius", "type": "double", "readonly": false},
        {"name": "corner", "type": "double", "readonly": false},
-       {"name": "half_angle", "type": "double", "readonly": false}
+       {"name": "half_angle", "type": "double", "readonly": false},
+       {"name": "segs", "type": "vector<ProfileSeg, allocator<ProfileSeg>>", "readonly": false},
+       {"name": "thickness", "type": "double", "readonly": false},
+       {"name": "heading", "type": "double", "readonly": false}
      ],
      "methods": []},
     {"name": "lithocam::TriMesh", "expose": "TriMesh", "bases": [], "abstract": false, "final": false, "default_constructible": false,
@@ -174,7 +189,7 @@
      "methods": []}
   ],
   "enums": [
-    {"name": "lithocam::CutterKind", "expose": "CutterKind", "underlying": "int", "values": [{"name": "Flat", "value": 0}, {"name": "Ball", "value": 1}, {"name": "Bull", "value": 2}, {"name": "Cone", "value": 3}]},
+    {"name": "lithocam::CutterKind", "expose": "CutterKind", "underlying": "int", "values": [{"name": "Flat", "value": 0}, {"name": "Ball", "value": 1}, {"name": "Bull", "value": 2}, {"name": "Cone", "value": 3}, {"name": "Profile", "value": 4}, {"name": "Disc", "value": 5}]},
     {"name": "lithocam::ToolKind", "expose": "ToolKind", "underlying": "int", "values": [{"name": "FlatEndMill", "value": 0}, {"name": "BallEndMill", "value": 1}, {"name": "BullNoseMill", "value": 2}, {"name": "TaperedBallMill", "value": 3}, {"name": "FaceMill", "value": 4}, {"name": "GrindingDisc", "value": 5}, {"name": "CupWheel", "value": 6}, {"name": "PolishingPad", "value": 7}, {"name": "AbrasiveBrush", "value": 8}, {"name": "ChamferMill", "value": 9}, {"name": "Engraver", "value": 10}, {"name": "CarvingBurr", "value": 11}, {"name": "DovetailMill", "value": 12}, {"name": "TSlotMill", "value": 13}, {"name": "KeyholeMill", "value": 14}, {"name": "EdgeProfileBit", "value": 15}, {"name": "ProfileWheel", "value": 16}, {"name": "Drill", "value": 17}, {"name": "FlatBottomDrill", "value": 18}, {"name": "StepDrill", "value": 19}, {"name": "CoreDrill", "value": 20}, {"name": "Tap", "value": 21}, {"name": "ThreadMill", "value": 22}, {"name": "DiscSaw", "value": 23}, {"name": "DiamondWire", "value": 24}, {"name": "MultiWireSaw", "value": 25}, {"name": "GangSaw", "value": 26}, {"name": "ChainSaw", "value": 27}, {"name": "ChainMortiser", "value": 28}, {"name": "BandSaw", "value": 29}, {"name": "PlanerHead", "value": 30}, {"name": "Waterjet", "value": 31}, {"name": "Knife", "value": 32}, {"name": "BushHammer", "value": 33}, {"name": "Chisel", "value": 34}, {"name": "Splitter", "value": 35}, {"name": "FlameTorch", "value": 36}, {"name": "AggregateHead", "value": 37}]}
   ],
   "functions": [
@@ -183,6 +198,11 @@
     {"name": "signed_distance_convex", "qualified": "lithocam::signed_distance_convex", "returns": "double", "params": [{"name": "poly_ccw", "type": "vector<Vec2, allocator<Vec2>>", "out": false}, {"name": "p", "type": "Vec2", "out": false}]},
     {"name": "kerf_path_convex", "qualified": "lithocam::kerf_path_convex", "returns": "vector<Vec2, allocator<Vec2>>", "params": [{"name": "part_ccw", "type": "vector<Vec2, allocator<Vec2>>", "out": false}, {"name": "kerf", "type": "double", "out": false}, {"name": "max_overcut", "type": "double", "out": false}]},
     {"name": "profile", "qualified": "lithocam::profile", "returns": "double", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "d", "type": "double", "out": false}]},
+    {"name": "validate_profile", "qualified": "lithocam::validate_profile", "returns": "std::string", "params": [{"name": "cutter", "type": "Cutter", "out": false}]},
+    {"name": "profile_cutter", "qualified": "lithocam::profile_cutter", "returns": "Cutter", "params": [{"name": "segs", "type": "vector<ProfileSeg, allocator<ProfileSeg>>", "out": false}]},
+    {"name": "tapered_cutter", "qualified": "lithocam::tapered_cutter", "returns": "Cutter", "params": [{"name": "radius", "type": "double", "out": false}, {"name": "flat_radius", "type": "double", "out": false}, {"name": "corner", "type": "double", "out": false}, {"name": "half_angle", "type": "double", "out": false}]},
+    {"name": "burr_cutter", "qualified": "lithocam::burr_cutter", "returns": "Cutter", "params": [{"name": "shape", "type": "std::string", "out": false}, {"name": "radius", "type": "double", "out": false}, {"name": "length", "type": "double", "out": false}, {"name": "corner", "type": "double", "out": false}]},
+    {"name": "disc_cutter", "qualified": "lithocam::disc_cutter", "returns": "Cutter", "params": [{"name": "radius", "type": "double", "out": false}, {"name": "thickness", "type": "double", "out": false}, {"name": "heading", "type": "double", "out": false}]},
     {"name": "drop_triangle", "qualified": "lithocam::drop_triangle", "returns": "double", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "tri", "type": "Tri", "out": false}, {"name": "x", "type": "double", "out": false}, {"name": "y", "type": "double", "out": false}]},
     {"name": "drop_cutter", "qualified": "lithocam::drop_cutter", "returns": "double", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "mesh", "type": "TriMesh", "out": false}, {"name": "x", "type": "double", "out": false}, {"name": "y", "type": "double", "out": false}]},
     {"name": "adaptive_line", "qualified": "lithocam::adaptive_line", "returns": "vector<CLPoint, allocator<CLPoint>>", "params": [{"name": "cutter", "type": "Cutter", "out": false}, {"name": "mesh", "type": "TriMesh", "out": false}, {"name": "x0", "type": "double", "out": false}, {"name": "y0", "type": "double", "out": false}, {"name": "x1", "type": "double", "out": false}, {"name": "y1", "type": "double", "out": false}, {"name": "p", "type": "PathParams", "out": false}]},
@@ -206,6 +226,7 @@
     {"name": "validate_tool", "qualified": "lithocam::validate_tool", "returns": "std::string", "params": [{"name": "tool", "type": "Tool", "out": false}]},
     {"name": "has_cutter", "qualified": "lithocam::has_cutter", "returns": "bool", "params": [{"name": "tool", "type": "Tool", "out": false}]},
     {"name": "cutter_of", "qualified": "lithocam::cutter_of", "returns": "Cutter", "params": [{"name": "tool", "type": "Tool", "out": false}]},
+    {"name": "disc_cutter_of", "qualified": "lithocam::disc_cutter_of", "returns": "Cutter", "params": [{"name": "tool", "type": "Tool", "out": false}, {"name": "heading", "type": "double", "out": false}]},
     {"name": "tool_operations", "qualified": "lithocam::tool_operations", "returns": "vector<std::string, allocator<std::string>>", "params": [{"name": "kind", "type": "ToolKind", "out": false}]},
     {"name": "tools_for_operation", "qualified": "lithocam::tools_for_operation", "returns": "vector<Tool, allocator<Tool>>", "params": [{"name": "lib", "type": "ToolLibrary", "out": false}, {"name": "operation", "type": "std::string", "out": false}]},
     {"name": "tools_of_kind", "qualified": "lithocam::tools_of_kind", "returns": "vector<Tool, allocator<Tool>>", "params": [{"name": "lib", "type": "ToolLibrary", "out": false}, {"name": "kind", "type": "ToolKind", "out": false}]},

@@ -6,7 +6,7 @@ Purpose: the source for the lithocam tool library. Every row here is a tool in `
 
 Scope: a light web survey of about 35 standard searches. No PDFs were downloaded, no sign-ins were used, no paywalls were crossed. Sources are linked; no source text is reproduced.
 
-Drop-cutter coverage today: 20 of the 63 library tools map onto the kernel's flat, ball, bull and cone cutters (exact, or conservative for annular tools). The envelope classes listed at the end are the roadmap for the rest.
+Drop-cutter coverage today: 22 of the 63 library tools map onto the kernel's flat, ball, bull, cone and general-profile cutters (exact, or conservative for annular tools). The profile cutter adds the tapered ball (W8) and the flame burr (S13), and a flat-tipped cone is now exact. The thin disc cutter for saw slotting (disc saws S15, W27, W27b) is a separate model, `disc_cutter`, built from the blade's radius and kerf; `cutter_of` does not map the disc saw kinds because the model needs the cut direction. The envelope classes listed at the end are the roadmap for the rest.
 
 ## How to read this file
 

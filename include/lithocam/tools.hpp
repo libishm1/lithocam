@@ -14,10 +14,15 @@
 //   BallEndMill                          Ball, radius D/2                               exact
 //   BullNoseMill                         Bull, radius D/2, corner r                     exact
 //   Drill, Engraver, ChamferMill         Cone, radius D/2, half angle = tip_angle / 2   exact when tip_diameter = 0
+//                                        Profile (flat of diameter tip_diameter, then the flank) exact when tip_diameter > 0
+//   TaperedBallMill                      Profile: tip radius corner_radius (arc), optional flat of diameter
+//                                        tip_diameter, flank taper_angle from the axis up to D/2   exact when the
+//                                        flute covers the cone, conservative when it is shorter
+//   CarvingBurr                          Profile from `profile` (flame, ball, cone, cylinder) with radius D/2 and head
+//                                        length flute_length; exact for that nominal shape
 //   CoreDrill, CupWheel                  Flat, radius D/2                               conservative (ignores the bore)
 // Every other kind has no drop-cutter model yet, and cutter_of rejects it:
-//   - flat-tipped cones: a pointed cone would sit below the real flat tip and gouge;
-//   - tapered ball, burrs and step drills need a general profile f(d) in the kernel;
+//   - burrs with another profile name, and step drills (a stepped profile is not convex);
 //   - flat-bottom drills: the centre spur projects below the rim;
 //   - undercut tools (dovetail, T-slot, keyhole) need full-profile collision;
 //   - compliant pads and brushes need a force model;
@@ -159,6 +164,9 @@ std::string validate_tool(const Tool& tool);
 bool has_cutter(const Tool& tool);
 // Drop-cutter model of the tool (see the table above); throws std::invalid_argument when there is none.
 Cutter cutter_of(const Tool& tool);
+// Saw-slot drop-cutter of a DiscSaw: radius diameter / 2, thickness kerf (the slot width), `heading` the cut direction
+// (atan2(dy, dx) of the pass). Throws std::invalid_argument for another kind or a missing diameter or kerf.
+Cutter disc_cutter_of(const Tool& tool, double heading);
 
 // Operation families the tool kind fits, e.g. "face", "pocket", "raster", "drill", "edge_profile", "polish",
 // "slab_saw", "wire_cut", "plane", "texture", "split". tool_operation_names lists every family any kind uses.

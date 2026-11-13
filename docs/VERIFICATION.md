@@ -12,6 +12,8 @@
 | 8 | A wire of radius r whose centre line runs parallel to a planar face, offset r along the outward normal, cuts no part material (every point within r of the line is outside the face plane) | `wire_tube_outside_part` | `ruled.py` access test (offset ruling); `robot.wire_target` places the wire at the offset (`test_wire_target_puts_the_wire_on_the_kerf_offset_line`) | proved, tested |
 | 9 | That wire touches the face along the ruling (no extra waste) | `wire_tube_touches_face` | as above | proved, tested |
 | 10 | Drop-cutter: no gouge and contact (flat, ball, bull, cone) | planned | `test_dropcutter.cpp` (8,007 cases, mutation check); OpenCAMLib oracle (flat, ball, bull agree; cone disagreement refereed by independent sampling, `docs/MILLING.md`) | tested |
+| 10a | Profile drop-cutter (tapered ball and flat, bull taper, flat-tipped cone, burrs, random line and arc chains): no gouge, tight contact, agreement with the exact ball, flat, bull and cone | planned | `test_dropcutter_profile.cpp` (25,721 cases); `test_dropcutter_mutation.cpp` (3 profile mutants detected, control clean) | tested |
+| 10b | Saw-slot disc drop-cutter (thin disc, horizontal axis): no gouge, tight contact, rotation invariance, thickness monotone | planned | `test_dropcutter_disc.cpp` (17,254 cases); `test_dropcutter_mutation.cpp` (3 disc mutants detected, control clean) | tested |
 | 11 | Adaptive path: straight runs stay within tolerance of the CL surface | planned | `test_pathdrop.cpp` (worst 1.34 tol on smooth terrain) | tested |
 
 All proved statements use only Lean's standard axioms (`propext`, `Classical.choice`, `Quot.sound`) and contain no `sorry`. CI rejects any `sorry`.

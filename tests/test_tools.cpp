@@ -34,6 +34,27 @@ double tool_surface(const Tool& t, double d) {
             const double tip = t.tip_diameter / 2;
             return d <= tip ? 0.0 : (d - tip) / std::tan(t.tip_angle / 2 * kPi / 180);
         }
+        case ToolKind::TaperedBallMill: {   // flat of radius a, corner arc (tip radius), flank from the axis
+            const double a = t.tip_diameter / 2, rho = t.corner_radius, al = t.taper_angle * kPi / 180;
+            const double rt = a + rho * std::cos(al), ht = rho * (1 - std::sin(al));
+            if (d <= a) return 0.0;
+            if (d <= rt) return rho - std::sqrt(rho * rho - (d - a) * (d - a));
+            return ht + (d - rt) / std::tan(al);
+        }
+        case ToolKind::CarvingBurr: {
+            const double L = t.flute_length;
+            if (t.profile == "ball") return R - std::sqrt(R * R - d * d);
+            if (t.profile == "cone") return d * L / R;
+            if (t.profile == "flame") {
+                const double rho = (R * R + L * L) / (2 * R);
+                const double e = d - (R - rho);
+                return L - std::sqrt(rho * rho - e * e);
+            }
+            const double r = t.corner_radius, flat = R - r;   // cylinder
+            if (d <= flat) return 0.0;
+            const double e = d - flat;
+            return r - std::sqrt(r * r - e * e);
+        }
         case ToolKind::CoreDrill:   // annulus: nothing under the bore
         case ToolKind::CupWheel:
             return d < t.bore_diameter / 2 ? INFINITY : 0.0;
@@ -71,7 +92,16 @@ Tool random_tool(lcheck::Gen& g, int serial) {
     const double R = t.diameter / 2;
     if (k == K::BullNoseMill) t.corner_radius = g.uniform(1e-3, 1.0) * R;
     if (k == K::BallEndMill && g.integer(0, 1)) t.corner_radius = R;
-    if (k == K::TaperedBallMill) t.corner_radius = g.uniform(0.01, 0.99) * R;
+    if (k == K::TaperedBallMill) {
+        t.corner_radius = g.uniform(0.01, 0.99) * R;
+        if (g.integer(0, 2) == 0) t.tip_diameter = g.uniform(0.0, 0.5) * t.diameter;
+    }
+    if (k == K::CarvingBurr && g.integer(0, 1)) {
+        static const char* shapes[] = {"flame", "ball", "cone", "cylinder"};
+        t.profile = shapes[g.integer(0, 3)];
+        t.flute_length = g.uniform(0.2, 3.0) * t.diameter;
+        if (t.profile == "cylinder") t.corner_radius = g.uniform(0.0, 1.0) * R;
+    }
     if (k == K::ProfileWheel || k == K::EdgeProfileBit) t.corner_radius = g.uniform(0.0, 1.0) * R;
     if (k == K::Drill || k == K::Engraver || k == K::ChamferMill || k == K::StepDrill) {
         t.tip_angle = g.uniform(1.0, 179.0);
@@ -173,7 +203,7 @@ int main() {
         }
     }
 
-    // A flat-tipped cone has no model (the pointed cone would gouge); cutter_of refuses it.
+    // A flat-tipped cone maps to a profile cutter with a flat of radius tip_diameter / 2 (a pointed cone would gouge).
     {
         Tool v;
         v.id = "V";
@@ -181,8 +211,24 @@ int main() {
         v.diameter = 10;
         v.tip_angle = 60;
         v.tip_diameter = 0.5;
-        lcheck::expect(validate_tool(v).empty() && !has_cutter(v), "flat_tip_cone_no_model");
-        lcheck::expect(throws<std::invalid_argument>([&] { cutter_of(v); }), "flat_tip_cone_throws");
+        lcheck::expect(validate_tool(v).empty() && has_cutter(v), "flat_tip_cone_has_model");
+        const Cutter c = cutter_of(v);
+        lcheck::expect(c.kind == CutterKind::Profile && std::fabs(profile(c, 0.25)) < 1e-15 &&
+                           std::fabs(profile(c, 1.25) - 1.0 / std::tan(kPi / 6)) < 1e-12,
+                       "flat_tip_cone_profile");
+        ++cases;
+    }
+
+    // Library coverage: 20 before the general profile, 22 with the tapered ball (W8) and the flame burr (S13).
+    {
+        ToolLibrary all = stone_tool_library();
+        const ToolLibrary w = wood_tool_library();
+        all.tools.insert(all.tools.end(), w.tools.begin(), w.tools.end());
+        int n = 0;
+        for (const auto& t : all.tools) n += has_cutter(t) ? 1 : 0;
+        lcheck::expect(n == 22, "survey_cutter_count", std::to_string(n));
+        lcheck::expect(has_cutter(find_tool(all, "W8")) && has_cutter(find_tool(all, "S13")), "survey_profile_tools",
+                       "W8 (tapered ball) and S13 (flame burr) map");
         ++cases;
     }
 

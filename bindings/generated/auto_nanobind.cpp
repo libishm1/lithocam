@@ -36,7 +36,9 @@ NB_MODULE(_lithocam, m) {
         .value("Flat", lithocam::CutterKind::Flat)
         .value("Ball", lithocam::CutterKind::Ball)
         .value("Bull", lithocam::CutterKind::Bull)
-        .value("Cone", lithocam::CutterKind::Cone);
+        .value("Cone", lithocam::CutterKind::Cone)
+        .value("Profile", lithocam::CutterKind::Profile)
+        .value("Disc", lithocam::CutterKind::Disc);
     nb::enum_<lithocam::ToolKind>(m, "ToolKind")
         .value("FlatEndMill", lithocam::ToolKind::FlatEndMill)
         .value("BallEndMill", lithocam::ToolKind::BallEndMill)
@@ -86,12 +88,22 @@ NB_MODULE(_lithocam, m) {
         .def_rw("a", &lithocam::Tri::a)
         .def_rw("b", &lithocam::Tri::b)
         .def_rw("c", &lithocam::Tri::c);
+    nb::class_<lithocam::ProfileSeg>(m, "ProfileSeg")
+        .def(nb::init<>())
+        .def_rw("arc", &lithocam::ProfileSeg::arc)
+        .def_rw("r", &lithocam::ProfileSeg::r)
+        .def_rw("h", &lithocam::ProfileSeg::h)
+        .def_rw("cr", &lithocam::ProfileSeg::cr)
+        .def_rw("ch", &lithocam::ProfileSeg::ch);
     nb::class_<lithocam::Cutter>(m, "Cutter")
         .def(nb::init<>())
         .def_rw("kind", &lithocam::Cutter::kind)
         .def_rw("radius", &lithocam::Cutter::radius)
         .def_rw("corner", &lithocam::Cutter::corner)
-        .def_rw("half_angle", &lithocam::Cutter::half_angle);
+        .def_rw("half_angle", &lithocam::Cutter::half_angle)
+        .def_rw("segs", &lithocam::Cutter::segs)
+        .def_rw("thickness", &lithocam::Cutter::thickness)
+        .def_rw("heading", &lithocam::Cutter::heading);
     nb::class_<lithocam::TriMesh>(m, "TriMesh")
         .def(nb::init<std::vector<Tri, std::allocator<Tri>>, double>())
         .def("triangles", &lithocam::TriMesh::triangles)
@@ -190,6 +202,11 @@ NB_MODULE(_lithocam, m) {
     m.def("signed_distance_convex", &lithocam::signed_distance_convex, "Signed distance to a convex CCW polygon (positive outside)", nb::arg("poly_ccw"), nb::arg("p"));
     m.def("kerf_path_convex", &lithocam::kerf_path_convex, "Wire or blade centre path around a convex part, never gouging, overcut bounded", nb::arg("part_ccw"), nb::arg("kerf"), nb::arg("max_overcut"));
     m.def("profile", &lithocam::profile, "Cutter lower-surface height above the tip at distance d", nb::arg("cutter"), nb::arg("d"));
+    m.def("validate_profile", &lithocam::validate_profile, "Empty string when a profile cutter is consistent, else the first problem", nb::arg("cutter"));
+    m.def("profile_cutter", &lithocam::profile_cutter, "Profile cutter from line and arc segments (convex, tip upwards)", nb::arg("segs"));
+    m.def("tapered_cutter", &lithocam::tapered_cutter, "Tapered ball, tapered flat, bull taper or flat-tipped cone", nb::arg("radius"), nb::arg("flat_radius"), nb::arg("corner"), nb::arg("half_angle"));
+    m.def("burr_cutter", &lithocam::burr_cutter, "Burr head: flame, ball, cone or cylinder", nb::arg("shape"), nb::arg("radius"), nb::arg("length"), nb::arg("corner"));
+    m.def("disc_cutter", &lithocam::disc_cutter, "Thin disc for saw slotting; heading is the cut direction", nb::arg("radius"), nb::arg("thickness"), nb::arg("heading"));
     m.def("drop_triangle", &lithocam::drop_triangle, "Drop-cutter tip height on one triangle", nb::arg("cutter"), nb::arg("tri"), nb::arg("x"), nb::arg("y"));
     m.def("drop_cutter", &lithocam::drop_cutter, "Drop-cutter tip height on a mesh at (x, y)", nb::arg("cutter"), nb::arg("mesh"), nb::arg("x"), nb::arg("y"));
     m.def("adaptive_line", &lithocam::adaptive_line, "Adaptive CL points along an xy segment", nb::arg("cutter"), nb::arg("mesh"), nb::arg("x0"), nb::arg("y0"), nb::arg("x1"), nb::arg("y1"), nb::arg("p"));
@@ -213,6 +230,7 @@ NB_MODULE(_lithocam, m) {
     m.def("validate_tool", &lithocam::validate_tool, "Empty string when the tool is consistent, else the first problem", nb::arg("tool"));
     m.def("has_cutter", &lithocam::has_cutter, "True when the tool has a drop-cutter model", nb::arg("tool"));
     m.def("cutter_of", &lithocam::cutter_of, "Drop-cutter model of a tool (exact or conservative)", nb::arg("tool"));
+    m.def("disc_cutter_of", &lithocam::disc_cutter_of, "Saw-slot drop-cutter of a disc saw (radius D/2, thickness kerf, cut direction heading)", nb::arg("tool"), nb::arg("heading"));
     m.def("tool_operations", &lithocam::tool_operations, "Operation families a tool kind fits", nb::arg("kind"));
     m.def("tools_for_operation", &lithocam::tools_for_operation, "Library tools that fit an operation family", nb::arg("lib"), nb::arg("operation"));
     m.def("tools_of_kind", &lithocam::tools_of_kind, "Library tools of one kind", nb::arg("lib"), nb::arg("kind"));

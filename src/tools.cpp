@@ -18,7 +18,7 @@ namespace {
 constexpr double kPi = 3.14159265358979323846;
 constexpr double kIn = 25.4;
 
-enum class Model { None, Flat, Ball, Bull, Cone, FlatConservative };
+enum class Model { None, Flat, Ball, Bull, Cone, FlatConservative, TBall, Burr };
 
 struct KindInfo {
     ToolKind kind;
@@ -40,7 +40,7 @@ const KindInfo kKinds[] = {
     {ToolKind::BullNoseMill, "bull_nose_mill", "Bull-nose (torus) mill", "both", "R-TORUS", Model::Bull, true,
      "face pocket raster waterline rest flank"},
     {ToolKind::TaperedBallMill, "tapered_ball_mill", "Tapered ball nose (conical ball)", "both", "R-TBALL",
-     Model::None, true, "raster rest carve engrave"},
+     Model::TBall, true, "raster rest carve engrave"},
     {ToolKind::FaceMill, "face_mill", "Face mill / calibrating wheel / surfacing cutter", "both", "R-FLAT",
      Model::Flat, true, "face calibrate"},
     {ToolKind::GrindingDisc, "grinding_disc", "Rigid grinding disc (metal-bond pad)", "stone", "R-FLAT", Model::Flat,
@@ -54,7 +54,7 @@ const KindInfo kKinds[] = {
     {ToolKind::ChamferMill, "chamfer_mill", "Chamfer mill / bevel bit", "both", "R-CONE", Model::Cone, true,
      "chamfer engrave"},
     {ToolKind::Engraver, "engraver", "V-bit engraver", "both", "R-CONE", Model::Cone, true, "engrave chamfer carve"},
-    {ToolKind::CarvingBurr, "carving_burr", "Carving burr (free tip profile)", "both", "R-PROFILE-TIP", Model::None,
+    {ToolKind::CarvingBurr, "carving_burr", "Carving burr (free tip profile)", "both", "R-PROFILE-TIP", Model::Burr,
      true, "carve engrave texture"},
     {ToolKind::DovetailMill, "dovetail_mill", "Dovetail bit", "wood", "R-UNDERCUT", Model::None, true,
      "dovetail joinery"},
@@ -305,8 +305,11 @@ std::string validate_tool(const Tool& t) {
                 return "a ball end mill's corner radius is diameter / 2 (or leave it 0)";
             break;
         case ToolKind::TaperedBallMill:
-            if (!(t.corner_radius > 0) || t.corner_radius >= R) return "tapered-ball tip radius must be in (0, D/2)";
+            // tip radius (corner) in [0, D/2); 0 is allowed with a flat at the tip (tapered flat end)
+            if (t.corner_radius >= R) return "tapered-ball tip radius must be in (0, D/2)";
+            if (!(t.corner_radius > 0) && !(t.tip_diameter > 0)) return "tapered-ball tip radius must be in (0, D/2)";
             if (!(t.taper_angle > 0)) return "tapered ball needs a taper angle";
+            if (t.tip_diameter >= t.diameter) return "tip diameter must be smaller than the diameter";
             break;
         case ToolKind::DovetailMill:
             if (!(t.taper_angle > 0)) return "dovetail needs a flank angle";
@@ -331,8 +334,8 @@ std::string validate_tool(const Tool& t) {
     if (k.model == Model::Cone) {
         if (!(t.tip_angle > 0)) return "tip angle must be in (0, 180) degrees";
         if (t.tip_diameter >= t.diameter) return "tip diameter must be smaller than the diameter";
-    } else if (t.tip_diameter != 0) {
-        return "tip diameter applies to engravers, chamfer mills and drills only";
+    } else if (t.tip_diameter != 0 && t.kind != ToolKind::TaperedBallMill) {
+        return "tip diameter applies to engravers, chamfer mills, drills and tapered mills only";
     }
     if (t.shank_diameter > 0 && t.holder_diameter > 0 && t.holder_diameter < t.shank_diameter)
         return "holder diameter is smaller than the shank";
@@ -341,36 +344,81 @@ std::string validate_tool(const Tool& t) {
     return "";
 }
 
+namespace {
+
+// The drop-cutter model of a tool, or false with the reason. Pure functions of the tool's own fields.
+bool try_cutter(const Tool& t, Cutter& out, std::string& why) {
+    why = validate_tool(t);
+    if (!why.empty()) return false;
+    const double R = t.diameter / 2;
+    try {
+        switch (info(t.kind).model) {
+            case Model::Flat:
+            case Model::FlatConservative:
+                out = Cutter{CutterKind::Flat, R, 0.0, 0.0};
+                return true;
+            case Model::Ball:
+                out = Cutter{CutterKind::Ball, R, 0.0, 0.0};
+                return true;
+            case Model::Bull:
+                out = Cutter{CutterKind::Bull, R, t.corner_radius, 0.0};
+                return true;
+            case Model::Cone:
+                if (t.tip_diameter > 0) {
+                    // flat tip of radius tip_diameter / 2, then the flank: exact (profile cutter)
+                    out = tapered_cutter(R, t.tip_diameter / 2, 0.0, t.tip_angle / 2 * kPi / 180);
+                    return true;
+                }
+                out = Cutter{CutterKind::Cone, R, 0.0, t.tip_angle / 2 * kPi / 180};
+                return true;
+            case Model::TBall:
+                // tip radius = corner_radius, optional flat of diameter tip_diameter, flank taper_angle from the axis,
+                // reaching the full diameter. A flute shorter than the cone makes the model conservative.
+                out = tapered_cutter(R, t.tip_diameter / 2, t.corner_radius, t.taper_angle * kPi / 180);
+                return true;
+            case Model::Burr:
+                if (t.profile != "ball" && !(t.flute_length > 0)) {
+                    why = "carving burr needs flute_length (the head length) for profile '" + t.profile + "'";
+                    return false;
+                }
+                if (t.profile != "flame" && t.profile != "ball" && t.profile != "cone" && t.profile != "cylinder") {
+                    why = "carving burr profile '" + t.profile + "' has no model (flame, ball, cone, cylinder)";
+                    return false;
+                }
+                out = burr_cutter(t.profile, R, t.flute_length, t.corner_radius);
+                return true;
+            case Model::None:
+                break;
+        }
+    } catch (const std::invalid_argument& e) {
+        why = e.what();
+        return false;
+    }
+    why = tool_kind_name(t.kind) + " (" + info(t.kind).envelope + ") has no drop-cutter model";
+    return false;
+}
+
+}  // namespace
+
 bool has_cutter(const Tool& t) {
-    const Model m = info(t.kind).model;
-    if (m == Model::None) return false;
-    if (m == Model::Cone && t.tip_diameter > 0) return false;
-    return validate_tool(t).empty();
+    Cutter c{CutterKind::Flat, 0.0};
+    std::string why;
+    return try_cutter(t, c, why);
 }
 
 Cutter cutter_of(const Tool& t) {
+    Cutter c{CutterKind::Flat, 0.0};
+    std::string why;
+    if (!try_cutter(t, c, why)) throw std::invalid_argument("tool " + t.id + ": " + why);
+    return c;
+}
+
+Cutter disc_cutter_of(const Tool& t, double heading) {
+    if (t.kind != ToolKind::DiscSaw) throw std::invalid_argument("tool " + t.id + ": only a disc saw has a saw-slot model");
     const std::string problem = validate_tool(t);
     if (!problem.empty()) throw std::invalid_argument("tool " + t.id + ": " + problem);
-    const double R = t.diameter / 2;
-    switch (info(t.kind).model) {
-        case Model::Flat:
-        case Model::FlatConservative:
-            return Cutter{CutterKind::Flat, R, 0.0, 0.0};
-        case Model::Ball:
-            return Cutter{CutterKind::Ball, R, 0.0, 0.0};
-        case Model::Bull:
-            return Cutter{CutterKind::Bull, R, t.corner_radius, 0.0};
-        case Model::Cone:
-            if (t.tip_diameter > 0)
-                throw std::invalid_argument("tool " + t.id +
-                                            ": a flat-tipped cone has no drop-cutter model yet (a pointed cone would "
-                                            "sit below the real tip and gouge)");
-            return Cutter{CutterKind::Cone, R, 0.0, t.tip_angle / 2 * kPi / 180};
-        case Model::None:
-            break;
-    }
-    throw std::invalid_argument("tool " + t.id + ": " + tool_kind_name(t.kind) + " (" + info(t.kind).envelope +
-                                ") has no drop-cutter model");
+    if (!(t.kerf > 0)) throw std::invalid_argument("tool " + t.id + ": the disc saw needs a kerf (the slot width)");
+    return disc_cutter(t.diameter / 2, t.kerf, heading);
 }
 
 std::vector<std::string> tool_operations(ToolKind kind) { return split_words(info(kind).operations); }

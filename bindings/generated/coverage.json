@@ -4,7 +4,7 @@
   "targets": [
     {
       "target": "nanobind",
-      "bound": 44,
+      "bound": 50,
       "skipped": 0,
       "classes": [
         {
@@ -33,6 +33,11 @@
           {"member": "signed_distance_convex", "signature": "double (vector<Vec2, allocator<Vec2>>, Vec2)"},
           {"member": "kerf_path_convex", "signature": "vector<Vec2, allocator<Vec2>> (vector<Vec2, allocator<Vec2>>, double, double)"},
           {"member": "profile", "signature": "double (Cutter, double)"},
+          {"member": "validate_profile", "signature": "std::string (Cutter)"},
+          {"member": "profile_cutter", "signature": "Cutter (vector<ProfileSeg, allocator<ProfileSeg>>)"},
+          {"member": "tapered_cutter", "signature": "Cutter (double, double, double, double)"},
+          {"member": "burr_cutter", "signature": "Cutter (std::string, double, double, double)"},
+          {"member": "disc_cutter", "signature": "Cutter (double, double, double)"},
           {"member": "drop_triangle", "signature": "double (Cutter, Tri, double, double)"},
           {"member": "drop_cutter", "signature": "double (Cutter, TriMesh, double, double)"},
           {"member": "adaptive_line", "signature": "vector<CLPoint, allocator<CLPoint>> (Cutter, TriMesh, double, double, double, double, PathParams)"},
@@ -56,6 +61,7 @@
           {"member": "validate_tool", "signature": "std::string (Tool)"},
           {"member": "has_cutter", "signature": "bool (Tool)"},
           {"member": "cutter_of", "signature": "Cutter (Tool)"},
+          {"member": "disc_cutter_of", "signature": "Cutter (Tool, double)"},
           {"member": "tool_operations", "signature": "vector<std::string, allocator<std::string>> (ToolKind)"},
           {"member": "tools_for_operation", "signature": "vector<Tool, allocator<Tool>> (ToolLibrary, std::string)"},
           {"member": "tools_of_kind", "signature": "vector<Tool, allocator<Tool>> (ToolLibrary, ToolKind)"},
