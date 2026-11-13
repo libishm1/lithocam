@@ -57,6 +57,8 @@ Studio jogging does not check collisions. `lithocam.robot` (Tesseract) checks pr
 |---|---|
 | `examples/pocket_2p5d.py` | 2.5D pocket with an island: z-level roughing, raster and contour finish, checked in the Z-map |
 | `examples/flank_5axis.py` | 5-axis flank milling of a twisted column on the KR120 with a turntable |
+| `examples/stone_finial.py OUT` | A procedural finial (Apache-2.0, generated at run time): two-view diamond-wire blank, 3+2 roughing and 5-setup ball surfacing, studio stations for the UR10e and KR120 |
+| `examples/bunny_wire_and_mill.py --fetch OUT` | The same pipeline on the Stanford bunny. `--fetch` downloads it once into the user cache, never into the repo. Credit: Stanford University Computer Graphics Laboratory (Turk and Levoy 1994). The Stanford terms do not allow commercial use without permission. `lithocam.meshfix` closes the scan's holes at load |
 
 ## Contract: every algorithm has a proof and a test
 

@@ -13,3 +13,7 @@ bindings/generator
 build_py/
 build_py_cfg.log
 *.pyd
+# example data and outputs: fetched or generated at run time, never committed
+bun_zipper*.ply
+bunny.tar.gz*
+examples/out*/
