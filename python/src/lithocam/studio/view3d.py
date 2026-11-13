@@ -128,6 +128,32 @@ def mesh_entity(parent, tris: np.ndarray, rgb, alpha: float = 1.0):
     return ent, tf
 
 
+def colored_mesh_entity(parent, tris: np.ndarray, colors: np.ndarray):
+    """Triangles (m, 3, 3) with a colour per triangle corner (m, 3, 3) or per triangle (m, 3), 0..1; flat normals,
+    lit by the per-vertex-colour material."""
+    tris = np.asarray(tris, dtype=float).reshape(-1, 3, 3)
+    col = np.asarray(colors, dtype=float)
+    col = np.repeat(col.reshape(-1, 1, 3), 3, axis=1) if col.ndim == 2 else col.reshape(-1, 3, 3)
+    n = np.cross(tris[:, 1] - tris[:, 0], tris[:, 2] - tris[:, 0])
+    n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-12)
+    data = np.concatenate([tris.reshape(-1, 3), np.repeat(n, 3, axis=0), col.reshape(-1, 3)], axis=1)
+    ent = Qt3DCore.QEntity(parent)
+    geom = Qt3DCore.QGeometry(ent)
+    buf = _buffer(geom, data)
+    cnt = len(data)
+    _attr(geom, buf, Qt3DCore.QAttribute.defaultPositionAttributeName(), 3, 36, 0, cnt)
+    _attr(geom, buf, Qt3DCore.QAttribute.defaultNormalAttributeName(), 3, 36, 12, cnt)
+    _attr(geom, buf, Qt3DCore.QAttribute.defaultColorAttributeName(), 3, 36, 24, cnt)
+    rend = Qt3DRender.QGeometryRenderer(ent)
+    rend.setGeometry(geom)
+    rend.setPrimitiveType(Qt3DRender.QGeometryRenderer.Triangles)
+    mat = Qt3DExtras.QPerVertexColorMaterial(ent)
+    tf = Qt3DCore.QTransform(ent)
+    for comp in (rend, mat, tf):
+        ent.addComponent(comp)
+    return ent, tf
+
+
 def lines_entity(parent, segments: np.ndarray, colors: np.ndarray):
     """segments (m, 2, 3); colors (m, 3) 0..1."""
     seg = np.asarray(segments, dtype=float).reshape(-1, 3)
@@ -455,9 +481,12 @@ class CellView:
             return
         e, tf = mesh_entity(self.root, tris_mm * 1e-3, (0.82, 0.78, 0.7))
         tf.setMatrix(qmatrix(work))
+        e.setEnabled(self._part_on)
         fs, fc = frame_segments(work, 0.12)
         e2, _ = lines_entity(self.root, fs, fc)
         self._replace("part", [e, e2])
+
+    _part_on = True
 
     def set_table(self, turntable: Optional[dict], work: np.ndarray):
         """A rotary table under the work frame origin (disc with a radial mark that turns with it)."""
@@ -484,7 +513,40 @@ class CellView:
         segs = np.array([[c[a], c[b]] for a, b in edges])
         segs = (segs.reshape(-1, 3) @ work[:3, :3].T + work[:3, 3]).reshape(-1, 2, 3)
         e, _ = lines_entity(self.root, segs, np.tile([0.95, 0.85, 0.3], (len(segs), 1)))
+        e.setEnabled(not self._stock_mesh_on)
         self._replace("stock", [e])
+
+    STOCK_RGB = (0.72, 0.6, 0.44)
+    _stock_mesh_on = False
+
+    def set_stock_mesh(self, V_mm: Optional[np.ndarray], F: Optional[np.ndarray], work: np.ndarray,
+                       colors: Optional[np.ndarray] = None):
+        """The simulated stock (studio.process): vertices in mm in the work frame, triangles F; `colors` (n, 3)
+        0..1 per vertex (stress colours) or None for a plain Phong surface. It replaces the stock box outline while
+        shown; V_mm None removes it and brings the outline back."""
+        if V_mm is None or F is None or len(F) == 0:
+            self._replace("stock_mesh", [])
+            self._stock_mesh_on = False
+        else:
+            V = np.asarray(V_mm, dtype=float) * 1e-3
+            F = np.asarray(F, dtype=np.int64)
+            if colors is None:
+                e, tf = mesh_entity(self.root, V[F], self.STOCK_RGB)
+            else:
+                c = 0.12 + 0.72 * np.clip(np.asarray(colors, dtype=float), 0.0, 1.0)   # unsaturated: shading shows
+                e, tf = colored_mesh_entity(self.root, V[F], c[F])
+            tf.setMatrix(qmatrix(work))
+            self._replace("stock_mesh", [e])
+            self._stock_mesh_on = True
+        for e in self._ents.get("stock", []):
+            e.setEnabled(not self._stock_mesh_on)
+
+    def show_part(self, on: bool):
+        """Show or hide the part surface (its frame axes stay); kept across set_part calls."""
+        self._part_on = bool(on)
+        ents = self._ents.get("part", [])
+        if ents:
+            ents[0].setEnabled(on)
 
     def set_path(self, pts: Optional[np.ndarray], feed: Optional[np.ndarray], ok: Optional[np.ndarray] = None):
         if pts is None or len(pts) < 2:
@@ -497,4 +559,13 @@ class CellView:
             bad = ~np.asarray(ok[1:], bool)
             cols[bad] = [1.0, 0.1, 0.1]
         e, _ = lines_entity(self.root, segs, cols)
+        e.setEnabled(self._path_on)
         self._replace("path", [e])
+
+    _path_on = True
+
+    def show_path(self, on: bool):
+        """Show or hide the toolpath lines; kept across set_path calls."""
+        self._path_on = bool(on)
+        for e in self._ents.get("path", []):
+            e.setEnabled(on)

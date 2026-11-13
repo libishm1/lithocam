@@ -4,7 +4,7 @@
 Layout (work tree and objects browser, machining operation toolbars, 3D view, robot panel, output tabs):
 
   toolbars   Station (open, save, part, tools, views, teach, simulate, post) and Machining (setup and one
-             drop-down per operation category, generate, stock check)
+             drop-down per operation category, generate, stock check, cut stock, process check)
   left       Work tree: station > robot > tools, work frame > part, stock, programs > steps (drag to reorder,
              drop palette items to insert); below it the Objects browser: Operations palette and Tool library
   centre     3D cell view with a simulation bar
@@ -25,8 +25,8 @@ from typing import Dict, List, Optional
 import numpy as np
 from PySide6.QtCore import QMimeData, QObject, QSize, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QAction, QBrush, QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap
-from PySide6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QComboBox, QDockWidget, QDoubleSpinBox,
-                               QFileDialog, QFormLayout, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
+from PySide6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+                               QDockWidget, QDoubleSpinBox, QFileDialog, QFormLayout, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
                                QListWidget, QListWidgetItem, QMainWindow, QMenu, QMessageBox, QPlainTextEdit,
                                QPushButton, QScrollArea, QSlider, QSpinBox, QStyle, QTableWidget, QTableWidgetItem, QTabWidget,
                                QToolBar, QToolBox, QToolButton, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
@@ -594,6 +594,117 @@ class Expander(QObject):
             self.done.emit(None, traceback.format_exc())
 
 
+class StockWorker(QObject):
+    """studio.process.simulate_stock in a worker thread. `gen` tells a stale run from the current one."""
+    done = Signal(int, object, object)   # generation, StockRun, error text
+    progress = Signal(str)
+
+    def __init__(self, gen, station, robot, expansion, tools):
+        super().__init__()
+        self.gen = gen
+        self.args = (station, robot, expansion, tools)
+
+    def run(self):
+        try:
+            from . import process
+            st, robot, ex, tools = self.args
+            run = process.simulate_stock(st, robot, ex, tools,
+                                         progress=lambda i, n, t: self.progress.emit(t))
+            self.done.emit(self.gen, run, None)
+        except Exception:   # noqa: BLE001
+            self.done.emit(self.gen, None, traceback.format_exc())
+
+
+class ProcessWorker(QObject):
+    """studio.process.process_check in a worker thread."""
+    done = Signal(int, object, object)   # generation, ProcessReport, error text
+    progress = Signal(str)
+
+    def __init__(self, gen, station, robot, run, expansion, tools, constants):
+        super().__init__()
+        self.gen = gen
+        self.args = (station, run, expansion, robot, tools, constants)
+
+    def run(self):
+        try:
+            from . import process
+            st, run, ex, robot, tools, c = self.args
+            rep = process.process_check(st, run, ex, robot, tools, c, progress=self.progress.emit)
+            self.done.emit(self.gen, rep, None)
+        except Exception:   # noqa: BLE001
+            self.done.emit(self.gen, None, traceback.format_exc())
+
+
+class ConstantsDialog(QDialog):
+    """Process-check constants: one field per constant, prefilled from the sourced rows (each labelled with its
+    source). A blank field skips the checks that need it."""
+
+    def __init__(self, parent, material, robot, previous=None):
+        super().__init__(parent)
+        from . import process
+        self.setWindowTitle("Process check constants")
+        self.setMinimumWidth(720)
+        v = QVBoxLayout(self)
+        head = QLabel("Material <b>{}</b>, robot <b>{}</b>. Values from lithocam.materials_mechanics are prefilled "
+                      "with their source; edit or clear any field. A blank field skips the check that needs it."
+                      .format(material, robot))
+        head.setWordWrap(True)
+        v.addWidget(head)
+        form = QFormLayout()
+        self.sourced = process.sourced_constants(material, robot)
+        self.fields = {}
+        previous = previous or {}
+        for c in process.CONSTANTS + process.OPTIONAL:
+            box = QWidget()
+            bl = QVBoxLayout(box)
+            bl.setContentsMargins(0, 0, 0, 4)
+            ed = QLineEdit()
+            s = self.sourced.get(c.key)
+            if c.key in previous:
+                ed.setText("" if previous[c.key] is None else "{:g}".format(previous[c.key]))
+            elif s is not None:
+                ed.setText("{:g}".format(s.value))
+            src = QLabel(("source: " + s.text) if s is not None else
+                         "no sourced row: enter a value, or leave blank to skip the {}".format(c.used_for))
+            src.setWordWrap(True)
+            src.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            src.setStyleSheet("color: #888; font-size: 8pt")
+            bl.addWidget(ed)
+            bl.addWidget(src)
+            form.addRow("{} ({})\n{}".format(c.key, c.unit, c.used_for), box)
+            self.fields[c.key] = ed
+        w = QWidget()
+        w.setLayout(form)
+        sa = QScrollArea()
+        sa.setWidget(w)
+        sa.setWidgetResizable(True)
+        sa.setMinimumHeight(420)
+        v.addWidget(sa, 1)
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept)
+        bb.rejected.connect(self.reject)
+        v.addWidget(bb)
+
+    def values(self):
+        """{key: value} for fields the user set or changed, {key: None} for cleared sourced fields; unchanged
+        sourced fields are left out, so the report names their row."""
+        out = {}
+        for k, ed in self.fields.items():
+            t = ed.text().strip()
+            s = self.sourced.get(k)
+            if not t:
+                if s is not None:
+                    out[k] = None
+                continue
+            try:
+                val = float(t)
+            except ValueError:
+                raise ValueError("{}: '{}' is not a number".format(k, t))
+            if s is None or abs(val - s.value) > 1e-12 * max(abs(s.value), 1.0):
+                out[k] = val
+        return out
+
+
 # ---------------------------------------------------------------- main window
 class Studio(QMainWindow):
     def __init__(self):
@@ -608,12 +719,21 @@ class Studio(QMainWindow):
         self.sim_q: np.ndarray = np.zeros((0, 6))
         self.view = CellView()
         self._threads = []
+        self.stock_run = None            # studio.process.StockRun of the current expansion
+        self.process_report = None       # studio.process.ProcessReport of stock_run
+        self._stock_gen = 0              # bumps on every new stock run; stale worker results are dropped
+        self._stock_busy = False
+        self._stock_shown = None         # frame position shown
+        self._after_stock = None         # callable run once the stock run is in (batch modes, process check)
+        self._after_process = None
+        self._constants_given = {}       # the dialog's last entries
 
         # centre: view + simulation bar
         centre = QWidget()
         cv = QVBoxLayout(centre)
         cv.setContentsMargins(0, 0, 0, 0)
-        cv.addWidget(QWidget.createWindowContainer(self.view.win), 1)
+        self.view_container = QWidget.createWindowContainer(self.view.win)
+        cv.addWidget(self.view_container, 1)
         bar = QHBoxLayout()
         st = self.style()
         self.btn_play = QToolButton()
@@ -680,6 +800,11 @@ class Studio(QMainWindow):
         bottom.addTab(self.traj, "Joint trajectory")
         bottom.addTab(self.log, "Log")
         bottom.addTab(self.output, "Posted program")
+        self.process_text = QPlainTextEdit()
+        self.process_text.setReadOnly(True)
+        self.process_text.setFont(QFont("Consolas", 9))
+        self.process_text.setPlainText("Process check: simulate, then press Process check on the Machining toolbar.")
+        bottom.addTab(self.process_text, "Process")
         self.bottom_tabs = bottom
         self._dock("Work tree", self.tree, Qt.LeftDockWidgetArea)
         self._dock("Objects", objects, Qt.LeftDockWidgetArea)
@@ -723,6 +848,23 @@ class Studio(QMainWindow):
         self.addToolBar(tb)
         self._act(tb, "New", st.standardIcon(QStyle.SP_FileIcon), self._new)
         self._act(tb, "Open", st.standardIcon(QStyle.SP_DialogOpenButton), self._open)
+        ex = QToolButton()
+        ex.setText("Examples")
+        ex.setToolTip("Open a ready-made station")
+        ex.setToolButtonStyle(Qt.ToolButtonTextOnly)
+        ex.setPopupMode(QToolButton.InstantPopup)
+        em = QMenu(ex)
+        em.addAction("Dome: raster and 5-axis finishing (built in)", self._demo_five_axis)
+        for f in sorted(_examples_dir().glob("*.lcs.json")):
+            title = f.name[:-len(".lcs.json")].replace("_", " ")
+            try:
+                import json as _json
+                title = _json.loads(f.read_text(encoding="utf-8")).get("title") or title
+            except Exception:   # noqa: BLE001
+                pass
+            em.addAction(title, lambda *_, p=str(f): self.open_station(p))
+        ex.setMenu(em)
+        tb.addWidget(ex)
         self._act(tb, "Save", st.standardIcon(QStyle.SP_DialogSaveButton), self._save)
         tb.addSeparator()
         self._act(tb, "Load part", glyph_icon("STL", "#8d6e63", 22), self._load_part, "Load a part (STL, mm)")
@@ -773,6 +915,13 @@ class Studio(QMainWindow):
         self._act(mt, "Generate", glyph_icon("G", "#ef6c00", 22), self._simulate, "Generate all toolpaths")
         self._act(mt, "Stock check", glyph_icon("Z", "#ad1457", 22), self._stock_check,
                   "Cut the stock in a Z-map along every 3-axis toolpath and report the leftover and gouge")
+        self.stock_box = QCheckBox("Stock")
+        self.stock_box.setToolTip("Cut a voxel (SDF) stock along the simulated robot motion after each simulation; "
+                                  "the bar then shows the stock as cut up to that sample")
+        self.stock_box.toggled.connect(self._toggle_stock)
+        mt.addWidget(self.stock_box)
+        self._act(mt, "Process check", glyph_icon("F", "#6a1b9a", 22), self._process_check,
+                  "Forces, robot deflection, wire bow and a voxel FEA strength check of the cut stock")
         self.collisions = QCheckBox("Collisions (Tesseract)")
         try:
             import tesseract_robotics  # noqa: F401
@@ -1211,9 +1360,11 @@ class Studio(QMainWindow):
         self.station.programs = [program.Program("Main", [
             program.Step("set_tool", {"tool": "W7"}),
             program.Step("movej", {"joints": [math.degrees(v) for v in program.HOME[self.station.robot]]}),
-            program.Step("rough_plane", {"tool": "W2", "stepdown": 8.0, "stepover": 4.0, "allowance": 1.0}),
-            program.Step("raster", {"tool": "W7", "stepover": 2.0}),
-            program.Step("polish", {"tool": "S8"}),
+            program.Step("comment", {"text": "Demo feeds are example values for a soft material; set the feeds "
+                                             "for your stone and tools before posting"}),
+            program.Step("rough_plane", {"tool": "W2", "stepdown": 8.0, "stepover": 4.0, "allowance": 1.0,
+                                         "feed": 600.0}),
+            program.Step("raster", {"tool": "W7", "stepover": 2.0, "feed": 600.0}),
             program.Step("movej", {"joints": [math.degrees(v) for v in program.HOME[self.station.robot]]}),
         ])]
         self._mount(self._first_tool())
@@ -1247,22 +1398,42 @@ class Studio(QMainWindow):
         self.station.stock = cam.stock_box(self.part_tris, float(step.params.get("stock_margin", 5.0)))
         self._refresh_scene()
 
-    def _refresh_scene(self):
+    def _scene_work(self) -> np.ndarray:
+        """The work frame turned with the table (the part's frame in the scene)."""
         W0 = self.station.work_frame()
         yaw = getattr(self, "_yaw", 0.0)
         W = W0.copy()
         W[:3, :3] = W0[:3, :3] @ np.array([[math.cos(yaw), -math.sin(yaw), 0], [math.sin(yaw), math.cos(yaw), 0],
                                            [0, 0, 1.0]])
+        return W
+
+    def _refresh_scene(self):
+        W = self._scene_work()
         self.view.set_part(self.part_tris, W)
         self.view.set_stock(self.station.stock, W)
         self.view.set_table(self.station.turntable, W)
         self.robot_panel.work = W
+        if getattr(self, "stock_run", None) is not None:      # the cut stock turns with the table too
+            self._show_stock(self.sim.value(), force=True)
         self._robot_moved(self.robot_panel.q)
 
     def _toggle_table(self, on):
         self.station.turntable = {"diameter": 0.8, "height": 0.04} if on else None
         self._yaw = 0.0
         self._refresh_scene()
+
+    def _fit_part_and_robot(self):
+        """Camera on the cut: centred between the work frame and the robot's reach, close enough to see the part."""
+        w = self.station.work_frame()[:3, 3]
+        q = self.sim_q[len(self.sim_q) // 2] if len(self.sim_q) else self.robot_panel.q
+        tf = self.robot.link_transforms(q)
+        pts = np.array([T[:3, 3] for T in tf.values()] + [w])
+        lo, hi = pts.min(0), pts.max(0)
+        win = self.view.win
+        win.center = 0.35 * (lo + hi) / 2 + 0.65 * w
+        win.dist = max(0.6, 1.15 * float(np.linalg.norm(hi - lo)))
+        win.yaw, win.pitch = math.radians(-60), math.radians(28)
+        win.update_camera()
 
     def _view(self, which):
         tf = self.robot.link_transforms(self.robot_panel.q)
@@ -1293,10 +1464,16 @@ class Studio(QMainWindow):
         self.statusBar().showMessage(text)
 
     def _expanded(self, ex, err):
-        if err:
-            self.say("Expansion failed:\n" + err)
+        if err or ex is None or not len(ex.joints()):
+            self.say("Expansion failed:\n" + (err or "nothing to simulate"))
+            if getattr(self, "record", None) or getattr(self, "smoke", None):   # batch modes never hang
+                out = self.record[0] if getattr(self, "record", None) else str(Path(self.smoke[0]).parent)
+                Path(out).mkdir(parents=True, exist_ok=True)
+                Path(out, "log.txt").write_text(self.log.toPlainText())
+                QApplication.exit(3)
             return
         self.expansion = ex
+        self._clear_stock()                 # the cut stock belongs to the previous expansion
         for m in ex.messages:
             self.say("  " + m)
         q = ex.joints()
@@ -1319,7 +1496,15 @@ class Studio(QMainWindow):
         self.say("Simulation ready: {} robot samples, {} unreachable. Press play or drag the bar.".format(
             len(q), ex.unreachable))
         self._post(show_only=True)
-        if getattr(self, "smoke", None):
+        if self.stock_box.isChecked():
+            if getattr(self, "record", None):
+                self._after_stock = self._record_after_stock
+            if self._start_stock() and getattr(self, "record", None):
+                return                           # the recording starts when the stock run is in
+            self._after_stock = None
+        if getattr(self, "record", None):
+            QTimer.singleShot(800, self._record_frames)
+        elif getattr(self, "smoke", None):
             QTimer.singleShot(300, self._smoke_capture)
         else:
             self.btn_play.setChecked(True)
@@ -1337,6 +1522,55 @@ class Studio(QMainWindow):
             Path(out).with_suffix(".log.txt").write_text(self.log.toPlainText())
             QApplication.quit()
         QTimer.singleShot(1500, grab)
+
+    def _record_frames(self):
+        """--record DIR N: N evenly spaced frames of the simulation, the 3D view only, as DIR/frame_000.png ...
+        (docs/media/frames_to_gif.py turns them into a GIF)."""
+        out, n = self.record
+        Path(out).mkdir(parents=True, exist_ok=True)
+        for d in self.findChildren(QDockWidget):          # the 3D view alone, as large as the window
+            d.hide()
+        for tb in self.findChildren(QToolBar):
+            tb.hide()
+        QApplication.processEvents()
+        self._fit_part_and_robot()
+        if self.stock_run is not None:          # the cut stock is the subject: closer, centred on the work
+            win = self.view.win
+            win.center = 0.25 * win.center + 0.75 * self.station.work_frame()[:3, 3]
+            win.dist *= 0.45
+            win.update_camera()
+        idx = [int(round(v)) for v in np.linspace(0, self.sim.maximum(), n)]
+        state = {"k": 0}
+        cont = self.view_container
+
+        def shot():
+            k = state["k"]
+            if k >= len(idx):
+                Path(out, "log.txt").write_text(self.log.toPlainText())
+                QApplication.quit()
+                return
+            self.sim.setValue(idx[k])
+            QApplication.processEvents()
+
+            def grab():
+                tl = cont.mapToGlobal(cont.rect().topLeft())
+                pm = QApplication.primaryScreen().grabWindow(0, tl.x(), tl.y(), cont.width(), cont.height())
+                pm.save(str(Path(out) / "frame_{:03d}.png".format(k)))
+                state["k"] += 1
+                QTimer.singleShot(30, shot)
+            QTimer.singleShot(120, grab)
+        shot()
+
+    def _demo_five_axis(self):
+        """Built-in example: the dome, a raster pass and a 5-axis ball surfacing pass."""
+        self._demo()
+        prog = self.station.programs[0]
+        ball = next((t for t in self.tool_lib if t.kind == lc.ToolKind.BallEndMill and 4 <= t.diameter <= 12), None)
+        if ball is not None:
+            prog.steps.insert(len(prog.steps) - 1,
+                              program.Step("surfacing5", {"tool": ball.id, "stepover": 4.0, "feed": 600.0}))
+        self._rebuild_tree()
+        self.say("Example: dome with raster and 5-axis surfacing. Press Simulate.")
 
     def _teach_smoke(self, out):
         """--teach-smoke: turn the TCP handle on, drag the z arrow 80 mm down and the z ring 30 deg through the same
@@ -1410,6 +1644,7 @@ class Studio(QMainWindow):
         self.view.update_robot(robot.link_transforms(q), robot.tcp(q))
         self.sim_label.setText("{}/{}".format(i + 1, len(self.sim_q)))
         self.traj.set_cursor(i)
+        self._show_stock(i)
 
     def _stop(self):
         self.btn_play.setChecked(False)
@@ -1464,11 +1699,161 @@ class Studio(QMainWindow):
                     self.say("Z-map {} / {}: leftover max {:.3f} mm, gouge {:.3f} mm over {} cells".format(
                         p.name, s.title(), stats.max_dev, -min(0.0, stats.min_dev), stats.cells))
 
+    # ---------------------------------------------------------------- cut stock (studio.process)
+    def _clear_stock(self):
+        self._stock_gen += 1                 # a run still in flight is now stale
+        self._stock_busy = False
+        self.stock_run = None
+        self.process_report = None
+        self._stock_shown = None
+        self.view.set_stock_mesh(None, None, np.eye(4))
+        self.view.show_part(True)
+        self.view.show_path(True)
+
+    def _toggle_stock(self, on):
+        if not on:
+            self._after_stock = None
+            self._clear_stock()
+            return
+        if self.expansion is None:
+            self.say("Stock: the cut stock is computed after the next simulation")
+        elif self.stock_run is None and not self._stock_busy:
+            self._start_stock()
+
+    def _start_stock(self) -> bool:
+        if self.station.stock is None:
+            self.say("Stock: the station has no stock box")
+            return False
+        import copy
+        self._stock_gen += 1
+        self._stock_busy = True
+        self.stock_run = None
+        self.process_report = None
+        self.say("Cutting the stock along {} robot samples ...".format(len(self.sim_q)))
+        th = QThread(self)
+        wk = StockWorker(self._stock_gen, copy.deepcopy(self.station), program.load_robot(self.station.robot),
+                         self.expansion, self._tools())
+        wk.moveToThread(th)
+        th.started.connect(wk.run)
+        wk.progress.connect(self._progress)      # bound slots: queued into the GUI thread
+        wk.done.connect(self._stock_done)
+        wk.done.connect(th.quit)
+        self._threads.append((th, wk))
+        th.start()
+        return True
+
+    def _stock_done(self, gen, run, err):
+        if gen != self._stock_gen:
+            return
+        self._stock_busy = False
+        if err or run is None:
+            self.say("Stock simulation failed:\n" + (err or "no result"))
+            self._batch_exit_on_error()
+            return
+        self.stock_run = run
+        for m in run.messages:
+            self.say("  " + m)
+        self._stock_shown = None
+        if self.stock_box.isChecked():
+            self._show_stock(self.sim.value(), force=True)
+        cb, self._after_stock = self._after_stock, None
+        if cb is not None:
+            cb()
+
+    def _show_stock(self, i, force=False):
+        """The latest stock snapshot at or before sample i; stress colours on the final one after a process check."""
+        run = self.stock_run
+        if run is None or not self.stock_box.isChecked():
+            return
+        k = run.frame_at(int(i))
+        if k == self._stock_shown and not force:
+            return
+        self._stock_shown = k
+        _, V, F = run.frames[k]
+        rep = self.process_report
+        colors = rep.colors if rep is not None and rep.colors is not None and k == len(run.frames) - 1 else None
+        self.view.set_stock_mesh(V, F, self._scene_work(), colors)
+        self.view.show_part(False)               # the cut stock is the part being made; the model would z-fight
+        self.view.show_path(False)               # and it shows where the tool has been
+
+    def _process_check(self):
+        if self.expansion is None:
+            self.say("Process check: simulate first")
+            return
+        if self.stock_run is None:
+            self._after_stock = self._process_check
+            self.say("Process check: cutting the stock first")
+            if not self.stock_box.isChecked():
+                self.stock_box.setChecked(True)  # starts the stock run
+            elif not self._stock_busy:
+                self._start_stock()
+            return
+        dlg = ConstantsDialog(self, self.station.material, self.station.robot, self._constants_given)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        try:
+            given = dlg.values()
+        except ValueError as e:
+            QMessageBox.warning(self, "Process check", str(e))
+            return
+        self._constants_given = given
+        self._start_process(given)
+
+    def _start_process(self, given):
+        import copy
+        self.say("Process check ...")
+        th = QThread(self)
+        wk = ProcessWorker(self._stock_gen, copy.deepcopy(self.station), program.load_robot(self.station.robot),
+                           self.stock_run, self.expansion, self._tools(), given)
+        wk.moveToThread(th)
+        th.started.connect(wk.run)
+        wk.progress.connect(self._progress)
+        wk.done.connect(self._process_done)
+        wk.done.connect(th.quit)
+        self._threads.append((th, wk))
+        th.start()
+
+    def _process_done(self, gen, rep, err):
+        if err or rep is None:
+            self.say("Process check failed:\n" + (err or "no result"))
+            self._batch_exit_on_error()
+            return
+        if gen != self._stock_gen:
+            return
+        self.process_report = rep
+        text = rep.text()
+        self.say(text)
+        self.process_text.setPlainText(text)
+        self.bottom_tabs.setCurrentWidget(self.process_text)
+        if rep.colors is not None:
+            self.say("Stress colours are on the final stock: the bar is at the end")
+            self.sim.setValue(self.sim.maximum())
+            self._stock_shown = None
+            self._show_stock(self.sim.value(), force=True)
+        cb, self._after_process = self._after_process, None
+        if cb is not None:
+            cb()
+
+    def _record_after_stock(self):
+        """--record with --stock: optionally run the process check (--process), then record the frames."""
+        if getattr(self, "record_process", None) is not None:
+            self._after_process = lambda: QTimer.singleShot(800, self._record_frames)
+            self._start_process(self.record_process)
+        else:
+            QTimer.singleShot(800, self._record_frames)
+
+    def _batch_exit_on_error(self):
+        if getattr(self, "record", None):
+            Path(self.record[0]).mkdir(parents=True, exist_ok=True)
+            Path(self.record[0], "log.txt").write_text(self.log.toPlainText())
+            QApplication.exit(3)
+
     # ---------------------------------------------------------------- files
     def _new(self):
         self.station = program.Station(robot=self.station.robot)
         self.part = self.part_tris = None
         self.expansion = None
+        self._clear_stock()
         self.view.set_path(None, None)
         self._refresh_scene()
         self._rebuild_tree()
@@ -1493,6 +1878,7 @@ class Studio(QMainWindow):
                     st.stock = cam.stock_box(tris, 0.0)
             self._yaw = 0.0
             self.expansion = None
+            self._clear_stock()
             self.view.set_path(None, None)
             self.table_box.blockSignals(True)
             self.table_box.setChecked(st.turntable is not None)
@@ -1510,8 +1896,17 @@ class Studio(QMainWindow):
             self.say("Saved {}".format(fn))
 
 
+def _examples_dir() -> Path:
+    """examples/studio of the repo, or of the bundle in a frozen executable."""
+    if getattr(sys, "frozen", False):
+        return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent)) / "examples" / "studio"
+    return program.CELLS.parent / "examples" / "studio"
+
+
 def main(argv=None) -> int:
-    """Options: --robot ur10e|kr120; --smoke OUT.png [FRACTION]: simulate the demo, capture, exit (CI and docs)."""
+    """Options: --robot ur10e|kr120; --smoke OUT.png [FRACTION]: simulate the demo, capture, exit (CI and docs);
+    --record DIR N [--five-axis-demo] [--no-collisions] [--stock] [--process [--constants k=v,...]] [--timeout S]:
+    N frames of the simulation (with --stock the cut stock, with --process stress colours on the final stock)."""
     import faulthandler
     if sys.stderr is not None:
         faulthandler.enable()
@@ -1528,7 +1923,32 @@ def main(argv=None) -> int:
         w.open_station(stations[0])
     w.show()
     w.showMaximized()
-    if "--teach-smoke" in argv:
+    if "--record" in argv:
+        k = argv.index("--record")
+        n = int(argv[k + 2]) if len(argv) > k + 2 and argv[k + 2].isdigit() else 60
+        w.record = (argv[k + 1], n)
+        if "--five-axis-demo" in argv:
+            w._demo_five_axis()
+        if "--no-collisions" in argv:
+            w.collisions.setChecked(False)
+        if "--stock" in argv or "--process" in argv:     # show the stock being cut
+            w.stock_box.setChecked(True)
+        if "--process" in argv:
+            # constants: sourced rows for the station material and robot, plus any given as
+            # --constants key=value,key=value (a key given as key= refuses its sourced row)
+            given = {}
+            if "--constants" in argv:
+                for kv in argv[argv.index("--constants") + 1].split(","):
+                    if "=" in kv:
+                        k_, v_ = kv.split("=", 1)
+                        given[k_.strip()] = float(v_) if v_.strip() else None
+            w.record_process = given
+        limit =int(argv[argv.index("--timeout") + 1]) if "--timeout" in argv else 900
+        QTimer.singleShot(limit * 1000, lambda: (Path(w.record[0]).mkdir(parents=True, exist_ok=True),
+                                                 Path(w.record[0], "log.txt").write_text(
+                                                     w.log.toPlainText() + "\nTIMEOUT"), QApplication.exit(4)))
+        QTimer.singleShot(1500, w._simulate)
+    elif "--teach-smoke" in argv:
         out = argv[argv.index("--teach-smoke") + 1]
         QTimer.singleShot(1500, lambda: w._teach_smoke(out))
     elif "--smoke" in argv:
