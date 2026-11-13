@@ -388,6 +388,12 @@ class Session:
         want = [x.data["q"] for x in ex.records if x.kind in ("movej", "movel")]
         if len(back) != len(want) or (back and np.max(np.abs(np.asarray(back) - np.asarray(want))) > 1e-5):
             raise ApiError("internal: the posted joint targets do not read back equal to the plan")
+        want_e1 = [x.data.get("e1") for x in ex.records if x.kind in ("movej", "movel")]
+        if any(v is not None for v in want_e1):               # the table is a coordinated axis: E1 reads back too
+            got = post.external_axes(text, dialect)
+            if len(got) != len(want_e1) or any((g is None) != (w is None) or (g is not None and abs(g - w) > 1e-3)
+                                               for g, w in zip(got, want_e1)):
+                raise ApiError("internal: the posted E1 values do not read back equal to the plan")
         if path:
             Path(path).write_text(text, encoding="utf-8")
         return text
@@ -454,7 +460,7 @@ def export_wire_cnc(session: "Session", machine_path, out_dir, feed: float, face
 
 def _generators():
     from . import cam
-    return set(cam.GENERATORS) | {"wire_ruled"}
+    return set(cam.GENERATORS) | {"wire_ruled", "polish"}
 
 
 def _num(v, name) -> float:
@@ -523,7 +529,11 @@ def main(argv=None) -> int:
         elif a[0] == "check":
             s = Session.open(a[1])
             names = a[2:] or s.programs()
-            out = {n: s.simulate(n).summary() for n in names}
+            import time
+            out = {}
+            for n in names:
+                t0 = time.perf_counter()
+                out[n] = s.simulate(n).summary() + ", {:.1f} s".format(time.perf_counter() - t0)
             print(json.dumps(out, indent=1))
         elif a[0] == "post":
             s = Session.open(a[1])

@@ -51,7 +51,7 @@ def raster_program():
         program.Step("raster", {"tool": "W7", "stepover": 6.0, "tolerance": 0.05}),
         program.Step("io", {"mode": "set", "port": 2, "value": False}),
         program.Step("pause", {"seconds": 0.5}),
-        program.Step("polish", {}),
+        program.Step("sand", {}),         # a planned step: posts as a comment, no generator yet
     ])
 
 
@@ -81,7 +81,7 @@ def test_raster_program_expands_and_posts(robot_name, work, part, tools):
         assert len(back) == len(rec_q), dialect
         tol = 1e-6 if dialect == "urscript" else (1e-12 if dialect == "cl" else math.radians(1e-4))
         assert np.max(np.abs(np.asarray(back) - np.asarray(rec_q))) < tol, dialect
-    assert any("polish" in m.lower() or "Polish" in m for m in ex.messages)
+    assert any("sand" in m.lower() and "planned" in m.lower() for m in ex.messages)
 
 
 def test_ur_movep_poses_match_the_verified_joints_and_blends_stay_apart(part, tools):

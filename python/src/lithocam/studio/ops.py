@@ -27,6 +27,37 @@ _Z = np.array([0.0, 0.0, 1.0])
 _GAP = 1.0   # mm: re-entry clearance above the bottom of the previous peck (geometry, not a process value)
 
 
+def parse_points(text):
+    """Hole points from text 'x,y; x,y,z_top; ...' (mm). Empty text, None or a list: returned as is (empty = detect)."""
+    if text is None:
+        return None
+    if not isinstance(text, str):
+        return text if len(text) else None
+    pts = []
+    for s in text.replace("\n", ";").split(";"):
+        if not s.strip():
+            continue
+        v = [float(x) for x in s.split(",")]
+        if len(v) not in (2, 3):
+            raise ValueError("a hole point is 'x,y' or 'x,y,z_top' in mm (got '{}')".format(s.strip()))
+        pts.append(tuple(v))
+    return pts or None
+
+
+def parse_range(text):
+    """A diameter range from text 'min,max' (mm); empty text or None gives None (any diameter)."""
+    if text is None:
+        return None
+    if not isinstance(text, str):
+        return tuple(text) if len(text) else None
+    if not text.strip():
+        return None
+    v = [float(x) for x in text.replace(";", ",").split(",") if x.strip()]
+    if len(v) != 2 or v[0] > v[1]:
+        raise ValueError("a diameter range is 'min,max' in mm (got '{}')".format(text.strip()))
+    return (v[0], v[1])
+
+
 # ------------------------------------------------------------------------------------------------------------------
 # Hole detection
 
@@ -745,3 +776,5 @@ def adaptive_raster(tris, mesh, tool, stock, scallop=0.0, adaptive=True, stepove
 
 GENERATORS = {"drill": drill, "core_drill": core_drill, "tap": tap, "bore": bore, "rest": rest, "pencil": pencil,
               "adaptive_raster": adaptive_raster}
+
+cam.GENERATORS.update(GENERATORS)   # registered with the studio's generators (cam.py imports this module last)

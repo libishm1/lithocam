@@ -458,6 +458,7 @@ class ProcessState:
         self.tool: Optional[str] = None
         self.on = {"spindle": False, "wire": False, "water": False}
         self.rpm = 0.0
+        self.reverse = False          # the spindle runs in reverse (tapping)
         src = (station.cell_io or "").strip()
         if not src:
             return
@@ -481,8 +482,10 @@ class ProcessState:
                              "change post as comments and operator pauses. Select cells/{}_io.json (placeholder "
                              "values) and set it for your cell.".format(self.robot))
 
-    def tool_change(self, tid: str):
-        if not tid or tid == self.tool:
+    def tool_change(self, tid: str, force: bool = False):
+        """A tool change record when the mounted tool changes. `force`: also for the same tool id (a new pad of the
+        same kind per grit)."""
+        if not tid or (tid == self.tool and not force):
             return
         self.all_off()
         self._warn()
@@ -498,8 +501,9 @@ class ProcessState:
             self.recs.append(post.Rec(other, {"rpm": 0.0, "on": False}))
             self.on[other] = False
         rpm = float(rpm or 0.0)
-        if not self.on[drive] or (drive == "spindle" and rpm and abs(rpm - self.rpm) > 1e-9):
+        if not self.on[drive] or (drive == "spindle" and ((rpm and abs(rpm - self.rpm) > 1e-9) or self.reverse)):
             self.recs.append(post.Rec(drive, {"rpm": rpm, "on": True}))
+            self.reverse = False
             if drive == "spindle" and not rpm:
                 self.msgs.append("step {}: spindle on without a speed: set the rpm on the step or the tool".format(
                     step + 1))
@@ -509,7 +513,19 @@ class ProcessState:
             self.recs.append(post.Rec("water", {"on": True}))
             self.on["water"] = True
 
+    def spindle_dir(self, reverse: bool, rpm: float, step: int = -1):
+        """Spindle running forward (False) or in reverse (True) at `rpm`: a record only when the direction or the
+        speed changes. Tapping reverses it for the way out."""
+        if not self.on["spindle"]:
+            self.drive_on("spindle", rpm, step)
+        if reverse != self.reverse or (rpm and abs(float(rpm) - self.rpm) > 1e-9):
+            self.recs.append(post.Rec("spindle", {"rpm": float(rpm), "on": True, "reverse": True} if reverse
+                                      else {"rpm": float(rpm), "on": True}))
+            self.reverse = bool(reverse)
+            self.rpm = float(rpm)
+
     def all_off(self):
+        self.reverse = False
         for k in ("spindle", "wire"):
             if self.on[k]:
                 self.recs.append(post.Rec(k, {"rpm": 0.0, "on": False}))
@@ -852,6 +868,14 @@ def _disc_step(i, st, p, station, robot, tool, backend, q, add, recs, msgs, erro
     except ValueError as e:
         errors.append("step {}: {}".format(i + 1, e))
         return q
+    return _run_disc(i, st, p, station, robot, tool, backend, q, add, recs, msgs, errors, yaw, sp, proc, cuts)
+
+
+def _run_disc(i, st, p, station, robot, tool, backend, q, add, recs, msgs, errors, yaw, sp, proc, cuts):
+    """Feed, spindle, and the robot moves of a list of saw cuts (lithocam.discsaw.Cut): the blade centre is the TCP,
+    the spindle axis the blade normal, the spin about it chosen by the planner."""
+    D = float(tool.diameter)
+    kerf = float(getattr(tool, "kerf", 0.0) or 0.0) or float(getattr(tool, "segment_height", 0.0) or 0.0)
     feed = float(p.get("feed") or getattr(tool, "feed", 0) or 0)
     rpm = float(p.get("rpm") or getattr(tool, "spindle_rpm", 0) or 0)
     if not feed or not rpm:
@@ -877,7 +901,7 @@ def _disc_step(i, st, p, station, robot, tool, backend, q, add, recs, msgs, erro
             backend.set_tool_mode("spindle")
     ns = max(1, int(p.get("spins", 8)))
     spins = [2 * math.pi * k / ns for k in range(ns)]
-    step_mm = 5.0
+    step_mm = DISC_STEP_MM
     moves = []
     for c in cuts:
         n = -np.asarray(c.normal, dtype=float)                 # tool axis (tip to holder) = minus the blade normal
@@ -905,11 +929,147 @@ def _disc_step(i, st, p, station, robot, tool, backend, q, add, recs, msgs, erro
     return qs[-1] if qs else q
 
 
+def _gen_params(kind: str, p: dict) -> dict:
+    """Generator keyword arguments from a step's parameters: the text fields of the hole steps become point lists and
+    ranges, empty text means the generator's own default."""
+    from . import ops
+    q = {k: v for k, v in p.items() if k != "tool"}
+    if "points" in q:
+        q["points"] = ops.parse_points(q["points"])
+    if "diameter_range" in q:
+        q["diameter_range"] = ops.parse_range(q["diameter_range"])
+    if "boundary" in q and not str(q["boundary"] or "").strip():
+        q["boundary"] = None
+    if kind == "rest" and not q.get("previous_tool_radius"):
+        q.pop("previous_tool_radius", None)
+    return q
+
+
+def _disc_ruled_step(i, st, p, station, robot, tool, backend, q, add, recs, msgs, errors, yaw, sp, proc=None):
+    """Saw cuts along the rulings of Station.ruled_path faces (lithocam.discsaw.ruled_disc_cuts). The log says per
+    face how many rulings can be cut, the depth, the twist and the tilt, and why a ruling is left out."""
+    from .. import discsaw
+    from ..wirepath import load_ruled_json
+    if not station.ruled_path:
+        msgs.append("step {}: disc saw on ruled faces needs the part's ruled-face JSON (Station.ruled_path)".format(
+            i + 1))
+        return q
+    D = float(tool.diameter)
+    kerf = float(getattr(tool, "kerf", 0.0) or 0.0) or float(getattr(tool, "segment_height", 0.0) or 0.0)
+    if D <= 0 or kerf <= 0:
+        errors.append("step {}: tool {} needs a diameter and a kerf".format(i + 1, tool.id))
+        return q
+    rep = load_ruled_json(station.ruled_path)
+    faces = [f for f in rep.faces if len(f.rulings) >= 1]
+    labels = {s.strip() for s in str(p.get("labels") or "").split(",") if s.strip()}
+    if labels:
+        faces = [f for f in faces if f.label in labels]
+    want = str(p.get("faces") or "all")
+    if want != "all":
+        keep = {int(s) for s in want.replace(";", ",").split(",") if s.strip()}
+        faces = [f for f in faces if f.index in keep]
+    if not faces:
+        msgs.append("step {}: no ruled face matches (labels '{}', faces '{}')".format(i + 1, ",".join(sorted(labels)),
+                                                                                      want))
+        return q
+    depth = float(p.get("depth") or 0.0)
+    kw = dict(blade_diameter=D, flange_diameter=float(p.get("flange_diameter", 100.0)), tol=float(p.get("tol", 0.5)),
+              intrusion_tol=float(p.get("intrusion_tol", 0.0)))
+    cuts = []
+    for f in faces:
+        try:
+            fe = discsaw.ruled_disc_feasibility(f, kerf=kerf, depth=depth if depth > 0 else None, **kw)
+            info = {}
+            fc = discsaw.ruled_disc_cuts(f, kerf=kerf, stepdown=float(p.get("stepdown", 10.0)),
+                                         depth=depth if depth > 0 else None, report=info, **kw)
+        except ValueError as e:
+            errors.append("step {}: disc face {}: {}".format(i + 1, f.index, e))
+            continue
+        msgs.append("step {}: disc face {} ({}): {}".format(i + 1, f.index, f.label, fe.summary()))
+        bad = [r for r in fe.rulings if not r.cuttable]
+        for r in bad[:6]:
+            msgs.append("step {}: disc face {}: ruling {} left out: {}".format(i + 1, f.index, r.index, r.reason))
+        if len(bad) > 6:
+            msgs.append("step {}: disc face {}: {} more rulings left out".format(i + 1, f.index, len(bad) - 6))
+        for ri, why in info.get("skipped", []):
+            if all(r.index != ri for r in bad):
+                msgs.append("step {}: disc face {}: ruling {} pass left out: {}".format(i + 1, f.index, ri, why))
+        cuts += fc
+    if not cuts:
+        msgs.append("step {}: no ruling of the selected faces can be cut with {}".format(i + 1, tool.id))
+        return q
+    return _run_disc(i, st, p, station, robot, tool, backend, q, add, recs, msgs, errors, yaw, sp, proc, cuts)
+
+
+DISC_STEP_MM = 5.0      # robot sample spacing along a saw cut, mm
+FEED_KINDS = ("feed", "plunge", "tap_in", "tap_out")      # moves that cut (at the step feed, or the move's own)
+
+
+def _tilted(m) -> bool:
+    """The move names a tool axis that is not the setup z axis."""
+    return len(m) > 2 and float(np.asarray(m[2], dtype=float) @ np.array([0.0, 0.0, 1.0])) < 1 - 1e-9
+
+
+def _attrs_text(a: dict) -> str:
+    """Per-point attributes (lithocam.polish) as program comment text."""
+    parts = []
+    if "grit" in a:
+        parts.append("grit {}".format(a["grit"]))
+    if "pressure_mpa" in a:
+        parts.append("pressure {:g} MPa".format(a["pressure_mpa"]))
+    if "force_n" in a:
+        parts.append("force {:.3g} N (simulation attribute, no force command)".format(a["force_n"]))
+    if "water" in a:
+        parts.append("water {}".format(a["water"]))
+    return ", ".join(parts)
+
+
+def _polish_groups(i, p, station, tool, tools, tris, mesh, stock_f, msgs, errors):
+    """Pad passes per grit (lithocam.polish.polish_steps) for a polish step, or [] with the reason in `errors`."""
+    from .. import polish
+
+    def num(v):
+        return float(v) if v not in (None, "", 0, 0.0) else None
+    grits = [g.strip() for g in str(p.get("grits") or "").replace(";", ",").split(",") if g.strip()] or None
+    water = str(p.get("water") or "").strip() or None
+    try:
+        steps = polish.grit_sequence(station.material, grits=grits, feed=num(p.get("feed")), water=water,
+                                     rpm=num(p.get("rpm")), rpm_pick=float(p.get("rpm_pick", 0.5)))
+        pads = {}
+        for part in str(p.get("grit_tools") or "").replace("\n", ";").split(";"):
+            if not part.strip():
+                continue
+            g, _, tid = part.partition("=")
+            if tid.strip() not in tools:
+                raise ValueError("pad '{}' for grit '{}' is not in the tool library".format(tid.strip(), g.strip()))
+            pads[g.strip()] = tools[tid.strip()]
+        region = None
+        if str(p.get("region") or "").strip():
+            region = tuple(float(v) for v in str(p["region"]).split(","))
+            if len(region) != 4:
+                raise ValueError("region is 'umin,umax,vmin,vmax' (mm)")
+        out = polish.polish_steps(
+            tris, mesh, tool, stock_f, steps=steps, pressure=num(p.get("pressure")), tools=pads or None,
+            cross=bool(p.get("cross", False)), cross_angle_deg=float(p.get("cross_angle_deg", 90.0)),
+            stepover=float(p.get("stepover") or 0.0), overlap=float(p.get("overlap", 0.5)),
+            pattern=str(p.get("pattern", "zigzag")), angle_deg=float(p.get("angle_deg", 0.0)),
+            clearance=float(p.get("clearance", 20.0)), region=region)
+    except ValueError as e:
+        errors.append("step {}: polish: {}".format(i + 1, e))
+        return []
+    msgs.append("step {}: polish: {} grit step{} for {} ({})".format(
+        i + 1, len(out), "" if len(out) == 1 else "s", station.material, ", ".join(s.grit for s in steps)))
+    return out
+
+
 def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, object], part=None,
            q0: Optional[Sequence[float]] = None, max_feed_points: int = 4000, progress=None,
-           backend=None) -> Expansion:
+           backend=None, leftover=None) -> Expansion:
     """Expand a program. `part` = (tris, trimesh) in mm, needed by machining steps. `tools` maps id -> Tool.
-    `backend`: a planner backend (studio.planner) for IK branches and collision checks; None = numpy IK only."""
+    `backend`: a planner backend (studio.planner) for IK branches and collision checks; None = numpy IK only.
+    `leftover`: the stock after the earlier operations (an SdfStock, or an (xs, ys, Z) height field in mm, work
+    frame), used by rest machining when no previous tool radius is given; without it rest uses the tool of the
+    previous milling step in the program."""
     from . import cam
     from .planner import collides
 
@@ -920,6 +1080,7 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
     msgs: List[str] = []
     errors: List[str] = []
     tool = None
+    last_mill = [None]              # the tool of the previous milling step (what a rest step compares with)
     # who turns the table: "" (no table), "operator", "e1" (coordinated external axis) or "io" (PLC through I/O)
     table_mode, terr, twarn = check_table(station)
     errors.extend(terr)
@@ -949,11 +1110,12 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
             framed[key] = (tf, cam.trimesh(tf), box)
         return framed[key]
 
-    def mount(i, tid):
-        """Put the cutter in the spindle: TCP, tool record (with the spindle mass), collet check."""
+    def mount(i, tid, force=False):
+        """Put the cutter in the spindle: TCP, tool record (with the spindle mass), collet check. `force`: change
+        even to the same tool id (a fresh pad per grit)."""
         t = tools[tid]
         robot.tcp_offset = station.tool_tcp(t)
-        proc.tool_change(tid)                          # drives off, then the change (only when the tool changes)
+        proc.tool_change(tid, force)                   # drives off, then the change (only when the tool changes)
         recs.append(post.Rec("tool", {"id": tid, "tcp": robot.tcp_offset.tolist(), "mass": sp.mass_kg}))
         shank = float(getattr(t, "shank_diameter", 0.0) or 0.0) or float(getattr(t, "diameter", 0.0) or 0.0)
         if sp.max_collet_mm and shank > sp.max_collet_mm + 1e-9 and t.kind not in (
@@ -1035,6 +1197,149 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
         segs.append(Segment(i, label, qs, np.asarray(feed, bool), np.asarray(ok, bool), tcp,
                             robot.tcp_offset.copy(), getattr(tool, "id", "") if tool is not None else "",
                             float(es[0]) if len(es) and table_mode == "e1" else yaw[0], es))
+
+    def wk_turn(F):
+        """The work frame turned with the table, then tilted by the setup."""
+        Rz = np.eye(4)
+        Rz[:3, :3] = np.array([[math.cos(yaw[0]), -math.sin(yaw[0]), 0], [math.sin(yaw[0]), math.cos(yaw[0]), 0],
+                               [0, 0, 1.0]])
+        return work @ Rz @ F
+
+    def run_cl(i, st, p, spec, tid, tool, moves, F, wk, q, rpm_in=0.0, feed_in=0.0, what=""):
+        """Joint solutions, simulation samples and post records of a cutter-location path (moves: kind, tip point
+        mm[, tool axis[, data]], see cam.py and ops.py). Returns the joints at the end. Move kinds: rapid, plunge,
+        feed (at the step feed, or the plunge feed), dwell (a timed stop, no motion), tap_in and tap_out (feed at
+        their own feed with the spindle forward or in reverse)."""
+        label = what or spec.label
+        if not moves:
+            msgs.append("step {}: {}: nothing to cut (empty path)".format(i + 1, label))
+            return q
+        # every posted point: the CL path simplified only within the step tolerance (never thinned by count),
+        # and the links between passes sampled as straight lines so the simulation shows what is posted
+        tol = max(float(p.get("tolerance", 0.01) or 0.01), 1e-4)
+        allm = _sample_links(cam.simplify(moves, tol), 5.0)
+        rmoves, dwell_after = [], {}
+        for m in allm:
+            if m[0] == "dwell":                      # a timed stop at the last point: no motion of its own
+                dwell_after[len(rmoves) - 1] = dwell_after.get(len(rmoves) - 1, 0.0) + float(m[3])
+            else:
+                rmoves.append(m)
+        if not rmoves:
+            msgs.append("step {}: {}: nothing to cut (only stops)".format(i + 1, label))
+            return q
+        if len(rmoves) > max_feed_points:
+            msgs.append("step {}: {} robot points after simplification (tolerance {:g} mm); planning takes "
+                        "longer".format(i + 1, len(rmoves), tol))
+        five = any(_tilted(m) for m in rmoves)
+        if backend is not None and getattr(backend, "checks_collision", False):
+            if hasattr(backend, "set_tool_mode"):
+                backend.set_tool_mode("spindle")
+            if hasattr(backend, "place_part"):
+                backend.place_part(work, yaw[0])
+        if five:
+            ns = max(1, int(p.get("spins", 12)))
+            spins = [2 * math.pi * k / ns for k in range(ns)]
+            qs, oks, chosen = _solve_five_axis(robot, backend, wk, rmoves, q, spins)
+            poses = [tool_pose(wk, m[1], m[2] if len(m) > 2 else None, s) for m, s in zip(rmoves, chosen)]
+            feeds = [m[0] in FEED_KINDS for m in rmoves]
+            if qs:
+                q = qs[-1]
+            msgs.append("step {}: 5-axis: {} points, spin chosen per point from {} candidates ({})".format(
+                i + 1, len(qs), ns, getattr(backend, "name", "numpy IK") if backend else "numpy IK"))
+        else:
+            first = down_pose(wk, rmoves[0][1])
+            q, ok = solve_start(robot, first, q)
+            if not ok:
+                msgs.append("step {}: the start of {} is out of reach".format(i + 1, label))
+            qs, feeds, oks, poses = [], [], [], []
+            for m in rmoves:
+                T = down_pose(wk, m[1])
+                q, ok = robot.solve_pose(T, q)
+                qs.append(q)
+                feeds.append(m[0] in FEED_KINDS)
+                oks.append(ok)
+                poses.append(T)
+            if backend is not None and getattr(backend, "checks_collision", False):
+                hits = [k for k, qq in enumerate(qs) if backend.in_collision(qq)]
+                for k in hits:
+                    oks[k] = False
+                msgs.append("step {}: collision check ({}): {} of {} samples in contact".format(
+                    i + 1, backend.name, len(hits), len(qs)))
+        add(i, st.title() if not what else "{} ({})".format(st.title(), what), qs, feeds, oks)
+        taps = [m for m in rmoves if m[0] in ("tap_in", "tap_out")]
+        needs_feed = any(m[0] in ("feed", "plunge") for m in rmoves)
+        rpm = float(rpm_in or p.get("rpm") or getattr(tool, "spindle_rpm", 0) or 0)
+        feed = float(feed_in or p.get("feed") or getattr(tool, "feed", 0) or 0)
+        if taps and not rpm:
+            rpm = float(taps[0][4])
+        if (not rpm or (not feed and needs_feed)) and (needs_feed or not rpm):
+            # sourced starting values for the material (lithocam.cutting_data)
+            from .. import cutting_data
+            sg = cutting_data.suggest(tool, station.material, float(p.get("stepdown", 0) or 0),
+                                      sp.max_rpm, station.robot_factor)
+            rpm = rpm or sg.rpm
+            feed = feed or sg.feed
+            recs.append(post.Rec("comment", {"text": "cutting data ({}): {}; {}; sources: {}".format(
+                station.material, sg.text(), "; ".join(sg.notes) or "-", ", ".join(sg.sources) or "none")}))
+            msgs.append("step {}: cutting data for {} in {}: {} ({} source{})".format(
+                i + 1, tid, station.material, sg.text(), len(sg.sources), "" if len(sg.sources) == 1 else "s"))
+        proc.drive_on("spindle", rpm, i)          # spindle and water before the first cut
+        if needs_feed and feed <= 0:
+            errors.append("step {}: {} has no feed: the step, the tool {} and the cutting data for {} give none. "
+                          "Set a feed on the step or the tool.".format(i + 1, label, tid or "(none)",
+                                                                       station.material))
+        elif feed > 0:
+            recs.append(post.Rec("speed", {"linear": feed / 60.0}))
+        recs.append(post.Rec("comment", {"text": "{} with {} ({} points)".format(label, tid or "tool", len(rmoves))}))
+        if taps:
+            recs.append(post.Rec("comment", {"text": "tapping: feed = pitch x rpm in the move, spindle reversed for "
+                                                     "the way out"}))
+        own_plunge = float(p.get("plunge_feed") or getattr(tool, "plunge_feed", 0) or 0)
+        # a drill's plunge is the drilling move itself: the drill feed. Other plunges enter the stock at half feed.
+        plunge = own_plunge or (feed if st.kind in ("drill", "core_drill") else feed / 2)
+        if not own_plunge and st.kind not in ("drill", "core_drill") and any(m[0] == "plunge" for m in rmoves):
+            recs.append(post.Rec("comment", {"text": "plunge at half the feed (no plunge feed on the step or "
+                                                     "the tool)"}))
+        last_attrs = None
+        dwell_total = sum(dwell_after.values())
+        if -1 in dwell_after:
+            recs.append(post.Rec("dwell", {"seconds": dwell_after[-1]}))
+        for k, (m, qq, T) in enumerate(zip(rmoves, qs, poses)):
+            kind = m[0]
+            if kind in ("tap_in", "tap_out"):
+                proc.spindle_dir(kind == "tap_out", float(m[4]), i)
+                recs.append(post.Rec("movel", {"q": np.asarray(qq).tolist(), "pose": np.asarray(T).tolist(),
+                                               "cut": True, "v": float(m[3]) / 60.0}))
+            elif kind in ("feed", "plunge"):   # cutting: pose of the cutter tip in the robot base (URDF) frame
+                if proc.reverse:
+                    proc.spindle_dir(False, rpm, i)            # forward again after a tap
+                if len(m) > 3 and isinstance(m[3], dict) and m[3] != last_attrs:
+                    last_attrs = dict(m[3])
+                    txt = _attrs_text(last_attrs)
+                    if txt:
+                        recs.append(post.Rec("comment", {"text": "pass: " + txt}))
+                recs.append(post.Rec("movel", {"q": np.asarray(qq).tolist(), "pose": np.asarray(T).tolist(),
+                                               "cut": True, "v": (feed if kind == "feed" else plunge) / 60.0}))
+            elif k == 0:                         # the approach from wherever the robot is: a joint move
+                recs.append(post.Rec("movej", {"q": np.asarray(qq).tolist()}))
+            else:                                # links and retracts: straight lines at the cell's rapid speed
+                recs.append(post.Rec("movel", {"q": np.asarray(qq).tolist(), "pose": np.asarray(T).tolist(),
+                                               "v": float(station.rapid_speed)}))
+            if k in dwell_after:
+                recs.append(post.Rec("dwell", {"seconds": dwell_after[k]}))
+        bad = len(oks) - sum(oks)
+        if bad:
+            msgs.append("step {}: {} of {} points unreachable, at a singularity or colliding".format(
+                i + 1, bad, len(oks)))
+        feed_len, rapid_len = cam.path_length(moves)
+        msgs.append("step {}: {}: {} CL points, feed {:.0f} mm, rapid {:.0f} mm{}".format(
+            i + 1, label, len(moves), feed_len, rapid_len,
+            ", {:g} s of dwell".format(dwell_total) if dwell_total else ""))
+        return q
+
+    def lc_has_cutter(t):
+        from .core import lc
+        return lc.has_cutter(t)
 
     for i, st in enumerate(program.steps):
         spec = catalog.BY_ID.get(st.kind)
@@ -1118,13 +1423,20 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
                 continue
             tool = mount(i, tid)
             q = _disc_step(i, st, p, station, robot, tool, backend, q, add, recs, msgs, errors, yaw, sp, proc)
-        elif st.kind in cam.GENERATORS:
+        elif st.kind == "disc_ruled":
+            tid = str(p.get("tool") or "")
+            if tid not in tools:
+                msgs.append("step {}: disc saw needs a disc tool from the library".format(i + 1))
+                continue
+            tool = mount(i, tid)
+            q = _disc_ruled_step(i, st, p, station, robot, tool, backend, q, add, recs, msgs, errors, yaw, sp, proc)
+        elif st.kind in cam.GENERATORS or st.kind == "polish":
             tid = str(p.get("tool") or "")
             if tid:
                 if tid not in tools:
                     msgs.append("step {}: tool '{}' is not in the library".format(i + 1, tid))
                     continue
-                tool = mount(i, tid)
+                tool = tools[tid] if st.kind == "polish" else mount(i, tid)     # a pad is mounted per grit
             if tool is None or part is None or station.stock is None:
                 msgs.append("step {}: {} needs a part, a stock and a tool".format(i + 1, spec.label))
                 continue
@@ -1135,100 +1447,41 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
                 tris, mesh, stock_f = in_setup_frame(F)
             else:
                 (tris, mesh), stock_f = part, station.stock
+            if st.kind == "polish":
+                # one pad pass per grit, a pad change before each
+                groups = _polish_groups(i, p, station, tool, tools, tris, mesh, stock_f, msgs, errors)
+                for g in groups:
+                    pad = g["tool"]
+                    tid = str(pad.id)
+                    tool = mount(i, tid, force=True)
+                    recs.append(post.Rec("comment", {"text": "polish grit {}: pad {}, {:g} rev/min, {:g} mm/min, water "
+                                                             "{}, pressure {:g} MPa, force {:.3g} N (simulation "
+                                                             "attributes; no force command is sent)".format(
+                                                                 g["grit"], tid, g["rpm"], g["feed_mm_min"],
+                                                                 g["water"], g["pressure_mpa"], g["force_n"])}))
+                    q = run_cl(i, st, p, spec, tid, tool, g["moves"], F, wk_turn(F), q,
+                               rpm_in=g["rpm"], feed_in=g["feed_mm_min"], what="polish grit {}".format(g["grit"]))
+                continue
             try:
-                moves = cam.GENERATORS[st.kind](tris, mesh, tool, stock_f,
-                                                **{k: v for k, v in p.items() if k != "tool"})
+                gp = _gen_params(st.kind, p)
+                if st.kind == "rest" and not gp.get("previous_tool_radius") and "leftover" not in gp:
+                    if leftover is not None and not tilt[0]:
+                        gp["leftover"] = leftover                      # the stock after the earlier operations
+                    elif last_mill[0] is not None:
+                        pt = last_mill[0]
+                        if lc_has_cutter(pt):
+                            gp["previous_tool"] = pt
+                        else:
+                            gp["previous_tool_radius"] = float(pt.diameter) / 2
+                        msgs.append("step {}: rest: the previous tool is {} of the previous milling step".format(
+                            i + 1, pt.id))
+                moves = cam.GENERATORS[st.kind](tris, mesh, tool, stock_f, **gp)
             except Exception as e:   # noqa: BLE001 - report generator errors in the program log
                 msgs.append("step {}: {} failed: {}".format(i + 1, spec.label, e))
                 continue
-            # every posted point: the CL path simplified only within the step tolerance (never thinned by count),
-            # and the links between passes sampled as straight lines so the simulation shows what is posted
-            tol = max(float(p.get("tolerance", 0.01) or 0.01), 1e-4)
-            rmoves = _sample_links(cam.simplify(moves, tol), 5.0)
-            if len(rmoves) > max_feed_points:
-                msgs.append("step {}: {} robot points after simplification (tolerance {:g} mm); planning takes "
-                            "longer".format(i + 1, len(rmoves), tol))
-            Rz = np.eye(4)
-            Rz[:3, :3] = np.array([[math.cos(yaw[0]), -math.sin(yaw[0]), 0], [math.sin(yaw[0]), math.cos(yaw[0]), 0],
-                                   [0, 0, 1.0]])
-            wk = work @ Rz @ F                               # the work frame turned with the table, then tilted
-            five = any(len(m) > 2 for m in rmoves)
-            if backend is not None and getattr(backend, "checks_collision", False):
-                if hasattr(backend, "set_tool_mode"):
-                    backend.set_tool_mode("spindle")
-                if hasattr(backend, "place_part"):
-                    backend.place_part(work, yaw[0])
-            if five:
-                ns = max(1, int(p.get("spins", 12)))
-                spins = [2 * math.pi * k / ns for k in range(ns)]
-                qs, oks, chosen = _solve_five_axis(robot, backend, wk, rmoves, q, spins)
-                poses = [tool_pose(wk, m[1], m[2] if len(m) > 2 else None, s) for m, s in zip(rmoves, chosen)]
-                feeds = [m[0] in ("feed", "plunge") for m in rmoves]
-                if qs:
-                    q = qs[-1]
-                msgs.append("step {}: 5-axis: {} points, spin chosen per point from {} candidates ({})".format(
-                    i + 1, len(qs), ns, getattr(backend, "name", "numpy IK") if backend else "numpy IK"))
-            else:
-                first = down_pose(wk, rmoves[0][1])
-                q, ok = solve_start(robot, first, q)
-                if not ok:
-                    msgs.append("step {}: the start of {} is out of reach".format(i + 1, spec.label))
-                qs, feeds, oks, poses = [], [], [], []
-                for m in rmoves:
-                    T = down_pose(wk, m[1])
-                    q, ok = robot.solve_pose(T, q)
-                    qs.append(q)
-                    feeds.append(m[0] in ("feed", "plunge"))
-                    oks.append(ok)
-                    poses.append(T)
-                if backend is not None and getattr(backend, "checks_collision", False):
-                    hits = [k for k, qq in enumerate(qs) if backend.in_collision(qq)]
-                    for k in hits:
-                        oks[k] = False
-                    msgs.append("step {}: collision check ({}): {} of {} samples in contact".format(
-                        i + 1, backend.name, len(hits), len(qs)))
-            add(i, st.title(), qs, feeds, oks)
-            rpm = float(p.get("rpm") or getattr(tool, "spindle_rpm", 0) or 0)
-            feed = float(p.get("feed") or getattr(tool, "feed", 0) or 0)
-            if not rpm or not feed:   # sourced starting values for the material (lithocam.cutting_data)
-                from .. import cutting_data
-                sg = cutting_data.suggest(tool, station.material, float(p.get("stepdown", 0) or 0),
-                                          sp.max_rpm, station.robot_factor)
-                rpm = rpm or sg.rpm
-                feed = feed or sg.feed
-                recs.append(post.Rec("comment", {"text": "cutting data ({}): {}; {}; sources: {}".format(
-                    station.material, sg.text(), "; ".join(sg.notes) or "-", ", ".join(sg.sources) or "none")}))
-                msgs.append("step {}: cutting data for {} in {}: {} ({} source{})".format(
-                    i + 1, tid, station.material, sg.text(), len(sg.sources), "" if len(sg.sources) == 1 else "s"))
-            proc.drive_on("spindle", rpm, i)          # spindle and water before the first cut
-            if feed <= 0:
-                errors.append("step {}: {} has no feed: the step, the tool {} and the cutting data for {} give none. "
-                              "Set a feed on the step or the tool.".format(i + 1, spec.label, tid or "(none)",
-                                                                           station.material))
-            else:
-                recs.append(post.Rec("speed", {"linear": feed / 60.0}))
-            recs.append(post.Rec("comment", {"text": "{} with {} ({} points)".format(spec.label, tid or "tool",
-                                                                                   len(rmoves))}))
-            plunge = float(p.get("plunge_feed") or getattr(tool, "plunge_feed", 0) or 0) or feed / 2
-            if not (p.get("plunge_feed") or getattr(tool, "plunge_feed", 0)):
-                recs.append(post.Rec("comment", {"text": "plunge at half the feed (no plunge feed on the step or "
-                                                         "the tool)"}))
-            for k, (m, qq, T) in enumerate(zip(rmoves, qs, poses)):
-                if m[0] in ("feed", "plunge"):   # cutting: pose of the cutter tip in the robot base (URDF) frame
-                    recs.append(post.Rec("movel", {"q": np.asarray(qq).tolist(), "pose": np.asarray(T).tolist(),
-                                                   "cut": True, "v": (feed if m[0] == "feed" else plunge) / 60.0}))
-                elif k == 0:                     # the approach from wherever the robot is: a joint move
-                    recs.append(post.Rec("movej", {"q": np.asarray(qq).tolist()}))
-                else:                            # links and retracts: straight lines at the cell's rapid speed
-                    recs.append(post.Rec("movel", {"q": np.asarray(qq).tolist(), "pose": np.asarray(T).tolist(),
-                                                   "v": float(station.rapid_speed)}))
-            bad = len(oks) - sum(oks)
-            if bad:
-                msgs.append("step {}: {} of {} points unreachable, at a singularity or colliding".format(
-                    i + 1, bad, len(oks)))
-            feed_len, rapid_len = cam.path_length(moves)
-            msgs.append("step {}: {}: {} CL points, feed {:.0f} mm, rapid {:.0f} mm".format(
-                i + 1, spec.label, len(moves), feed_len, rapid_len))
+            if st.kind not in ("drill", "core_drill", "tap"):
+                last_mill[0] = tool
+            q = run_cl(i, st, p, spec, tid, tool, moves, F, wk_turn(F), q)
         else:
             recs.append(post.Rec("comment", {"text": "{} ({}): no generator yet".format(spec.label, spec.status)}))
             msgs.append("step {}: {} is {}; posted as a comment".format(i + 1, spec.label, spec.status))

@@ -13,7 +13,8 @@ Layout (every key except "controller" is optional; "note" may appear in any obje
    "ready_inputs": [{"di": 0, "value": true}],          # waited for once, at program start
    "fault_input": {"di": 1, "ok": false},               # waited for before every drive start
    "spindle": {"start": [action...], "stop": [action...], "speed": speed, "ready": {"di": 2, "value": true},
-               "dwell_s": 2.0, "max_rpm": 12000},
+               "dwell_s": 2.0, "max_rpm": 12000,
+               "reverse": {"start": [action...], "stop": [action...]}},   # spindle only: tapping runs it in reverse
    "wire":    (same keys as spindle; speed optional),
    "water":   {"on": [action...], "off": [action...]},
    "air":     {"on": [action...], "off": [action...]},
@@ -54,7 +55,7 @@ FIELDS = {"rpm", "tool", "pocket"}
 _OPS = ("do", "ao", "wait_di", "register", "call", "mcode", "dwell")
 _TOP = {"schema", "name", "robot", "controller", "placeholder", "note", "ready_inputs", "fault_input", "spindle",
         "wire", "water", "air", "tool_change"}
-_DRIVE = {"start", "stop", "speed", "ready", "dwell_s", "max_rpm", "note"}
+_DRIVE = {"start", "stop", "speed", "ready", "dwell_s", "max_rpm", "reverse", "note"}
 _SWITCH = {"on", "off", "note"}
 _TOOL = {"mode", "message", "actions", "pockets", "ready", "note"}
 
@@ -226,6 +227,16 @@ def validate(d: Dict) -> List[str]:
         _check_speed(drive + ".speed", s.get("speed"), c)
         if s.get("ready") is not None:
             _check_input(drive + ".ready", s["ready"], c)
+        rv = s.get("reverse")
+        if rv is not None:
+            if drive != "spindle":
+                _err(drive, "only the spindle has a reverse")
+            if not isinstance(rv, dict) or set(rv) - {"start", "stop", "note"}:
+                _err("spindle.reverse", "must be an object with start (and optionally stop) actions")
+            _check_actions("spindle.reverse.start", rv.get("start", []), c)
+            _check_actions("spindle.reverse.stop", rv.get("stop", []), c)
+            if not rv.get("start"):
+                warn.append("spindle.reverse has no start actions: reversing is refused until they are set")
         for key in ("dwell_s", "max_rpm"):
             v = s.get(key)
             if v is not None and (not isinstance(v, (int, float)) or v < 0):
@@ -374,6 +385,39 @@ class CellIO:
             ops.append(("dwell", float(s["dwell_s"])))
         return ops
 
+    def has_reverse(self) -> bool:
+        """True when the spindle section defines how to run the spindle in reverse (tapping)."""
+        rv = (self.data.get("spindle") or {}).get("reverse")
+        return bool(rv and rv.get("start"))
+
+    def reverse_on(self, rpm: float, running: bool) -> List[Op]:
+        """Run the spindle in reverse at `rpm` (spindle.reverse.start). `running`: it already runs in reverse."""
+        s = self.data.get("spindle") or {}
+        if not self.has_reverse():
+            raise CellIOError("the cell I/O defines no spindle reverse output (spindle.reverse.start): tapping needs "
+                              "the spindle reversed")
+        ops: List[Op] = []
+        fi = self.data.get("fault_input")
+        if fi is not None and not running:
+            ops.append(("wait_di", fi["di"], bool(fi.get("ok", False))))
+        if rpm and rpm > 0:
+            ops += self.speed_ops("spindle", rpm)
+        if running:
+            return ops
+        ops += self._acts(s["reverse"]["start"], {"rpm": _num(rpm or 0), "tool": "", "pocket": ""})
+        if s.get("ready") is not None:
+            ops.append(("wait_di", s["ready"]["di"], bool(s["ready"].get("value", True))))
+        if s.get("dwell_s"):
+            ops.append(("dwell", float(s["dwell_s"])))
+        return ops
+
+    def reverse_off(self) -> List[Op]:
+        """Stop the reverse run: spindle.reverse.stop, else the spindle's stop actions."""
+        s = self.data.get("spindle") or {}
+        acts = (s.get("reverse") or {}).get("stop") or s.get("stop")
+        return self._acts(acts, {"rpm": "0", "tool": "", "pocket": ""}) or [
+            ("comment", "spindle reverse stop: no stop actions in the cell I/O")]
+
     def drive_off(self, drive: str) -> List[Op]:
         s = self.data.get(drive)
         if s is None:
@@ -469,6 +513,7 @@ class Process:
         self.io = io
         self.on = {"spindle": False, "wire": False, "water": False, "air": False}
         self.tool = ""
+        self.rev = False                      # the spindle runs in reverse (tapping)
 
     def ops(self, kind: str, data: Dict) -> List[Op]:
         io = self.io
@@ -477,12 +522,31 @@ class Process:
         if kind in ("spindle", "wire"):
             rpm = float(data.get("rpm") or 0.0)
             on = bool(data.get("on", rpm > 0 if kind == "spindle" else True))
+            rev = bool(data.get("reverse")) and kind == "spindle" and on
             was = self.on[kind]
+            if rev and (io is None or not io.has_reverse()):
+                raise CellIOError("tapping reverses the spindle, but the cell I/O defines no spindle reverse output "
+                                  "(spindle.reverse.start): set it for your cell, or post G-code")
             self.on[kind] = on
             if io is None:
                 return no_io_ops(kind, dict(data, on=on))
+            if rev:
+                ops: List[Op] = []
+                if was and not self.rev:
+                    ops += io.drive_off(kind)            # the forward run stops before the reverse starts
+                ops += io.reverse_on(rpm, was and self.rev)
+                self.rev = True
+                return ops
             if on:
-                return io.drive_on(kind, rpm, was, self.tool)
+                ops = []
+                if self.rev:
+                    ops += io.reverse_off()
+                    was = False
+                    self.rev = False
+                return ops + io.drive_on(kind, rpm, was, self.tool)
+            if kind == "spindle" and self.rev:
+                self.rev = False
+                return io.reverse_off()
             return io.drive_off(kind) if was else [("comment", "{} already off".format(kind))]
         if kind in ("water", "air"):
             on = bool(data.get("on", True))

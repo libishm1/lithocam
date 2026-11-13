@@ -1181,8 +1181,20 @@ def _gc_build(recs: List[Rec], mc: MillMachine, W, io, tool_length: Optional[flo
         elif r.kind in PROCESS_KINDS:
             if r.kind == "spindle":
                 st["rpm"] = float(d.get("rpm") or 0.0)
-            ops = proc.ops(r.kind, d)
-            lines = _gc_ops(ops, mc, warn)
+            if r.kind == "spindle" and d.get("reverse") and d.get("on", True):
+                # tapping: M4 runs the spindle counter-clockwise (reverse); M3 again for the next forward run
+                lines = ["M4 S{:g}".format(st["rpm"])]
+                proc.on["spindle"] = True
+                st["rev"] = True
+            elif r.kind == "spindle" and st.get("rev") and d.get("on", True) and (d.get("rpm") or 0) > 0:
+                lines = ["M3 S{:g}".format(st["rpm"])]
+                proc.on["spindle"] = True
+                st["rev"] = False
+            else:
+                if r.kind == "spindle":
+                    st["rev"] = False
+                ops = proc.ops(r.kind, d)
+                lines = _gc_ops(ops, mc, warn)
             if r.kind == "tool_change":
                 tid = str(d.get("id", ""))
                 st["tool"] = tid

@@ -37,7 +37,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from .. import interaction, materials_mechanics
+from .. import cutting_data, interaction, materials, materials_mechanics
 from ..sdfstock import SdfStock
 from . import program, spindles
 
@@ -245,16 +245,22 @@ def simulate_stock(station: program.Station, robot, expansion: program.Expansion
     vols = [v0]
     steps: List[StepCut] = []
     cache: Dict[Tuple[int, int], np.ndarray] = {}
-    W_inv: Dict[int, np.ndarray] = {}
+    W_inv: Dict[float, np.ndarray] = {}      # table angle -> inverse of the turned work frame
     bad = 0
 
     def pose(si, k):
+        """Tool pose of sample k in the part frame at that sample's table angle: Segment.e1 holds it per sample (it
+        changes within a segment when the table is driven as E1), else the segment's yaw."""
         key = (si, k)
         if key not in cache:
             seg = expansion.segments[si]
-            if si not in W_inv:
-                W_inv[si] = np.linalg.inv(_turned_work(station, seg.yaw))
-            cache[key] = tool_pose_mm(robot, seg, seg.q[k], W_inv[si])
+            e = float(seg.e1[k]) if seg.e1 is not None and len(seg.e1) == len(seg.q) else float(seg.yaw)
+            ek = round(e, 12)
+            if ek not in W_inv:
+                if len(W_inv) > 4096:
+                    W_inv.clear()
+                W_inv[ek] = np.linalg.inv(_turned_work(station, e))
+            cache[key] = tool_pose_mm(robot, seg, seg.q[k], W_inv[ek])
         return cache[key]
 
     for n_done, (gi, si, k) in enumerate(plan):
@@ -314,7 +320,16 @@ CONSTANTS: List[ConstantSpec] = [
 ]
 # optional: cutter bending (stepped cantilever) needs the cutter's modulus and the flute diameter factor
 OPTIONAL = [ConstantSpec("tool_E", "GPa", None, used_for="cutter bending"),
-            ConstantSpec("flute_factor", "-", None, used_for="cutter bending")]
+            ConstantSpec("flute_factor", "-", None, used_for="cutter bending"),
+            # wear (lithocam.materials.wear): a sourced row fills these when one exists; none does today
+            ConstantSpec("g_ratio", "mm3/mm3", "g_ratio", "low", used_for="tool wear of milling and drilling"),
+            ConstantSpec("wear_per_area", "mm/m2", "wear_per_area", "high", used_for="tool wear of saws and wires"),
+            ConstantSpec("usable_volume_mm3", "mm3", None, used_for="tool life fraction (G-ratio model)"),
+            ConstantSpec("usable_height_mm", "mm", None, used_for="tool life fraction (per-area model)"),
+            # limits of the feed-limit badge (lithocam.materials.feed_limit); yours to set
+            ConstantSpec("tool_deflection_limit_mm", "mm", None, used_for="feed limit by cutter bending"),
+            ConstantSpec("robot_deflection_limit_mm", "mm", None, used_for="feed limit by TCP deflection")]
+WEAR_KEYS = ("g_ratio", "wear_per_area", "usable_volume_mm3", "usable_height_mm")
 SPECS = {c.key: c for c in CONSTANTS + OPTIONAL}
 
 
@@ -329,7 +344,7 @@ def sourced_constants(material: str, robot_name: str = "") -> Dict[str, Sourced]
     """Constants with a sourced row in lithocam.materials_mechanics: rows of exactly this material first, else rows
     whose material contains it; the conservative end of the ranges (ConstantSpec.end); the rows are named."""
     out: Dict[str, Sourced] = {}
-    for c in CONSTANTS:
+    for c in CONSTANTS + OPTIONAL:
         if c.quantity is None:
             continue
         name = (robot_name if c.by_robot else material).strip().lower()
@@ -491,6 +506,9 @@ class ProcessReport:
     colors: Optional[np.ndarray] = None       # per vertex of the final stock mesh (run.frames[-1])
     color_max: float = 0.0
     seconds: float = 0.0
+    life: Optional[materials.LifeReport] = None          # tool wear over the program (lithocam.materials.tool_life)
+    wear_by_step: Dict[int, float] = field(default_factory=dict)       # program step index -> life fraction used
+    feed_limits: Dict[int, "StepFeed"] = field(default_factory=dict)   # program step index -> feed limit
 
     def text(self) -> str:
         return "\n".join(self.messages)
@@ -509,17 +527,123 @@ def _feeds_from_records(expansion: program.Expansion) -> Dict[Tuple[float, ...],
     return out
 
 
+@dataclass
+class StepFeed:
+    """Feed limit of one program step (lithocam.materials.feed_limit) from the stock simulation's engagement."""
+    step: int
+    programmed: float                        # mm/min, the step's feed in the post records (0 = none)
+    rpm: float
+    removed_mm3: float
+    length_mm: float
+    limit: materials.FeedLimit
+
+    def badge(self) -> str:
+        if not self.programmed:
+            return "no feed set"
+        return self.limit.badge(self.programmed)
+
+    def tooltip(self) -> str:
+        head = "feed {:.0f} mm/min at {:.0f} rev/min; removed {:.0f} mm3 over {:.0f} mm of path".format(
+            self.programmed, self.rpm, self.removed_mm3, self.length_mm)
+        return head + "\n" + self.limit.text()
+
+
+def _given_refusals(given: Optional[Dict[str, object]], keys) -> Dict[str, None]:
+    """Keys the caller gave as None or "" (a refusal of the sourced row), as {key: None} for lithocam.materials."""
+    return {k: None for k in keys if given and k in given and (given[k] is None or given[k] == "")}
+
+
+def step_feed_limits(station: program.Station, run: StockRun, expansion: program.Expansion, robot,
+                     tools: Dict[str, object], prog: program.Program,
+                     constants: Optional[Dict[str, object]] = None) -> Dict[int, StepFeed]:
+    """Feed limit per cutting step of `prog` (milling steps the stock simulation cut): the removed volume over the
+    path length is the engagement (materials.engagement_from_stock; ap from the step-down or ae from the stepover when
+    the step has one), the spindle's power and speed, the cutter's geometry and the robot's Jacobian at the first cut
+    sample go to materials.feed_limit. Constants not sourced and not given are skipped, named in the limit's
+    `skipped` list. Returns {program step index: StepFeed}."""
+    from . import catalog
+    vals, _ = resolve_constants(station.material, station.robot, constants)
+    given_c = {k: v for k, v in vals.items()}
+    given_c.update(_given_refusals(constants, list(SPECS)))
+    consts = {"specific_energy": given_c.get("specific_energy"), "radial_ratio": given_c.get("radial_ratio"),
+              "axial_ratio": given_c.get("axial_ratio"), "tool_E": given_c.get("tool_E"),
+              "flute_factor": given_c.get("flute_factor"), "joint_stiffness": given_c.get("joint_stiffness")}
+    consts = {k: v for k, v in consts.items() if v is not None or (constants and k in constants)}
+    limits = {"tool_deflection_mm": vals.get("tool_deflection_limit_mm"),
+              "robot_deflection_mm": vals.get("robot_deflection_limit_mm")}
+    limits = {k: v for k, v in limits.items() if v}
+    feeds = _feeds_from_records(expansion)
+    sp = station.spindle_model()
+    by_step: Dict[int, List[StepCut]] = {}
+    for s in run.steps:
+        if s.kind in (BALL, CYLINDER):
+            by_step.setdefault(expansion.segments[s.segment].step, []).append(s)
+    out: Dict[int, StepFeed] = {}
+    saved = robot.tcp_offset
+    try:
+        for idx, cuts in sorted(by_step.items()):
+            if idx >= len(prog.steps):
+                continue
+            st = prog.steps[idx]
+            tool = tools.get(cuts[0].tool)
+            if tool is None:
+                continue
+            seg = expansion.segments[cuts[0].segment]
+            vr = [feeds.get(tuple(float(x) for x in c.q), (None, 0.0)) for c in cuts]
+            v, rpm = max(vr, key=lambda r: r[0] or 0.0)                 # the cutting feed, not a half-feed plunge
+            removed = float(sum(c.removed for c in cuts))
+            length = float(sum(c.length for c in cuts))
+            if length <= 0:
+                continue
+            pp = dict(catalog.default_params(st.spec), **st.params)
+            ap = float(pp.get("stepdown") or 0.0) if st.kind == "rough_plane" else None
+            ae = float(pp.get("stepover") or 0.0) if st.kind != "rough_plane" else None
+            eng = materials.engagement_from_stock(removed, length, float(tool.diameter), ap or None, ae or None)
+            geom = {}
+            parts = spindles.cutter_parts(tool, spindles.stickout(tool))
+            shank = [q for q in parts if q[0] == "shank"]
+            flute = [q for q in parts if q[0] == "flutes"]
+            if flute:
+                geom["flute_length_mm"] = flute[0][3]
+                geom["shank_diameter_mm"] = shank[0][1] if shank else flute[0][1]
+                geom["shank_length_mm"] = shank[0][3] if shank else 0.0
+            rb = {"robot_name": station.robot}
+            try:
+                robot.tcp_offset = seg.tcp_offset
+                rb["J"] = np.asarray(robot.jacobian(cuts[0].q))[:3]
+            except Exception:   # noqa: BLE001 - no Jacobian: the robot check is skipped and says so
+                pass
+            fl = materials.feed_limit(tool, station.material, eng, float(rpm or getattr(tool, "spindle_rpm", 0) or 1.0),
+                                      spindle=sp, robot=rb, limits=limits, constants=consts, geometry=geom)
+            out[idx] = StepFeed(idx, float(v) * 60.0 if v else 0.0, float(rpm or 0.0), removed, length, fl)
+    finally:
+        robot.tcp_offset = saved
+    return out
+
+
+def tool_wear(station: program.Station, run: StockRun, tools: Dict[str, object], vals: Dict[str, float],
+              given: Optional[Dict[str, object]] = None) -> materials.LifeReport:
+    """Tool wear of the whole run (lithocam.materials.tool_life): per step and per tool, from the wear constants
+    (g_ratio, wear_per_area, usable_volume_mm3, usable_height_mm) the caller gave or a sourced row names."""
+    wc: Dict[str, object] = {k: vals[k] for k in WEAR_KEYS if k in vals}
+    wc.update(_given_refusals(given, WEAR_KEYS))
+    kinds = {tid: cutting_data.tool_kind_label(tl) for tid, tl in tools.items()}
+    return materials.tool_life(run.steps, station.material, kinds, wc)
+
+
 def _missing(vals, keys) -> List[str]:
     return [k for k in keys if k not in vals]
 
 
 def process_check(station: program.Station, run: StockRun, expansion: program.Expansion, robot,
                   tools: Dict[str, object], constants: Optional[Dict[str, object]] = None,
-                  max_voxels: int = 20000, progress: Optional[Callable[[str], None]] = None) -> ProcessReport:
+                  max_voxels: int = 20000, progress: Optional[Callable[[str], None]] = None,
+                  prog: Optional[program.Program] = None) -> ProcessReport:
     """Per-step forces, deflections and wire loads, and a part check of the final stock. See the module text.
 
     constants: {key: value} in the units of CONSTANTS (J/mm3, GPa, MPa, N, m/s, Nm/rad, ratios); absent keys come
-    from sourced rows for the station material and robot; a check whose constant is still missing is skipped."""
+    from sourced rows for the station material and robot; a check whose constant is still missing is skipped.
+    prog: the expanded program; with it the report carries the feed limit of each milling step."""
     t0 = time.perf_counter()
     vals, srcs = resolve_constants(station.material, station.robot, constants)
     msgs: List[str] = ["Process check: {} ({}), {} cut steps".format(station.material, station.robot,
@@ -545,6 +669,7 @@ def process_check(station: program.Station, run: StockRun, expansion: program.Ex
     no_feed = no_rpm = plunges = 0
     rows: List[Dict[str, object]] = []
     saved_tcp = robot.tcp_offset
+    seg_base = np.r_[0, np.cumsum([len(g.q) for g in expansion.segments])].astype(int)   # first sample of a segment
     try:
         for s in run.steps:
             row: Dict[str, object] = {"index": s.index, "kind": s.kind, "tool": s.tool, "removed_mm3": s.removed}
@@ -554,7 +679,8 @@ def process_check(station: program.Station, run: StockRun, expansion: program.Ex
                 row["time_s"] = s.length / v
             seg = expansion.segments[s.segment]
             tool = tools.get(s.tool)
-            W = _turned_work(station, seg.yaw)
+            W = _turned_work(station, float(seg.e1[s.index - seg_base[s.segment]]) if seg.e1 is not None and
+                             len(seg.e1) == len(seg.q) else seg.yaw)
             if s.kind in (BALL, CYLINDER, DISC):
                 if not mill_need:
                     if not v:
@@ -642,6 +768,38 @@ def process_check(station: program.Station, run: StockRun, expansion: program.Ex
                         "interaction.wire_bow; the bow values there only say the wire cannot hold that load at this "
                         "feed".format(steep, len(bows)))
     rep = ProcessReport(vals, srcs, msgs, rows)
+    try:
+        life = tool_wear(station, run, tools, vals, constants)
+    except ValueError as e:
+        msgs.append("SKIPPED tool wear: {}".format(e))
+    else:
+        rep.life = life
+        for k, r in zip(range(len(rows)), rows):
+            if k < len(life.per_step):
+                r["life_fraction"] = life.per_step[k]
+        msgs.append("  " + life.text())
+        for tid, fr in sorted(life.per_tool.items()):
+            msgs.append("    tool {}: {:.3%} of the usable segment ({} model)".format(
+                tid, fr, "per-area" if any(s.kind == WIRE and s.tool == tid for s in run.steps) else "wear"))
+        per_step: Dict[int, float] = {}
+        for sc, f in zip(run.steps, life.per_step):
+            if f is not None:
+                k = expansion.segments[sc.segment].step
+                per_step[k] = per_step.get(k, 0.0) + f
+        rep.wear_by_step = per_step
+        for k, f in sorted(per_step.items()):
+            msgs.append("    program step {}: {:.3%} of the usable segment".format(k + 1, f))
+        for s in life.sources.items():
+            msgs.append("    source {}: {}".format(*s))
+    if prog is not None:
+        try:
+            rep.feed_limits = step_feed_limits(station, run, expansion, robot, tools, prog, constants)
+        except ValueError as e:
+            msgs.append("SKIPPED feed limits: {}".format(e))
+        else:
+            for idx, sf in sorted(rep.feed_limits.items()):
+                msgs.append("  step {} feed limit: {}".format(idx + 1, sf.badge()))
+                msgs.append("    " + sf.limit.text().replace("\n", "\n    "))
     part_need = _missing(vals, ["E", "nu", "tensile_strength"])
     if part_need:
         msgs.append("SKIPPED part check: missing {}".format(", ".join(part_need)))

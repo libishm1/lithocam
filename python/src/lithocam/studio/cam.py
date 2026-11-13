@@ -199,7 +199,7 @@ def simplify(moves: List[Move], tol: float, ang_tol_deg: float = 0.5,
                 p = m0[1] + (m1[1] - m0[1]) * f
                 if len(m0) > 2 and len(m1) > 2:
                     a = m0[2] * (1 - f) + m1[2] * f
-                    res.append(("feed", p, a / np.linalg.norm(a)))
+                    res.append(("feed", p, a / np.linalg.norm(a)) + tuple(m1[3:]))   # per-point attributes carry on
                 else:
                     res.append(("feed", p))
             res.append(m1)
@@ -279,14 +279,153 @@ def _part_rect(lo, hi, R):
     return (lo[0] - R + _EDGE_INSET, hi[0] + R - _EDGE_INSET, lo[1] - R + _EDGE_INSET, hi[1] + R - _EDGE_INSET)
 
 
+# ------------------------------------------------------------------------------------------------------------------
+# Boundary: keep the passes inside an xy rectangle or polygon (a relief panel's border, not the slab sides)
+
+def parse_boundary(b):
+    """The boundary as a counter-clockwise polygon (n, 2) in mm, or None. Accepts None or "" (no boundary), a
+    rectangle written "xmin,ymin,xmax,ymax" (4 numbers), a polygon written "x,y; x,y; x,y" (3 or more points), a dict
+    with xmin, ymin, xmax, ymax, or an array: 4 numbers = rectangle, (n, 2) = polygon."""
+    if b is None:
+        return None
+    if isinstance(b, dict):
+        b = [b["xmin"], b["ymin"], b["xmax"], b["ymax"]]
+    if isinstance(b, str):
+        text = b.replace("\n", ";").strip()
+        if not text:
+            return None
+        if ";" in text:
+            pts = [[float(v) for v in s.split(",")] for s in text.split(";") if s.strip()]
+            if len(pts) < 3 or any(len(q) != 2 for q in pts):
+                raise ValueError("a boundary polygon needs at least 3 points written 'x,y; x,y; x,y' (mm)")
+            P = np.asarray(pts, dtype=float)
+        else:
+            v = [float(s) for s in text.split(",") if s.strip()]
+            if len(v) != 4:
+                raise ValueError("a boundary rectangle is 'xmin,ymin,xmax,ymax' (4 numbers, mm); a polygon is "
+                                 "'x,y; x,y; x,y'")
+            b = v
+    if not isinstance(b, str):
+        A = np.asarray(b, dtype=float)
+        if A.size == 0:
+            return None
+        if A.ndim == 1 and A.size == 4:
+            x0, y0, x1, y1 = (float(v) for v in A)
+            if not (x1 > x0 and y1 > y0):
+                raise ValueError("boundary rectangle needs xmax > xmin and ymax > ymin")
+            P = np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]])
+        elif A.ndim == 2 and A.shape[1] == 2 and len(A) >= 3:
+            P = A
+        else:
+            raise ValueError("a boundary is 4 numbers (rectangle) or at least 3 xy points (polygon)")
+    area = 0.5 * float(np.sum(P[:, 0] * np.roll(P[:, 1], -1) - np.roll(P[:, 0], -1) * P[:, 1]))
+    if abs(area) < 1e-9:
+        raise ValueError("the boundary has no area")
+    return P if area > 0 else P[::-1]
+
+
+def _in_poly(P: np.ndarray, x: float, y: float) -> bool:
+    inside = False
+    n = len(P)
+    for k in range(n):
+        x0, y0 = P[k]
+        x1, y1 = P[(k + 1) % n]
+        if (y0 > y) != (y1 > y) and x < x0 + (y - y0) * (x1 - x0) / (y1 - y0):
+            inside = not inside
+    return inside
+
+
+def boundary_rect(rect, poly):
+    """The zigzag rectangle (xmin, xmax, ymin, ymax) cut down to the boundary's bounding box."""
+    if poly is None:
+        return rect
+    lo, hi = poly.min(0), poly.max(0)
+    r = (max(rect[0], lo[0]), min(rect[1], hi[0]), max(rect[2], lo[1]), min(rect[3], hi[1]))
+    if not (r[1] > r[0] and r[3] > r[2]):
+        raise ValueError("the boundary lies outside the part: nothing to cut")
+    return r
+
+
+def clip_polyline(P: np.ndarray, poly, zfun=None) -> List[np.ndarray]:
+    """The parts of the polyline P (n, 3) inside the polygon `poly`, each with its ends on the boundary. A crossing
+    takes its z from `zfun(x, y)` when given, else linearly between the two points. poly None returns [P]."""
+    P = np.asarray(P, dtype=float)
+    if poly is None or len(P) == 0:
+        return [P] if len(P) else []
+    n = len(poly)
+    runs: List[List[np.ndarray]] = []
+    cur: List[np.ndarray] = []
+
+    def z_at(p, q, t):
+        xy = p[:2] + (q[:2] - p[:2]) * t
+        return float(zfun(xy[0], xy[1])) if zfun is not None else float(p[2] + (q[2] - p[2]) * t)
+
+    if len(P) == 1:
+        return [P] if _in_poly(poly, P[0, 0], P[0, 1]) else []
+    for a, b in zip(P[:-1], P[1:]):
+        ts = [0.0, 1.0]
+        d = b[:2] - a[:2]
+        for k in range(n):
+            e0, e1 = poly[k], poly[(k + 1) % n]
+            e = e1 - e0
+            den = d[0] * e[1] - d[1] * e[0]
+            if abs(den) < 1e-14:
+                continue
+            w = e0 - a[:2]
+            t = (w[0] * e[1] - w[1] * e[0]) / den
+            s = (w[0] * d[1] - w[1] * d[0]) / den
+            if 0.0 < t < 1.0 and -1e-12 <= s <= 1.0 + 1e-12:
+                ts.append(float(t))
+        ts = sorted(set(ts))
+        for t0, t1 in zip(ts[:-1], ts[1:]):
+            tm = 0.5 * (t0 + t1)
+            m = a[:2] + d * tm
+            if not _in_poly(poly, m[0], m[1]):
+                if cur:
+                    runs.append(cur)
+                    cur = []
+                continue
+            p0 = a + (b - a) * t0 if t0 > 0 else a.copy()
+            p1 = b.copy() if t1 >= 1.0 else a + (b - a) * t1
+            if t0 > 0:
+                p0[2] = z_at(a, b, t0)
+            if t1 < 1.0:
+                p1[2] = z_at(a, b, t1)
+            if not cur:
+                cur = [p0]
+            cur.append(p1)
+    if cur:
+        runs.append(cur)
+    return [np.array(r) for r in runs if len(r) >= 2]
+
+
+def clip_passes(passes: List[np.ndarray], poly, zfun=None) -> List[np.ndarray]:
+    if poly is None:
+        return passes
+    out: List[np.ndarray] = []
+    for ps in passes:
+        out += clip_polyline(ps, poly, zfun)
+    return out
+
+
 def raster(tris, mesh, tool, stock, stepover=2.0, scallop=0.0, allowance=0.0, tolerance=0.01, clearance=20.0,
-           **_) -> List[Move]:
+           boundary=None, **_) -> List[Move]:
+    """Zigzag finishing. boundary (see parse_boundary): the tool tip stays inside this xy rectangle or polygon, so the
+    passes stop at a panel's border instead of running down the stock sides."""
     R = tool.diameter / 2
     if scallop > 0 and tool.kind == lc.ToolKind.BallEndMill:
         stepover = min(stepover, lc.max_stepover(R, scallop)) if stepover > 0 else lc.max_stepover(R, scallop)
     lo, hi = tris.reshape(-1, 3).min(0), tris.reshape(-1, 3).max(0)
-    rect = _part_rect(lo, hi, R)
+    poly = parse_boundary(boundary)
+    rect = boundary_rect(_part_rect(lo, hi, R), poly)
     passes = _zigzag(tool, mesh, rect, max(stepover, 0.05), tolerance, lo[2])
+    if poly is not None:
+        cutter = lc.cutter_of(tool)
+
+        def zfun(x, y):
+            z = lc.drop_cutter(cutter, mesh, float(x), float(y))
+            return z if math.isfinite(z) else lo[2]
+        passes = clip_passes(passes, poly, zfun)
     passes = [p + np.array([0, 0, allowance]) for p in passes]
     return _link(passes, stock["zmax"] + clearance)
 
@@ -357,7 +496,7 @@ def _limit_axis_rate(A: np.ndarray, C: np.ndarray, rate: float) -> np.ndarray:
 
 
 def surfacing5(tris, mesh, tool, stock, stepover=2.0, lead=15.0, max_tilt=45.0, smooth=7, allowance=0.0,
-               tolerance=0.01, clearance=20.0, axis_rate=2.0, **_) -> List[Move]:
+               tolerance=0.01, clearance=20.0, axis_rate=2.0, boundary=None, **_) -> List[Move]:
     """Simultaneous 5-axis ball-end finishing. Moves are (kind, tip point mm, tool axis) in the setup frame; the
     axis points from the tip to the holder.
 
@@ -371,7 +510,8 @@ def surfacing5(tris, mesh, tool, stock, stepover=2.0, lead=15.0, max_tilt=45.0, 
     R = tool.diameter / 2
     cutter = lc.cutter_of(tool)
     lo, hi = tris.reshape(-1, 3).min(0), tris.reshape(-1, 3).max(0)
-    rect = _part_rect(lo, hi, R)
+    poly = parse_boundary(boundary)
+    rect = boundary_rect(_part_rect(lo, hi, R), poly)
     passes = _zigzag(tool, mesh, rect, max(stepover, 0.05), tolerance, lo[2])
     d = max(0.25, min(1.0, R / 4))
     floor = lo[2]
@@ -379,6 +519,7 @@ def surfacing5(tris, mesh, tool, stock, stepover=2.0, lead=15.0, max_tilt=45.0, 
     def h(x, y):
         z = lc.drop_cutter(cutter, mesh, float(x), float(y))
         return z if math.isfinite(z) else floor
+    passes = clip_passes(passes, poly, h)
 
     lam, tmax = math.radians(lead), math.radians(max_tilt)
     zax = np.array([0.0, 0.0, 1.0])
@@ -721,7 +862,7 @@ def _waterline_runs(fld: _Field, stepdown, tolerance, direction="climb", mask=No
 
 
 def waterline(tris, mesh, tool, stock, stepdown=1.0, allowance=0.0, tolerance=0.01, clearance=20.0,
-              min_slope_deg=0.0, overlap=0.0, direction="climb", cell=0.0, **_) -> List[Move]:
+              min_slope_deg=0.0, overlap=0.0, direction="climb", cell=0.0, boundary=None, **_) -> List[Move]:
     """Constant-Z finishing loops on the drop-cutter contour of every level from the part's top down to its floor,
     `stepdown` apart. min_slope_deg > 0 keeps only the parts of the loops on ground at least that steep (the steep
     region grown by `overlap` mm). direction: "climb" or "conventional" for a clockwise (M3) spindle."""
@@ -730,11 +871,22 @@ def waterline(tris, mesh, tool, stock, stepdown=1.0, allowance=0.0, tolerance=0.
     if min_slope_deg > 0:
         mask = _dilate(fld.steep_mask(float(min_slope_deg)), int(math.ceil(max(overlap, 0.0) / fld.cell)))
     runs = _waterline_runs(fld, stepdown, tolerance, direction, mask)
+    runs = _clip_runs(runs, parse_boundary(boundary))
     return _link(runs, stock["zmax"] + clearance)
 
 
+def _clip_runs(runs: List[np.ndarray], poly) -> List[np.ndarray]:
+    """Waterline and raster runs cut to the boundary. A closed loop that crosses it is opened at the crossings."""
+    if poly is None:
+        return runs
+    out: List[np.ndarray] = []
+    for r in runs:
+        out += clip_polyline(r, poly)
+    return out
+
+
 def steep_shallow_paths(tris, mesh, tool, stock, threshold_deg=40.0, overlap=1.0, stepover=2.0, stepdown=0.0,
-                        allowance=0.0, tolerance=0.01, direction="climb", cell=0.0, **_):
+                        allowance=0.0, tolerance=0.01, direction="climb", cell=0.0, boundary=None, **_):
     """The two families of steep / shallow finishing as tip runs: (waterline runs on steep ground, raster runs on
     shallow ground). Slope is that of the drop-cutter height field (for a ball, the part's slope at the contact).
     Each family covers its region grown by `overlap` mm, so the two overlap in a band 2 * overlap wide.
@@ -750,7 +902,8 @@ def steep_shallow_paths(tris, mesh, tool, stock, threshold_deg=40.0, overlap=1.0
     shallow = _dilate(~steep, k)
     R = tool.diameter / 2
     lo, hi = fld.lo, fld.hi
-    passes = lc.zigzag(fld.cutter, mesh, *_part_rect(lo, hi, R), max(stepover, 0.05),
+    poly = parse_boundary(boundary)
+    passes = lc.zigzag(fld.cutter, mesh, *boundary_rect(_part_rect(lo, hi, R), poly), max(stepover, 0.05),
                        _params(tolerance, lo[2], fld.cutter.radius))
     ra = []
     for ps in passes:
@@ -759,15 +912,17 @@ def steep_shallow_paths(tris, mesh, tool, stock, threshold_deg=40.0, overlap=1.0
         P = np.array([[c.x, c.y, c.z + fld.a] for c in ps])
         contact = np.array([bool(c.contact) for c in ps])
         ra += _runs(P, contact & fld.lookup(shallow, P[:, 0], P[:, 1]))
-    return wl, ra
+    return _clip_runs(wl, poly), _clip_runs(ra, poly)
 
 
 def steep_shallow(tris, mesh, tool, stock, threshold_deg=40.0, overlap=1.0, stepover=2.0, stepdown=0.0,
-                  allowance=0.0, tolerance=0.01, clearance=20.0, direction="climb", cell=0.0, **_) -> List[Move]:
+                  allowance=0.0, tolerance=0.01, clearance=20.0, direction="climb", cell=0.0, boundary=None,
+                  **_) -> List[Move]:
     """Steep / shallow finishing: waterline loops on ground steeper than `threshold_deg`, raster along x on the
-    rest, with an `overlap` mm band cut by both. Waterline first, then raster."""
+    rest, with an `overlap` mm band cut by both. Waterline first, then raster. boundary (see parse_boundary): the
+    tool tip stays inside this xy rectangle or polygon."""
     wl, ra = steep_shallow_paths(tris, mesh, tool, stock, threshold_deg, overlap, stepover, stepdown, allowance,
-                                 tolerance, direction, cell)
+                                 tolerance, direction, cell, boundary=boundary)
     return _link(wl + ra, stock["zmax"] + clearance)
 
 
@@ -780,7 +935,7 @@ def path_length(moves: List[Move]) -> Tuple[float, float]:
     feed = rapid = 0.0
     for (k0, p0, *_), (k1, p1, *_) in zip(moves, moves[1:]):
         d = float(np.linalg.norm(p1 - p0))
-        if k1 == "feed" and k0 in ("feed", "plunge") or k1 == "plunge":
+        if k1 in ("tap_in", "tap_out") or k1 == "feed" and k0 in ("feed", "plunge") or k1 == "plunge":
             feed += d
         else:
             rapid += d
@@ -805,3 +960,8 @@ def zmap_check(tris, mesh, tool, moves: List[Move], stock, cell: float = 1.0):
     target = lc.target_heights(mesh, zm)
     lo, hi = tris.reshape(-1, 3).min(0), tris.reshape(-1, 3).max(0)
     return lc.deviation(zm, target, lo[0], hi[0], lo[1], hi[1]), zm
+
+
+# The hole cycles, rest machining, pencil and adaptive raster live in ops.py and register themselves here. Imported
+# last: ops imports this module, and when ops is imported first it updates GENERATORS itself.
+from . import ops as _ops  # noqa: E402,F401

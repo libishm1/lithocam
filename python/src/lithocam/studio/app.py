@@ -466,6 +466,7 @@ class RobotPanel(QWidget):
 class Properties(QWidget):
     edited = Signal()
     teach_into = Signal(object, str)   # step, param key
+    table_mode_changed = Signal(str)   # the station's table driven mode: operator, e1, io
 
     def __init__(self):
         super().__init__()
@@ -569,13 +570,29 @@ class Properties(QWidget):
         for k, axis in enumerate(("roll", "pitch", "yaw")):
             self.form.addRow("Work frame {} (deg)".format(axis),
                              spin(st.work_rpy[k], -360, 360, 2, lambda v, k=k: st.work_rpy.__setitem__(k, v)))
-        from .. import cutting_data
-        mats = sorted({e.material for e in cutting_data.TABLE})
+        from .. import cutting_data, materials
+        mats = materials.available()
+        have = {e.material for e in cutting_data.TABLE}
         mc = QComboBox()
-        mc.addItems(mats if st.material in mats else mats + [st.material])
-        mc.setCurrentText(st.material)
-        mc.currentTextChanged.connect(lambda t: (setattr(st, "material", t), on_change()))
-        mc.setToolTip("Cutting data (feeds, speeds, wire sawing rate) are looked up for this material")
+        for n in mats:
+            mc.addItem(n if n in have else n + "   (no cutting data)", n)
+        if st.material not in mats:
+            mc.addItem(st.material, st.material)
+        mc.setCurrentIndex(max(0, mc.findData(st.material)))
+
+        def mat_tip(name):
+            try:
+                return ("Cutting data (feeds, speeds, wire sawing rate) are looked up for this material.\n"
+                        "Which quantities are sourced (lithocam.materials.report):\n" + materials.report([name]))
+            except KeyError as e:
+                return "No sourced row for '{}': {}".format(name, e)
+
+        def pick_material(_):
+            st.material = mc.currentData()
+            mc.setToolTip(mat_tip(st.material))
+            on_change()
+        mc.setToolTip(mat_tip(st.material))
+        mc.currentIndexChanged.connect(pick_material)
         self.form.addRow("Material", mc)
         self.form.addRow("Robot feed factor", spin(st.robot_factor, 0.01, 2.0, 2,
                                                    lambda v: setattr(st, "robot_factor", v)))
@@ -586,6 +603,7 @@ class Properties(QWidget):
         if st.turntable:
             self.form.addRow("Turntable diameter (m)", spin(st.turntable.get("diameter", 0.8), 0.05, 5, 3,
                                                             lambda v: st.turntable.__setitem__("diameter", v)))
+            self._table_fields(st, on_change, spin)
         # cell I/O: how the controller switches the spindle, water, wire motor and tool change
         io = QComboBox()
         io.addItem("None (posted as comments, with a warning)", "")
@@ -627,6 +645,72 @@ class Properties(QWidget):
             gm.currentIndexChanged.connect(pick_gm)
             gm.setToolTip("Machine definition used when posting ISO G-code (docs/POSTPROCESSORS.md)")
             self.form.addRow("G-code machine", gm)
+
+    def _table_fields(self, st, on_change, spin):
+        """Who turns the table (operator, E1 or PLC I/O) and the E1 axis values. E1 is a coordinated external axis of
+        a KUKA or ABB controller: it is disabled for a cell that cannot post it, with the reason."""
+        ts = program.table_settings(st.turntable)
+        dc = QComboBox()
+        for key, label in (("operator", "Operator (the program stops)"), ("e1", "E1 (coordinated external axis)"),
+                           ("io", "PLC through I/O (cell I/O request and done)")):
+            dc.addItem(label, key)
+        probe = program.Station(robot=st.robot, turntable={"driven": "e1"})
+        why = program.check_table(probe)[1]
+        e1_ok = not why
+        it = dc.model().item(1)
+        if not e1_ok:
+            it.setEnabled(False)
+            it.setToolTip(why[0])
+        dc.setCurrentIndex(max(0, dc.findData(ts["driven"])))
+        dc.setToolTip("Operator: the program stops while the operator turns the table.\n"
+                      "E1: the table is an external axis of the controller, moved together with the arm.\n"
+                      "PLC I/O: a request output and a done input of the cell I/O.\n"
+                      + ("" if e1_ok else "E1 is not available here: " + why[0]))
+        self.form.addRow("Table driven by", dc)
+        status = QLabel()
+        status.setWordWrap(True)
+        e1_rows = []
+
+        def show_status():
+            mode, errs, warns = program.check_table(st)
+            lines = ["<span style='color:#c0392b'>{}</span>".format(e) for e in errs] + \
+                    ["<span style='color:#b8860b'>{}</span>".format(w) for w in warns]
+            status.setText("<br>".join(lines))
+            for w in e1_rows:
+                w.setEnabled(ts_mode() == "e1")
+
+        def ts_mode():
+            return str(st.turntable.get("driven", "operator") or "operator")
+
+        def pick(_):
+            st.turntable["driven"] = dc.currentData()
+            show_status()
+            on_change()
+            self.table_mode_changed.emit(dc.currentData())
+        dc.currentIndexChanged.connect(pick)
+        ph = set(ts["placeholders"])
+
+        def field(label, key, val, lo, hi, dec, to_store):
+            mark = "  [placeholder]" if key in ph else ""
+            w = spin(val, lo, hi, dec, to_store)
+            w.setToolTip("PLACEHOLDER: no value comes from a real table; set it for your cell." if key in ph else
+                         "Set for your cell")
+            self.form.addRow(label + mark, w)
+            e1_rows.append(w)
+        lo_, hi_ = ts["e1_limits_deg"]
+
+        def set_limit(k, v):
+            cur = list(program.table_settings(st.turntable)["e1_limits_deg"])
+            cur[k] = v
+            st.turntable["e1_limits_deg"] = cur
+        field("E1 travel, low (deg)", "e1_limits_deg", lo_, -3600, 3600, 1, lambda v: set_limit(0, v))
+        field("E1 travel, high (deg)", "e1_limits_deg", hi_, -3600, 3600, 1, lambda v: set_limit(1, v))
+        field("E1 speed (deg/s)", "e1_speed_deg_s", ts["e1_speed_deg_s"], 0.1, 3600, 1,
+              lambda v: st.turntable.__setitem__("e1_speed_deg_s", v))
+        field("E1 largest step per ruling (deg)", "e1_max_step_deg", ts["e1_max_step_deg"], 0.1, 360, 1,
+              lambda v: st.turntable.__setitem__("e1_max_step_deg", v))
+        self.form.addRow(status)
+        show_status()
 
     def _tool_row(self, spec, key, label):
         w = QComboBox()
@@ -703,16 +787,16 @@ class ProcessWorker(QObject):
     done = Signal(int, object, object)   # generation, ProcessReport, error text
     progress = Signal(str)
 
-    def __init__(self, gen, station, robot, run, expansion, tools, constants):
+    def __init__(self, gen, station, robot, run, expansion, tools, constants, prog=None):
         super().__init__()
         self.gen = gen
-        self.args = (station, run, expansion, robot, tools, constants)
+        self.args = (station, run, expansion, robot, tools, constants, prog)
 
     def run(self):
         try:
             from . import process
-            st, run, ex, robot, tools, c = self.args
-            rep = process.process_check(st, run, ex, robot, tools, c, progress=self.progress.emit)
+            st, run, ex, robot, tools, c, prog = self.args
+            rep = process.process_check(st, run, ex, robot, tools, c, progress=self.progress.emit, prog=prog)
             self.done.emit(self.gen, rep, None)
         except Exception:   # noqa: BLE001
             self.done.emit(self.gen, None, traceback.format_exc())
@@ -810,6 +894,8 @@ class Studio(QMainWindow):
         self._after_stock = None         # callable run once the stock run is in (batch modes, process check)
         self._after_process = None
         self._constants_given = {}       # the dialog's last entries
+        self.step_feeds = {}             # id(Step) -> process.StepFeed of the current stock run
+        self._yaw = 0.0                  # table angle the 3D view shows (radians)
         self.gcode_machine = ""          # milling machine definition for the G-code post ("" = generic 3-axis)
 
         # centre: view + simulation bar
@@ -869,6 +955,7 @@ class Studio(QMainWindow):
         self.props = Properties()
         self.props.edited.connect(self._step_edited)
         self.props.teach_into.connect(self._teach_into)
+        self.props.table_mode_changed.connect(self._table_mode_changed)
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.output = QPlainTextEdit()
@@ -1062,7 +1149,7 @@ class Studio(QMainWindow):
 
     DIALECT_NAMES = {"urscript": "Universal Robots URScript", "krl": "KUKA KRL", "rapid": "ABB RAPID",
                      "gcode": "ISO G-code (CNC machine file)", "cl": "Neutral CL (test)"}
-    GENERATING = {"wire_ruled", "disc_cut", "disc_comb"}
+    GENERATING = {"wire_ruled", "disc_cut", "disc_comb", "disc_ruled", "polish"}
 
     def _ready(self, spec) -> bool:
         """An operation that produces motion or a real record (not only a comment)."""
@@ -1267,10 +1354,17 @@ class Studio(QMainWindow):
                 si.setData(0, ROLE, s)
                 si.setIcon(0, step_icon(s.spec))
                 why = self._feed_missing(s)
+                sf = self.step_feeds.get(id(s))
                 if why:                                            # visible before Generate
                     si.setForeground(0, QBrush(QColor("#e0a020")))
                     si.setText(0, s.title() + "   (no feed)")
                     si.setToolTip(0, why)
+                elif sf is not None:                               # the stock run exists: the feed against its limit
+                    over = sf.limit.feed is not None and sf.programmed > sf.limit.feed
+                    si.setText(0, "{}   [{}]".format(s.title(), sf.badge()))
+                    si.setForeground(0, QBrush(QColor("#e0a020" if over else "#4caf50" if sf.limit.feed else
+                                                      "#9e9e9e")))
+                    si.setToolTip(0, sf.tooltip())
                 if s is select:
                     sel_item = si
             pi.setExpanded(True)
@@ -1322,7 +1416,8 @@ class Studio(QMainWindow):
                     tool_now = s.params["tool"]
         if spec.tool_family and spec.tool_family != "any":
             fits = [t.id for t in self.tool_lib if spec.tool_family in lc.tool_operations(t.kind) and
-                    (lc.has_cutter(t) or sid not in cam.GENERATORS)]
+                    (lc.has_cutter(t) or sid not in cam.GENERATORS or
+                                                                          sid in catalog.NO_CUTTER_MODEL)]
             if tool_now in fits:
                 step.params["tool"] = tool_now
             elif fits:
@@ -1500,8 +1595,10 @@ class Studio(QMainWindow):
 
     def _feed_missing(self, s) -> str:
         """Why a cutting step would be refused at post time for lack of a feed ('' when a feed exists)."""
-        if s.kind not in cam.GENERATORS and s.kind not in ("disc_cut", "disc_comb"):
+        if s.kind not in cam.GENERATORS and s.kind not in ("disc_cut", "disc_comb", "disc_ruled"):
             return ""
+        if s.kind == "tap":
+            return ""                                  # the tap feed is pitch x rpm, set in the move
         if float(s.params.get("feed") or 0) > 0:
             return ""
         t = self._tools().get(str(s.params.get("tool") or ""))
@@ -1519,6 +1616,14 @@ class Studio(QMainWindow):
             pass
         return ("No feed: the step, tool {} and the cutting data for {} give none. Set the step's feed; "
                 "posting is refused until then.".format(t.id, self.station.material))
+
+    def _table_mode_changed(self, mode):
+        """The table is driven differently: the planning model (the collision backend with or without a table joint)
+        is built again on the next simulation, so the present expansion is stale."""
+        self.say("Table driven by '{}': simulate again; the collision backend is rebuilt from the station".format(mode))
+        self._posted_key = None
+        self._clear_stock()
+        self._update_checklist()
 
     def _station_edited(self):
         self._refresh_scene()
@@ -1922,14 +2027,31 @@ class Studio(QMainWindow):
             self._mount(self._tools().get(seg.tool))
             robot.tcp_offset = seg.tcp_offset
             self.sim_label.setToolTip(seg.label)
-            if abs(seg.yaw - getattr(self, "_yaw", 0.0)) > 1e-9:   # the turntable turns the part
-                self._yaw = seg.yaw
-                self._refresh_scene()
+        self._turn_part(k, i)
         self.robot_panel.set_q(q, emit=False)
         self.view.update_robot(robot.link_transforms(q), robot.tcp(q))
         self.sim_label.setText("{}/{}".format(i + 1, len(self.sim_q)))
         self.traj.set_cursor(i)
         self._show_stock(i)
+
+    def _turn_part(self, k: int, i: int):
+        """Turn the part with the table to the angle of sample i: Segment.e1 holds it per sample (it changes within a
+        segment when the table is driven as E1), else the segment's yaw."""
+        segs = self.expansion.segments
+        if k >= len(segs):
+            return
+        seg = segs[k]
+        j = i - (int(self.sim_seg_end[k - 1]) if k > 0 else 0)
+        e = float(seg.e1[j]) if seg.e1 is not None and 0 <= j < len(seg.e1) else float(seg.yaw)
+        if abs(e - getattr(self, "_yaw", 0.0)) > 1e-9:
+            self._yaw = e
+            W = self._scene_work()
+            self.view.set_part(self.part_tris, W)
+            self.view.set_stock(self.station.stock, W)
+            self.view.set_table(self.station.turntable, W)
+            self.robot_panel.work = W
+            if getattr(self, "stock_run", None) is not None:
+                self._show_stock(i, force=True)
 
     def _stop(self):
         self.btn_play.setChecked(False)
@@ -1974,14 +2096,29 @@ class Studio(QMainWindow):
                                                "PASS" if same else "FAIL", chk.matched, chk.n, chk.max_tip_err,
                                                chk.max_axis_err))
         else:
-            text = post.write(self.expansion.records, dialect, **program.post_options(self.station.robot, dialect))
+            try:
+                text = post.write(self.expansion.records, dialect,
+                                  **program.post_options(self.station.robot, dialect))
+            except ValueError as e:
+                self.say("Not posted ({}): {}".format(dialect, e))
+                self.output.setPlainText("; not posted: {}\n".format(e))
+                return
             self.output.setPlainText(text)
             back = post.joint_targets(text, dialect)
             rec_q = [r.data["q"] for r in self.expansion.records if r.kind in ("movej", "movel")]
             same = len(back) == len(rec_q) and (not back or np.max(np.abs(np.asarray(back) -
                                                                          np.asarray(rec_q))) < 1e-5)
-            self.say("Posted {} lines ({}); read-back check: {}".format(text.count("\n"), dialect,
-                                                                          "PASS" if same else "FAIL"))
+            e1_note = ""
+            want_e1 = [r.data.get("e1") for r in self.expansion.records if r.kind in ("movej", "movel")]
+            if any(v is not None for v in want_e1):           # the table is a coordinated axis: read E1 back too
+                got_e1 = post.external_axes(text, dialect)
+                e1_same = len(got_e1) == len(want_e1) and all(
+                    (g is None) == (w is None) and (g is None or abs(g - w) < 1e-3) for g, w in zip(got_e1, want_e1))
+                same = same and e1_same
+                e1_note = "; E1 read-back {} ({} values)".format("PASS" if e1_same else "FAIL",
+                                                                  sum(v is not None for v in got_e1))
+            self.say("Posted {} lines ({}); read-back check: {}{}".format(text.count("\n"), dialect,
+                                                                            "PASS" if same else "FAIL", e1_note))
         if show_only:
             return
         if same:
@@ -2004,9 +2141,12 @@ class Studio(QMainWindow):
                     tool = tools[s.params["tool"]]
                     if not lc.has_cutter(tool):
                         continue
-                    params = dict(catalog.default_params(s.spec), **s.params)
-                    params.pop("tool", None)
-                    moves = cam.GENERATORS[s.kind](tris, mesh, tool, self.station.stock, **params)
+                    params = program._gen_params(s.kind, dict(catalog.default_params(s.spec), **s.params))
+                    try:
+                        moves = cam.GENERATORS[s.kind](tris, mesh, tool, self.station.stock, **params)
+                    except Exception as e:   # noqa: BLE001 - e.g. rest machining needs the previous tool
+                        self.say("Z-map {} / {}: not checked ({})".format(p.name, s.title(), e))
+                        continue
                     stats, _ = cam.zmap_check(tris, mesh, tool, moves, self.station.stock, 1.0)
                     self.say("Z-map {} / {}: leftover max {:.3f} mm, gouge {:.3f} mm over {} cells".format(
                         p.name, s.title(), stats.max_dev, -min(0.0, stats.min_dev), stats.cells))
@@ -2018,6 +2158,9 @@ class Studio(QMainWindow):
         self.stock_run = None
         self.process_report = None
         self._stock_shown = None
+        if self.step_feeds:
+            self.step_feeds = {}
+            self._rebuild_tree()
         self.view.set_stock_mesh(None, None, np.eye(4))
         self.view.show_part(True)
         self.view.show_path(True)
@@ -2065,12 +2208,31 @@ class Studio(QMainWindow):
         self.stock_run = run
         for m in run.messages:
             self.say("  " + m)
+        self._update_step_feeds()
         self._stock_shown = None
         if self.stock_box.isChecked():
             self._show_stock(self.sim.value(), force=True)
         cb, self._after_stock = self._after_stock, None
         if cb is not None:
             cb()
+
+    def _update_step_feeds(self, feeds=None):
+        """Feed-limit badges in the tree: from a process report, or from the stock run with the sourced constants."""
+        self.step_feeds = {}
+        prog = getattr(self, "_expanded_prog", None)
+        if prog is None or self.stock_run is None or self.expansion is None:
+            return
+        try:
+            if feeds is None:
+                from . import process
+                feeds = process.step_feed_limits(self.station, self.stock_run, self.expansion, self.robot, self._tools(),
+                                                 prog, self._constants_given)
+            for idx, sf in feeds.items():
+                if idx < len(prog.steps):
+                    self.step_feeds[id(prog.steps[idx])] = sf
+        except Exception as e:   # noqa: BLE001 - the badges are advisory
+            self.say("Feed limits not shown: {}".format(e))
+        self._rebuild_tree()
 
     def _show_stock(self, i, force=False):
         """The latest stock snapshot at or before sample i; stress colours on the final one after a process check."""
@@ -2116,7 +2278,8 @@ class Studio(QMainWindow):
         self.say("Process check ...")
         th = QThread(self)
         wk = ProcessWorker(self._stock_gen, copy.deepcopy(self.station), program.load_robot(self.station.robot),
-                           self.stock_run, self.expansion, self._tools(), given)
+                           self.stock_run, self.expansion, self._tools(), given,
+                           copy.deepcopy(getattr(self, "_expanded_prog", None)))
         wk.moveToThread(th)
         th.started.connect(wk.run)
         wk.progress.connect(self._progress)
@@ -2133,6 +2296,8 @@ class Studio(QMainWindow):
         if gen != self._stock_gen:
             return
         self.process_report = rep
+        if rep.feed_limits:
+            self._update_step_feeds(rep.feed_limits)
         text = rep.text()
         self.say(text)
         self.process_text.setPlainText(text)
