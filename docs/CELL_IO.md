@@ -18,11 +18,11 @@ The studio expansion (`studio.program.expand`) emits these records. The robot wr
 | Record | Data | Emitted |
 |---|---|---|
 | `tool_change` | `id`, `mode` (`none`, `manual`, `changer`) | when the mounted tool changes, the first tool included; before the `tool` record |
-| `spindle` | `rpm`, `on` | on before the first cut of a milling or disc step; a new record when the speed changes; off before a tool change, a table turn and the program end |
+| `spindle` | `rpm`, `on`, `reverse` (optional) | on before the first cut of a milling or disc step; a new record when the speed changes; off before a tool change, a table turn and the program end. `reverse: true` is the way out of a tapped hole: see "Spindle reverse" |
 | `wire` | `on` | wire saw motor on before the first cut of a wire step; off as for the spindle |
 | `water` | `on` | on with the spindle or wire motor; off with them |
 | `air` | `on` | available to programs; the expansion does not emit it yet |
-| `dwell` | `seconds` | available to programs; the spin-up dwell comes from the cell I/O at post time |
+| `dwell` | `seconds` | a timed stop with no motion: the dwell at the bottom of a hole (drill, core drill, tap). The spin-up dwell comes from the cell I/O at post time |
 | `io_map` | `path`, `io` | right after `start` when the station names a cell I/O file |
 
 The mode on a `tool_change` record is the cell's mode at expansion time (`manual` without a cell I/O).
@@ -56,6 +56,19 @@ Actions and their statements:
 | `{"dwell": s}` | `sleep(s)` | `WAIT SEC s` | `WaitTime s;` | `G4 P s` |
 
 Templates may use `{rpm}`, `{tool}` and `{pocket}`.
+
+### Spindle reverse (tapping)
+
+A tap steps out with the spindle reversed. The spindle section takes an optional `reverse` object:
+`"reverse": {"start": [actions], "stop": [actions]}`. `start` runs the spindle in reverse (the forward `stop` actions
+run first, the speed output is set as for a forward start); `stop` ends the reverse run (default: the spindle's `stop`
+actions). The next forward record stops the reverse run and starts the spindle forward again.
+
+- Robot posts (URScript, KRL, RAPID) refuse a `spindle` record with `reverse` unless the cell I/O defines `reverse.start`.
+  The refusal is a `ValueError` whose text names the missing output. No value is shipped: the placeholder files have no
+  `reverse` key.
+- G-code posts `M4 S<rpm>` for the reverse run and `M3 S<rpm>` for the next forward run, whatever the cell I/O says.
+  A controller with rigid tapping can fold the pair into `G84` by hand; the post does not.
 
 Speed outputs:
 

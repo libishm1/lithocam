@@ -208,6 +208,8 @@ CELLS = {"kr120": dict(work=[1.10, -0.30, 0.7], home=[0.0, -90.0, 90.0, 0.0, 28.
                        rough_stepover=6.0, flat_feed=(800.0, 8000.0), rough_feed=(600.0, 8000.0))}
 
 STOCK_TOP = 3.0   # mm of sawn stock above the relief's highest point, removed by the face step
+# the finishing passes stay inside the panel (xmin,ymin,xmax,ymax mm), not down the slab sides
+PANEL = "0,0,{:g},{:g}".format(WIDTH_MM, WIDTH_MM)
 
 
 def station(robot, stock_top=STOCK_TOP):
@@ -232,11 +234,13 @@ def station(robot, stock_top=STOCK_TOP):
                                            "clearance": 10.0},
          "label": "Rough {} z-levels, 1 mm allowance (example feed)".format(flat)},
         {"kind": "steep_shallow", "params": {"tool": "B8", "threshold_deg": 40.0, "overlap": 1.0, "stepover": 2.0,
-                                             "allowance": 0.2, "feed": 1500.0, "rpm": 10000.0, "clearance": 10.0},
-         "label": "Semi-finish B8 steep / shallow, 0.2 mm allowance (example feed)"},
+                                             "allowance": 0.2, "feed": 1500.0, "rpm": 10000.0, "clearance": 10.0,
+                                             "boundary": PANEL},
+         "label": "Semi-finish B8 steep / shallow, 0.2 mm allowance, inside the panel border (example feed)"},
         {"kind": "surfacing5", "params": {"tool": "B6", "stepover": 1.5, "lead": 15.0, "max_tilt": 30.0,
-                                          "tolerance": 0.02, "feed": 1200.0, "rpm": 12000.0, "clearance": 10.0},
-         "label": "Finish B6 5-axis, lead 15 deg (example feed)"},
+                                          "tolerance": 0.02, "feed": 1200.0, "rpm": 12000.0, "clearance": 10.0,
+                                          "boundary": PANEL},
+         "label": "Finish B6 5-axis, lead 15 deg, inside the panel border (example feed)"},
         {"kind": "movej", "params": {"joints": c["home"], "speed": 50.0}, "label": "Home"},
     ]
     return {"robot": robot, "work_xyz": c["work"], "work_rpy": [0.0, 0.0, 0.0],

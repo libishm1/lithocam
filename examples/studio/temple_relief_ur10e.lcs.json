@@ -22,8 +22,8 @@
     {"kind": "setup", "params": {"stock_margin": 0.0, "yaw": 0.0, "tilt": 0.0}, "label": "Setup top"},
     {"kind": "face", "params": {"tool": "R12", "depth": 3.0, "stepover": 0.0, "feed": 800.0, "rpm": 8000.0, "clearance": 10.0}, "label": "Face the sawn top R12 (example feed)"},
     {"kind": "rough_plane", "params": {"tool": "R12", "stepdown": 4.0, "stepover": 6.0, "allowance": 1.0, "feed": 600.0, "rpm": 8000.0, "clearance": 10.0}, "label": "Rough R12 z-levels, 1 mm allowance (example feed)"},
-    {"kind": "steep_shallow", "params": {"tool": "B8", "threshold_deg": 40.0, "overlap": 1.0, "stepover": 2.0, "allowance": 0.2, "feed": 1500.0, "rpm": 10000.0, "clearance": 10.0}, "label": "Semi-finish B8 steep / shallow, 0.2 mm allowance (example feed)"},
-    {"kind": "surfacing5", "params": {"tool": "B6", "stepover": 1.5, "lead": 15.0, "max_tilt": 30.0, "tolerance": 0.02, "feed": 1200.0, "rpm": 12000.0, "clearance": 10.0}, "label": "Finish B6 5-axis, lead 15 deg (example feed)"},
+    {"kind": "steep_shallow", "params": {"tool": "B8", "threshold_deg": 40.0, "overlap": 1.0, "stepover": 2.0, "allowance": 0.2, "feed": 1500.0, "rpm": 10000.0, "clearance": 10.0, "boundary": "0,0,600,600"}, "label": "Semi-finish B8 steep / shallow, 0.2 mm allowance, inside the panel border (example feed)"},
+    {"kind": "surfacing5", "params": {"tool": "B6", "stepover": 1.5, "lead": 15.0, "max_tilt": 30.0, "tolerance": 0.02, "feed": 1200.0, "rpm": 12000.0, "clearance": 10.0, "boundary": "0,0,600,600"}, "label": "Finish B6 5-axis, lead 15 deg, inside the panel border (example feed)"},
     {"kind": "movej", "params": {"joints": [0.0, -90.0, 90.0, -90.0, -90.0, 0.0], "speed": 50.0}, "label": "Home"}
    ]
   }
