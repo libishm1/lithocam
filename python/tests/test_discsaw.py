@@ -294,3 +294,179 @@ def test_json_roundtrip():
     assert json.loads(text)["format"] == "lithocam.discsaw.v1"
     back = ds.load(text)
     assert back == cuts
+
+
+# ---------------------------------------------------------------- ruled faces (T7)
+from pathlib import Path
+from types import SimpleNamespace as NS
+
+RULED = Path(__file__).parent / "data" / "ruled_json"
+
+
+def hypar_face(c, X=100.0, Z=100.0, n=9):
+    """Horizontal rulings z = const of the surface y = x z / c, outward normal +y. The middle ruling (z = 0) has
+    the tangent plane turning about it by atan(x / c): spread 2 atan(X / c)."""
+    rs = []
+    for z in np.linspace(-Z, Z, n):
+        nm = np.array([-z / c, 1.0, 0.0])
+        rs.append(NS(p0=[-X, -X * z / c, z], p1=[X, X * z / c, z], normal=list(nm / np.linalg.norm(nm)),
+                     tool_free=[True, True]))
+    return NS(rulings=rs)
+
+
+def plane_face(n=5, length=300.0, pitch=40.0):
+    return NS(rulings=[NS(p0=[0.0, 0.0, -k * pitch], p1=[length, 0.0, -k * pitch], normal=[0.0, 1.0, 0.0],
+                          tool_free=[True, True]) for k in range(n)])
+
+
+BIG = dict(blade_diameter=1000.0, flange_diameter=100.0)        # flange limit 449 mm, never binds in the hypar tests
+
+
+def test_plane_all_rulings_cuttable_at_full_depth():
+    f = plane_face()
+    rep = ds.ruled_disc_feasibility(f, blade_diameter=350.0, flange_diameter=100.0, tol=0.1)
+    full = ds.max_cut_depth(175.0, 50.0, 1.0, 0.0)
+    assert rep.all_cuttable and rep.n_cuttable == 5
+    assert rep.max_depth == pytest.approx(full)                      # 124 mm: set by the flange only
+    for r in rep.rulings:
+        assert r.twist_deg == pytest.approx(0.0, abs=1e-9)
+        assert math.isinf(r.curvature_depth)
+        assert r.bevel_deg == pytest.approx(0.0, abs=1e-6) and r.tilt_deg == pytest.approx(0.0, abs=1e-6)
+    cuts = ds.ruled_disc_cuts(f, blade_diameter=350.0, flange_diameter=100.0, kerf=3.2, stepdown=31.0, tol=0.1)
+    assert len(cuts) == 5 * 4 and all(c.kind == "ruling" for c in cuts)
+    chk = ds.ruled_blade_intrudes(cuts, f)
+    print("plane intrusion", chk.max_intrusion, "excess", chk.max_excess)
+    assert chk.max_intrusion <= 1e-9 and chk.max_excess <= 1e-9
+    for c in cuts:                                                   # the part-side face holds the ruling line
+        N, T = np.asarray(c.normal), np.asarray(c.direction)
+        g = np.cross(T, N)
+        assert abs(N @ T) < 1e-12 and g[2] == pytest.approx(-1.0)
+        low = np.asarray(c.start) + c.radius * g
+        assert low[2] == pytest.approx(-40.0 * c.edge - c.depth)     # lowest point depth below the ruling
+        assert (np.asarray(c.start) - 0.5 * c.kerf * N)[1] == pytest.approx(0.0, abs=1e-9)   # face plane y = 0
+
+
+def test_plane_full_depth_request_beyond_flange_refused():
+    rep = ds.ruled_disc_feasibility(plane_face(), blade_diameter=350.0, flange_diameter=100.0, tol=0.1, depth=130.0)
+    assert not rep.all_cuttable and "flange" in rep.rulings[0].reason
+
+
+@pytest.mark.parametrize("c", [600.0, 300.0, 150.0])
+def test_hypar_depth_falls_with_twist_as_derived(c):
+    tol = 0.5
+    rep = ds.ruled_disc_feasibility(hypar_face(c), tol=tol, **BIG)
+    mid = [r for r in rep.rulings if r.index == 4][0]
+    S = 2.0 * math.atan(100.0 / c)                                    # twist spread of the middle ruling
+    D = tol / math.tan(S)                                             # curvature depth, intrusion_tol = 0
+    print("hypar c", c, "twist deg", mid.twist_deg, "depth", mid.max_depth, "derived", D)
+    assert math.radians(mid.twist_deg) == pytest.approx(S, rel=1e-6)
+    assert mid.curvature_depth == pytest.approx(D, rel=1e-6)
+    assert mid.max_depth == pytest.approx(D, rel=1e-3)                # the sheet check agrees at this depth
+    assert mid.cuttable
+
+
+def test_hypar_depth_decreases_monotonically_and_dies_beyond_90_degrees():
+    ds_ = [ds.ruled_disc_feasibility(hypar_face(c), tol=0.5, **BIG).max_depth for c in (1200.0, 600.0, 300.0, 150.0)]
+    assert all(a > b for a, b in zip(ds_, ds_[1:]))
+    rep = ds.ruled_disc_feasibility(hypar_face(75.0), tol=0.5, **BIG)      # middle spread 106 deg: no depth works
+    assert not rep.all_cuttable and not rep.rulings[4].cuttable and rep.rulings[4].max_depth == 0.0
+
+
+def test_hypar_intrusion_tolerance_raises_depth_at_equal_tol():
+    S = 2.0 * math.atan(100.0 / 300.0)
+    a = ds.ruled_disc_feasibility(hypar_face(300.0), tol=0.5, **BIG).rulings[4]
+    b = ds.ruled_disc_feasibility(hypar_face(300.0), tol=0.5, intrusion_tol=0.5, **BIG).rulings[4]
+    assert a.curvature_depth == pytest.approx(0.5 / math.tan(S))
+    assert b.curvature_depth == pytest.approx(0.5 / math.tan(S / 2))
+
+
+def test_hypar_tilt_range_at_shallower_depth():
+    c, tol = 300.0, 0.5
+    S = 2.0 * math.atan(100.0 / c)
+    D = 0.9 * tol / math.tan(S)                                       # 90 percent of the curvature depth
+    r = ds.ruled_disc_feasibility(hypar_face(c), tol=tol, depth=D, **BIG).rulings[4]
+    width = math.degrees(math.atan(tol / D) - S)
+    assert r.cuttable
+    assert r.tilt_max_deg - r.tilt_min_deg == pytest.approx(width, rel=1e-6)
+    assert r.tilt_deg == pytest.approx(0.5 * (r.tilt_min_deg + r.tilt_max_deg), abs=0.05)
+    assert r.tilt_min_deg <= r.tilt_deg <= r.tilt_max_deg
+
+
+def rotate_cut_about_ruling(c, ang_deg):
+    """The same cut with its blade plane turned about the ruling line (a deliberately wrong posture)."""
+    from dataclasses import replace
+    T, N = np.asarray(c.direction), np.asarray(c.normal)
+    g = np.cross(T, N)
+    a = math.radians(ang_deg)
+
+    def rot(v):
+        return v * math.cos(a) + np.cross(T, v) * math.sin(a) + T * (T @ v) * (1 - math.cos(a))
+    base = np.asarray(c.start) + (c.radius - c.depth) * g - 0.5 * c.kerf * N
+
+    def pt(p):
+        return tuple(base + rot(np.asarray(p) - base))
+    return replace(c, normal=tuple(rot(N)), start=pt(c.start), end=pt(c.end), lead_in=pt(c.lead_in),
+                   lead_out=pt(c.lead_out))
+
+
+@pytest.mark.parametrize("c", [600.0, 300.0])
+def test_hypar_generated_passes_do_not_intrude(c):
+    f = hypar_face(c)
+    rep = {}
+    cuts = ds.ruled_disc_cuts(f, kerf=3.2, stepdown=0.5, tol=0.5, report=rep, **BIG)
+    assert cuts and not rep["skipped"]
+    chk = ds.ruled_blade_intrudes(cuts, f)
+    print("hypar", c, "n cuts", len(cuts), "intrusion", chk.max_intrusion, "excess", chk.max_excess)
+    assert chk.max_intrusion <= 1e-6
+    assert chk.max_excess <= 0.5 + 1e-6
+    # control: turn the blades by 3 degrees about their rulings and the check sees the part being cut
+    bad = ds.ruled_blade_intrudes([rotate_cut_about_ruling(x, 3.0) for x in cuts], f)
+    bad2 = ds.ruled_blade_intrudes([rotate_cut_about_ruling(x, -3.0) for x in cuts], f)
+    assert max(bad.max_intrusion, bad2.max_intrusion) > 0.01
+    assert max(bad.max_excess, bad2.max_excess) > 0.5
+
+
+def test_twisted_column_passes():
+    f = ds.load_face(RULED / "twisted_column.json", 0)
+    rep = {}
+    kw = dict(blade_diameter=350.0, flange_diameter=100.0, tol=0.5)
+    fe = ds.ruled_disc_feasibility(f, **kw)
+    print(fe.summary())
+    assert fe.all_cuttable and fe.n_cuttable == 9
+    assert 9.0 < fe.min_twist_deg < fe.max_twist_deg < 10.5          # a few degrees of twist per 300 mm ruling
+    cuts = ds.ruled_disc_cuts(f, kerf=3.2, stepdown=1.0, report=rep, **kw)
+    assert len({c.edge for c in cuts}) == 9 and not rep["skipped"]
+    chk = ds.ruled_blade_intrudes(cuts, f)
+    print("column intrusion", chk.max_intrusion, "excess", chk.max_excess, "n", len(cuts))
+    assert chk.max_intrusion <= 1e-6 and chk.max_excess <= 0.5 + 1e-6
+    for c in cuts:                                                   # blade normal is perpendicular to the cut
+        assert abs(np.dot(c.normal, c.direction)) < 1e-12
+    # a deeper request than the curvature allows is refused per ruling
+    deep = ds.ruled_disc_feasibility(f, depth=20.0, **kw)
+    assert deep.n_cuttable == 0 and "curvature" in deep.rulings[0].reason
+    # json round trip keeps the ruling cuts
+    assert ds.load(ds.cuts_to_json(cuts))[0].kind == "ruling"
+
+
+def test_column_horizontal_faces_refused_vertical_planar_face_cut():
+    for idx in (4, 5):                                               # the horizontal end faces: a disc cannot lie flat
+        f = ds.load_face(RULED / "twisted_column.json", idx)
+        fe = ds.ruled_disc_feasibility(f, blade_diameter=350.0, flange_diameter=100.0, tol=0.1)
+        assert fe.n_cuttable == 0 and "lean more than 75" in fe.rulings[0].reason
+    f = ds.load_face(RULED / "cladding_panel.json", 0)               # vertical plane, vertical rulings: refused too
+    assert ds.ruled_disc_feasibility(f, blade_diameter=350.0, flange_diameter=100.0, tol=0.1).n_cuttable == 0
+
+def test_vertical_rulings_refused():
+    f = NS(rulings=[NS(p0=[0, 0, 0], p1=[0, 0, 300], normal=[0, 1, 0], tool_free=[True, True]),
+                    NS(p0=[40, 0, 0], p1=[40, 0, 300], normal=[0, 1, 0], tool_free=[True, True])])
+    rep = ds.ruled_disc_feasibility(f, blade_diameter=350.0, flange_diameter=100.0, tol=0.1)
+    assert rep.n_cuttable == 0 and "vertical" in rep.rulings[0].reason
+
+
+def test_blocked_end_leaves_uncut_wedge():
+    f = plane_face(n=2)
+    for r in f.rulings:
+        r.tool_free = [False, True]
+    cuts = ds.ruled_disc_cuts(f, blade_diameter=350.0, flange_diameter=100.0, kerf=3.2, stepdown=124.0, tol=0.1)
+    c = cuts[0]
+    assert c.uncut_mm == pytest.approx(ds.runout(175.0, c.depth))     # blocked end: the lowest point stops e(d) short\n    assert c.overcut_mm > 0 and min(c.uncut_start, c.uncut_end) == 0.0

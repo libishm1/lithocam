@@ -573,3 +573,461 @@ def blade_intrudes(cuts: Sequence[Cut], outline, t: float, samples: int = 9, *, 
             if is_face and c.kind == "profile":
                 face_d[c.edge] = min(face_d.get(c.edge, math.inf), float(np.min(part_sd)))
     return IntrusionReport(worst, face_d, plane_err)
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# ruled faces: blade posture and depth rules along rulings
+# ----------------------------------------------------------------------------------------------------------------
+# A ruling is a straight line on the face. A flat blade can follow it only if the blade plane contains the line, so
+# the only free posture parameter is the tilt tau of the blade plane about the ruling. Where the face twists along the
+# ruling its tangent plane turns about the ruling while the blade plane stays flat. Per ruling, with unit direction d
+# and the face normal n(w) at the fraction w along it (from the neighbour rulings of the face, see _twist):
+#
+#   n(w) ~ d x ( da + w d(b - a) )         da, d(b - a): central differences of the ruling start and of b - a
+#   psi(w) = angle about d from n(1/2) to n(w)      (the twist, radians)
+#   S = max psi - min psi                            (the twist spread of the ruling)
+#
+# The groove is cut from the ruling down into the stock in the blade plane (direction g, in the plane, perpendicular to
+# d, pointing down). To first order the face leaves the blade plane at depth h by
+#
+#   e(h, w) = h * tan(tau' - psi'(w))     (e > 0: the face lies on the waste side, the plane is in the part)
+#
+# (tau' = s tau, psi' = s psi; s = +-1 is the sign that makes g point down). A tolerance `tol` of left-over stock
+# (e >= -tol) and `intrusion_tol` into the part (e <= intrusion_tol, 0 = none) at the full depth D give
+#
+#   psi'_max - atan(tol / D)  <=  tau'  <=  psi'_min + atan(intrusion_tol / D)           (tilt range)
+#
+# which is empty when S > atan(tol / D) + atan(intrusion_tol / D). The largest depth that keeps it non-empty is the
+# curvature depth. For intrusion_tol = 0 it is tol / tan(S); for intrusion_tol = tol it is tol / tan(S / 2). A plane
+# (S = 0) has no curvature limit. The depth is also limited by the flange (max_cut_depth) and the blade must stay
+# within MAX_BEVEL_DEG of the vertical. The recommended tilt is the middle of the tilt range (for a plane, exactly the tangent plane).
+#
+# The first order rule ignores the bending of the face across the groove. Every depth is therefore verified on the
+# face itself (the ruled sheet between neighbour rulings) and shortened until no sheet point in the groove lies more
+# than intrusion_tol in the part or tol outside the blade plane. Stock above a ruling (h < 0) is taken as already
+# removed: use the rulings from the top edge of the face downwards.
+MAX_BEVEL_DEG = 75.0     # the same limit profile_cuts applies to bevel angles
+
+
+def _rget(r, k, default=None):
+    if isinstance(r, dict):
+        return r.get(k, default)
+    return getattr(r, k, default)
+
+
+def _face_rulings(face):
+    rs = face["rulings"] if isinstance(face, dict) else getattr(face, "rulings", face)
+    rs = list(rs)
+    if not rs:
+        raise ValueError("the face has no rulings")
+    return rs
+
+
+class _Prep(NamedTuple):
+    order: np.ndarray        # sorted position -> index in the face's ruling list
+    A: np.ndarray            # (n, 3) ruling starts, consistently oriented, sorted along the sweep
+    B: np.ndarray            # (n, 3) ruling ends
+    free: list               # (start free, end free) of the oriented ruling
+    nrm: np.ndarray          # (n, 3) outward normals at the ruling mid points
+
+
+def _prepare(face) -> _Prep:
+    rs = _face_rulings(face)
+    P0 = np.array([_rget(r, "p0") for r in rs], float)
+    P1 = np.array([_rget(r, "p1") for r in rs], float)
+    NR = np.array([_rget(r, "normal") for r in rs], float)
+    FR = [tuple(bool(x) for x in (_rget(r, "tool_free", (True, True)) or (True, True))) for r in rs]
+    n = len(rs)
+    order = np.arange(n)
+    if n > 1:
+        mids = 0.5 * (P0 + P1)
+        c = mids - mids.mean(axis=0)
+        sweep = np.linalg.svd(c, full_matrices=False)[2][0]
+        order = np.argsort(c @ sweep, kind="stable")
+    A, B, NR = P0[order].copy(), P1[order].copy(), NR[order]
+    free = [FR[i] for i in order]
+    for i in range(1, n):
+        if (B[i] - A[i]) @ (B[i - 1] - A[i - 1]) < 0:
+            A[i], B[i] = B[i].copy(), A[i].copy()
+            free[i] = free[i][::-1]
+    return _Prep(order, A, B, free, NR)
+
+
+def _rot(v, d, ang):
+    """Rotate v (perpendicular to unit d) about d by ang (right hand)."""
+    return v * math.cos(ang) + np.cross(d, v) * math.sin(ang)
+
+
+class _Frame(NamedTuple):
+    d: np.ndarray            # unit ruling direction (oriented)
+    n_ref: np.ndarray        # reference normal (tangent plane at the middle of the ruling)
+    g0: np.ndarray           # in-plane down direction at tau = 0
+    s: float                 # +1 / -1, T = s d is the travel direction
+    L: float
+    w: np.ndarray            # fractions along the ruling
+    psi: np.ndarray          # twist angle psi'(w) = s psi(w), radians
+    known: bool              # False when the face has one ruling (twist unknown, taken as zero)
+
+
+def _frame(prep: _Prep, i: int, nw: int = 33) -> _Frame:
+    A, B = prep.A, prep.B
+    n = len(A)
+    ab = B[i] - A[i]
+    L = float(np.linalg.norm(ab))
+    d = ab / L
+    n_rec = prep.nrm[i] - d * (prep.nrm[i] @ d)
+    n_rec /= np.linalg.norm(n_rec)
+    lo, hi = max(i - 1, 0), min(i + 1, n - 1)
+    w = np.linspace(0.0, 1.0, nw)
+    known = hi > lo
+    nn = None
+    if known:
+        dA = A[hi] - A[lo]
+        dE = (B[hi] - A[hi]) - (B[lo] - A[lo])
+        V = dA[None, :] + w[:, None] * dE[None, :]
+        nn = np.cross(d, V)
+        nrm = np.linalg.norm(nn, axis=1)
+        if nrm.min() < 1e-9 * max(nrm.max(), 1e-300) or nrm.max() < 1e-12:
+            known, nn = False, None
+        else:
+            nn = nn / nrm[:, None]
+            nn[nn @ n_rec < 0] *= -1.0
+    n_ref = n_rec if nn is None else nn[nw // 2]
+    n_ref = n_ref - d * (n_ref @ d)
+    n_ref /= np.linalg.norm(n_ref)
+    g0 = np.cross(d, n_ref)
+    s = 1.0 if g0[2] <= 0 else -1.0                 # g points down: g . (-z) >= 0
+    g0 = s * g0
+    if nn is None:
+        psi = np.zeros(nw)
+    else:
+        psi = s * np.arctan2(np.cross(n_ref[None, :], nn) @ d, nn @ n_ref)
+    return _Frame(d, n_ref, g0, s, L, w, psi, known)
+
+
+def _bevel_deg(fr: _Frame, tau_p: float) -> float:
+    """Angle of the in-plane down direction from the vertical, signed by the z component of the blade normal."""
+    tau = fr.s * tau_p
+    g = _rot(fr.g0, fr.d, tau)
+    N = _rot(fr.n_ref, fr.d, tau)
+    a = math.degrees(math.acos(max(-1.0, min(1.0, -g[2]))))
+    return a if N[2] >= 0 else -a
+
+
+def _curvature_depth(spread: float, tol: float, intrusion_tol: float) -> float:
+    """Largest depth D with atan(tol/D) + atan(intrusion_tol/D) >= spread (inf when spread = 0)."""
+    if spread <= 1e-12:
+        return math.inf
+
+    def F(D):
+        return math.atan(tol / D) + math.atan(intrusion_tol / D)
+    if F(1e9) >= spread:
+        return math.inf
+    lo, hi = 1e-9, 1e9
+    if F(lo) < spread:
+        return 0.0
+    for _ in range(200):
+        mid = math.sqrt(lo * hi)
+        if F(mid) >= spread:
+            lo = mid
+        else:
+            hi = mid
+    return lo
+
+
+def _tilt_range(fr: _Frame, D: float, tol: float, intrusion_tol: float, max_bevel_deg: float):
+    """(tau'_lo, tau'_hi, tau'_recommended, reason) at depth D, within the bevel limit; reason '' when non-empty."""
+    lo = float(fr.psi.max()) - math.atan(tol / D)
+    hi = float(fr.psi.min()) + math.atan(intrusion_tol / D)
+    if lo > hi + 1e-12:
+        return lo, hi, None, ("twist {:.3f} deg exceeds what a flat blade can follow at depth {:.1f} mm "
+                              "(curvature limit)".format(math.degrees(fr.psi.max() - fr.psi.min()), D))
+    ts = np.linspace(lo, max(hi, lo), 721)
+    ok = np.array([abs(_bevel_deg(fr, t)) <= max_bevel_deg for t in ts])
+    if not ok.any():
+        return lo, hi, None, "the blade would lean more than {:.0f} degrees from the vertical (ruling too steep, or face too flat, " "to cut from above)".format(max_bevel_deg)
+    mid = 0.5 * (lo + hi)
+    if float(fr.psi.max() - fr.psi.min()) < 1e-9:      # no twist (a plane): the exact tilt, not the middle
+        mid = float(fr.psi.min())
+    k = np.nonzero(ok)[0]
+    best = k[np.argmin(np.abs(ts[k] - mid))]
+    return float(ts[k[0]]), float(ts[k[-1]]), float(ts[best]), ""
+
+
+def _ruling_geometry(prep: _Prep, i: int, fr: _Frame, tau_p: float, R: float, d: float, kerf: float,
+                     corner_clearance: float = 2.0):
+    """Frame, travel limits and end data of one pass on ruling i at lowest-point depth d."""
+    tau = fr.s * tau_p
+    N = _rot(fr.n_ref, fr.d, tau)
+    g = _rot(fr.g0, fr.d, tau)
+    T = fr.s * fr.d
+    O = prep.A[i] if fr.s > 0 else prep.B[i]
+    free = prep.free[i] if fr.s > 0 else prep.free[i][::-1]
+    e0 = runout(R, d)
+    u_b = -(e0 + corner_clearance) if free[0] else e0
+    u_f = fr.L + e0 + corner_clearance if free[1] else fr.L - e0
+    return dict(N=N, g=g, T=T, O=O, e0=e0, u_b=u_b, u_f=u_f, free=free)
+
+
+def _sheet_points(prep: _Prep, h_res: float, nw: int = 41, max_ns: int = 400) -> np.ndarray:
+    """Points (m, 3) of the ruled sheet between neighbouring rulings (bilinear in the two end points). The spacing
+    across the rulings is at most h_res (mm), so the groove of a pass of depth about 10 h_res holds many points."""
+    A, B = prep.A, prep.B
+    w = np.linspace(0.0, 1.0, nw)[:, None]
+    pts = []
+    if len(A) == 1:
+        pts.append(A[0] + w * (B[0] - A[0]))
+    for i in range(len(A) - 1):
+        r0 = A[i][None, :] + w * (B[i] - A[i])[None, :]
+        r1 = A[i + 1][None, :] + w * (B[i + 1] - A[i + 1])[None, :]
+        gap = float(np.max(np.linalg.norm(r1 - r0, axis=1)))
+        ns = int(min(max_ns, max(2, math.ceil(gap / max(h_res, 1e-6)) + 1)))
+        for s in np.linspace(0.0, 1.0, ns):
+            pts.append((1.0 - s) * r0 + s * r1)
+    return np.vstack(pts)
+
+def _extremes(X, geo, R, d):
+    """(max e, min e) of the face points inside the groove of one pass: depth 0 <= h <= d along the blade plane and
+    within the rim reach of the swept lowest point."""
+    rel = X - geo["O"][None, :]
+    u, h, e = rel @ geo["T"], rel @ geo["g"], rel @ geo["N"]
+    dd = np.clip(d - h, 0.0, 2.0 * R)
+    reach = np.sqrt(np.maximum(2.0 * R * dd - dd * dd, 0.0))
+    m = (h >= -1e-9) & (h <= d) & (u >= geo["u_b"] - reach) & (u <= geo["u_f"] + reach)
+    if not m.any():
+        return 0.0, 0.0
+    return float(e[m].max()), float(e[m].min())
+
+
+@dataclass
+class RulingFeasibility:
+    """Blade rules for one ruling. Angles in degrees, depths in mm along the blade (lowest point below the ruling).
+
+    index          ruling index in the face's list
+    cuttable       True when a pass to `depth` exists (depth None: to max_depth, which must exceed zero)
+    reason         why not, else ''
+    twist_deg      spread S of the face's tangent plane about the ruling
+    tilt_min/max   allowed tilt of the blade plane about the ruling at the pass depth, from the plane that is
+                   tangent at the middle of the ruling (positive about the oriented ruling start -> end)
+    tilt_deg       recommended tilt (middle of the range)
+    bevel_deg      the blade's lean from the vertical at the recommended tilt (signed by the blade normal's z)
+    curvature_depth, flange_depth   the two depth limits (first order, mm)
+    verified_depth the deepest pass the sheet check accepts (<= both limits); max_depth = verified_depth
+    """
+    index: int
+    length: float
+    cuttable: bool
+    reason: str
+    twist_deg: float
+    tilt_min_deg: float
+    tilt_max_deg: float
+    tilt_deg: float
+    bevel_deg: float
+    curvature_depth: float
+    flange_depth: float
+    max_depth: float
+    depth: float
+    twist_known: bool = True
+
+
+@dataclass
+class FaceFeasibility:
+    rulings: List[RulingFeasibility]
+    n_cuttable: int
+    max_depth: float            # smallest max_depth over the cuttable rulings (0 when none)
+    min_twist_deg: float
+    max_twist_deg: float
+    recommended_tilt_deg: float  # median tilt of the cuttable rulings
+    all_cuttable: bool
+
+    def summary(self) -> str:
+        return ("{} of {} rulings cuttable, depth to {:.1f} mm, twist {:.3f} to {:.3f} deg, tilt {:.2f} deg".format(
+            self.n_cuttable, len(self.rulings), self.max_depth, self.min_twist_deg, self.max_twist_deg,
+            self.recommended_tilt_deg))
+
+
+def _analyse(prep, sheet, i, *, R, rf, kerf, tol, intrusion_tol, clearance, depth, max_bevel_deg, corner_clearance):
+    fr = _frame(prep, i)
+    S = float(fr.psi.max() - fr.psi.min())
+    Dc = _curvature_depth(S, tol, intrusion_tol)
+    Df0 = max_cut_depth(R, rf, clearance, 0.0)
+    D = float(depth) if depth is not None else min(Df0, Dc)
+    base = dict(index=int(prep.order[i]), length=fr.L, twist_deg=math.degrees(S), curvature_depth=Dc,
+                twist_known=fr.known, depth=D)
+    fail = dict(cuttable=False, tilt_min_deg=math.nan, tilt_max_deg=math.nan, tilt_deg=math.nan,
+                bevel_deg=math.nan, flange_depth=Df0, max_depth=0.0)
+    if D <= 0 or not math.isfinite(D):
+        return RulingFeasibility(reason="no positive depth (curvature limit {:.3g} mm)".format(Dc), **fail, **base)
+    lo, hi, rec, why = _tilt_range(fr, D, tol, intrusion_tol, max_bevel_deg)
+    if rec is None:
+        return RulingFeasibility(reason=why, **fail, **base)
+    bev = _bevel_deg(fr, rec)
+    Df = max_cut_depth(R, rf, clearance, bev)
+    # the sheet check: shorten the depth until the groove has no sheet point beyond the tolerances
+    Dv = min(D, Df, Dc if math.isfinite(Dc) else D)
+    if sheet is None:
+        sheet = _sheet_points(prep, max(Dv, 1e-3) / 10.0)
+    ok = False
+    for _ in range(80):
+        if Dv <= 1e-6:
+            break
+        geo = _ruling_geometry(prep, i, fr, rec, R, Dv, kerf, corner_clearance)
+        emax, emin = _extremes(sheet, geo, R, Dv)
+        if emax <= intrusion_tol + 1e-7 and -emin <= tol + 1e-7:
+            ok = True
+            break
+        Dv *= 0.97
+    ok_depth = Dv if ok else 0.0
+    cut = ok and (depth is None or ok_depth >= D - 1e-9)
+    why = ""
+    if not cut:
+        why = ("depth {:.1f} mm exceeds the flange limit {:.1f} mm".format(D, Df) if depth is not None and Df < D - 1e-9
+               else "depth {:.1f} mm exceeds the curvature limit {:.1f} mm".format(D, Dc)
+               if depth is not None and Dc < D - 1e-9 else "the face check shortens the depth to {:.1f} mm".format(
+                   ok_depth) if depth is not None else "no safe depth")
+    sgn = fr.s
+    t_lo, t_hi = (lo, hi) if sgn > 0 else (-hi, -lo)
+    return RulingFeasibility(index=base["index"], length=fr.L, cuttable=bool(cut), reason=why,
+                             twist_deg=base["twist_deg"], tilt_min_deg=math.degrees(t_lo),
+                             tilt_max_deg=math.degrees(t_hi), tilt_deg=math.degrees(sgn * rec), bevel_deg=bev,
+                             curvature_depth=Dc, flange_depth=Df, max_depth=ok_depth, depth=D,
+                             twist_known=fr.known)
+
+
+def _setup(blade_diameter, flange_diameter, kerf, tol, intrusion_tol):
+    R, rf = 0.5 * blade_diameter, 0.5 * flange_diameter
+    if R <= 0 or rf < 0 or rf >= R:
+        raise ValueError("need blade_diameter > flange_diameter >= 0")
+    if tol <= 0 or intrusion_tol < 0 or kerf < 0:
+        raise ValueError("tol must be positive, intrusion_tol and kerf not negative")
+    return R, rf
+
+
+def ruled_disc_feasibility(face, *, blade_diameter: float, flange_diameter: float, tol: float,
+                           intrusion_tol: float = 0.0, kerf: float = 0.0, clearance: float = 1.0,
+                           depth: Optional[float] = None, max_bevel_deg: float = MAX_BEVEL_DEG,
+                           corner_clearance: float = 2.0) -> FaceFeasibility:
+    """Per ruling and per face: can a disc cut along it, how deep, and at what tilt.
+
+    face is a face of lithocam.wirepath.load_ruled_json (or a dict / list of rulings with p0, p1, normal and
+    tool_free). tol is the left-over stock allowed between the flat blade and the face at the full depth (mm),
+    intrusion_tol the allowed intrusion into the part (0 = none). depth None asks for the deepest safe pass of every
+    ruling (its max_depth); a number asks for that depth and marks the rulings that cannot reach it."""
+    R, rf = _setup(blade_diameter, flange_diameter, kerf, tol, intrusion_tol)
+    prep = _prepare(face)
+    sheet = None
+    rows = [_analyse(prep, sheet, i, R=R, rf=rf, kerf=kerf, tol=tol, intrusion_tol=intrusion_tol,
+                     clearance=clearance, depth=depth, max_bevel_deg=max_bevel_deg,
+                     corner_clearance=corner_clearance) for i in range(len(prep.A))]
+    rows.sort(key=lambda r: r.index)
+    good = [r for r in rows if r.cuttable]
+    tw = [r.twist_deg for r in rows]
+    return FaceFeasibility(rows, len(good), min((r.max_depth for r in good), default=0.0), min(tw), max(tw),
+                           float(np.median([r.tilt_deg for r in good])) if good else math.nan,
+                           len(good) == len(rows))
+
+
+def ruled_disc_cuts(face, *, blade_diameter: float, kerf: float, flange_diameter: float, stepdown: float, tol: float,
+                    intrusion_tol: float = 0.0, depth: Optional[float] = None, clearance: float = 1.0,
+                    corner_clearance: float = 2.0, lead_clearance: float = 2.0,
+                    max_bevel_deg: float = MAX_BEVEL_DEG, report: Optional[dict] = None) -> List[Cut]:
+    """Disc passes along the cuttable rulings of a ruled (or planar) face: kind 'ruling', one set of stepdown passes
+    per ruling at the recommended tilt, `edge` = ruling index in the face's list.
+
+    The blade plane contains the ruling, its normal points to the waste side and tool z = blade normal as for
+    profile cuts, so disc_pose, cuts_to_json and blade_intrudes conventions carry over. Ends marked tool_free get
+    the run-out overcut, a blocked end stops e(d) short (uncut wedge, as at a reflex corner). depth None cuts each
+    ruling to its own max_depth. Rulings that cannot be cut are left out and listed in report['skipped'] as
+    (ruling index, reason)."""
+    R, rf = _setup(blade_diameter, flange_diameter, kerf, tol, intrusion_tol)
+    if kerf <= 0:
+        raise ValueError("kerf must be positive")
+    prep = _prepare(face)
+    sheet = None
+    skipped, out = [], []
+    for i in range(len(prep.A)):
+        rf_ = _analyse(prep, sheet, i, R=R, rf=rf, kerf=kerf, tol=tol, intrusion_tol=intrusion_tol,
+                       clearance=clearance, depth=depth, max_bevel_deg=max_bevel_deg,
+                       corner_clearance=corner_clearance)
+        if not rf_.cuttable:
+            skipped.append((rf_.index, rf_.reason))
+            continue
+        fr = _frame(prep, i)
+        tau_p = math.radians(fr.s * rf_.tilt_deg)
+        d_final = rf_.max_depth if depth is None else float(depth)
+        for k, d in enumerate(_depths(d_final, stepdown)):
+            geo = _ruling_geometry(prep, i, fr, tau_p, R, d, kerf, corner_clearance)
+            u_b, u_f = geo["u_b"], geo["u_f"]
+            if u_f < u_b - 1e-9:
+                skipped.append((rf_.index, "run-out {:.1f} mm does not fit between the ruling ends".format(
+                    geo["e0"])))
+                continue
+            N, g, T, O = geo["N"], geo["g"], geo["T"], geo["O"]
+            up = -g
+
+            def centre(u, dd=d):
+                return O + u * T + (R - dd) * up + 0.5 * kerf * N
+
+            oc_s, oc_e = max(0.0, -u_b), max(0.0, u_f - fr.L)
+            un_s, un_e = max(0.0, u_b), max(0.0, fr.L - u_f)
+            lift = (d + lead_clearance) * up
+            bev = _bevel_deg(fr, tau_p)
+            out.append(Cut(
+                edge=rf_.index, pass_index=k, start=tuple(centre(u_b)), end=tuple(centre(u_f)), normal=tuple(N),
+                direction=tuple(T), depth=float(d), bevel=float(bev), kind="ruling", overcut_mm=oc_s + oc_e,
+                uncut_mm=un_s + un_e, radius=R, kerf=float(kerf), top=float(O[2]),
+                lead_in=tuple(centre(u_b) + lift), lead_out=tuple(centre(u_f) + lift), overcut_start=oc_s,
+                overcut_end=oc_e, uncut_start=un_s, uncut_end=un_e, through=False))
+    if report is not None:
+        report["skipped"] = skipped
+        report["feasibility"] = None
+    return out
+
+
+class RulingIntrusion(NamedTuple):
+    max_intrusion: float            # mm, > 0 means a face point lies inside the blade side of the plane (the part is cut)
+    max_excess: float               # mm of stock left between the flat blade and the face
+    per_cut: Dict[tuple, tuple]     # (ruling, pass) -> (intrusion, excess)
+
+
+def ruled_blade_intrudes(cuts: Sequence[Cut], face) -> RulingIntrusion:
+    """Check generated ruling passes against the face itself: the ruled sheet between neighbouring rulings.
+
+    For every cut, the sheet points inside its groove (depth 0..d along the blade plane, within the rim reach of
+    the swept lowest point) are measured against the part-side face of the blade. max_intrusion is the largest
+    distance a point lies on the blade (waste) side, so <= intrusion_tol means the blade does not cut the part;
+    max_excess is the largest left-over stock (reported, limited by tol)."""
+    prep = _prepare(face)
+    depths = [c.depth for c in cuts if c.kind == "ruling"]
+    sheet = _sheet_points(prep, (min(depths) if depths else 1.0) / 10.0)
+    inv ={int(o): k for k, o in enumerate(prep.order)}
+    worst_i, worst_x = -math.inf, 0.0
+    per = {}
+    for c in cuts:
+        if c.kind != "ruling":
+            continue
+        i = inv[c.edge]
+        T, N = np.asarray(c.direction, float), np.asarray(c.normal, float)
+        g = np.cross(T, N)
+        d_ = prep.B[i] - prep.A[i]
+        O = prep.A[i] if T @ d_ > 0 else prep.B[i]
+        s0, s1 = np.asarray(c.start, float), np.asarray(c.end, float)
+        # ruling line point under the blade centre: centre - (R - d)(-g)... = centre + (R - d) g - kerf/2 N
+        base = s0 + (c.radius - c.depth) * g - 0.5 * c.kerf * N
+        u_b = float((base - O) @ T)
+        u_f = u_b + float((s1 - s0) @ T)
+        geo = dict(O=O, T=T, N=N, g=g, u_b=u_b, u_f=u_f)
+        emax, emin = _extremes(sheet, geo, c.radius, c.depth)
+        per[(c.edge, c.pass_index)] = (emax, -emin)
+        worst_i = max(worst_i, emax)
+        worst_x = max(worst_x, -emin)
+    return RulingIntrusion(worst_i if per else 0.0, worst_x, per)
+
+
+def load_face(path, index: int):
+    """Face `index` of a `python -m lithocam.ruled ... --json` file (needs no OCP: reads the JSON)."""
+    from .wirepath import load_ruled_json
+    for f in load_ruled_json(str(path)).faces:
+        if f.index == index:
+            return f
+    raise ValueError("no face {} in {}".format(index, path))

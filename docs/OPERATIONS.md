@@ -71,10 +71,10 @@ Status key:
 | Operation | lithocam | Status |
 |---|---|---|
 | Diamond wire, planar and ruled (as in wire EDM 2D/4D) | `ruled` labels, `wiresim` (exact planar), `meshsim` (ruled), robot bow saws, Lean wire-tube theorem | done |
-| Disc saw (disc roughing, disc cutting 2D/6D) | saw-disc routes from features, kerf theorems | planned (toolpaths) |
+| Disc saw (disc roughing, disc cutting 2D/6D) | `lithocam.discsaw`: kerf-compensated profile and comb cuts on flat slabs; posture and depth rules along the rulings of ruled and planar faces (`ruled_disc_feasibility`, `ruled_disc_cuts`, `ruled_blade_intrudes`); blade-intrusion checks | partial (tested; not yet visually validated; the studio does not call it yet) |
 | Jet cutting 2D/5D (waterjet) | contour-cut route for through cutouts | planned |
 | Lathe (stone turning: balusters). Lathe operation set: OD/ID roughing and finishing, facing, hole machining, part-off, OD/ID/face grooving, OD/ID/profile threading | turned-profile route from features | planned |
-| Polishing and grinding (stone surface finish, constant force) | – | planned (robot force control is hardware-gated) |
+| Polishing and grinding (stone surface finish, constant force) | `lithocam.polish` (`docs/POLISHING.md`): constant-contact pad paths with the tool axis on the surface normal, Preston removal and dwell maps, stepover and feed for uniform removal, grit steps with a tool change per grit; force and pressure are simulation attributes only | partial (tested; not yet visually validated; no process constants built in; robot force control is hardware-gated and dormant) |
 | Splitting and guillotine block cutting (quarry) | wire-saw guillotine sequencing exists in Frahan | planned (bridge) |
 | Feature-based machining | quiddity + stone rule table (`features`) | done (recognition and routing) |
 
@@ -84,7 +84,7 @@ Out of scope for lithocam: cladding, welding, knife cutting.
 
 | Capability | lithocam | Status | Builds on |
 |---|---|---|---|
-| Tool library (kinds, dimensions, holder, shank, feeds) | 38 kinds and 63 stone and wood tools from the survey (`docs/TOOLING.md`); CSV files; drop-cutter mapping for 20 of them; bound to Python | done (core) | Drop-cutter for the remaining envelopes (tapered ball, profile tip, undercut); selection in the Qt GUI |
+| Tool library (kinds, dimensions, holder, shank, feeds) | 38 kinds and 63 stone and wood tools from the survey (`docs/TOOLING.md`); CSV files; drop-cutter mapping for 22 of them (flat, ball, bull, cone and the general line-and-arc profile: tapered ball W8, flame burr S13); bound to Python | done (core) | Drop-cutter for the remaining envelopes (side-profile wheels and bits, undercut, step drills); selection in the Qt GUI |
 | Stock models | Z-map (3-axis), Manifold meshes (wire and flank) | partial | OpenVDB level set for undercuts (`docs/STOCK_SIMULATION.md`) |
 | Simulation and verification (gouge, leftover, scallop) | Z-map deviation maps; Manifold volume deltas; Lean bounds for scallop and wire tube | done | Per-operation reports |
 | Rest-material detection | – | planned | Z-map leftover above tolerance |
