@@ -1,6 +1,6 @@
 # Operations: coverage and roadmap
 
-The list combines the standard 2 / 2.5 / 3 / 5-axis operation families with the operation names that SprutCAM's public manual uses. SprutCAM names come from the [SprutCAM 15 operations matrix](https://kb.sprutcam.com/SC15manual/en/10389.html) and the SprutCAM 16 [3-axis](https://kb.sprutcam.com/SC16manual/en/10116.html) and [configuration](https://kb.sprutcam.com/SC16manual/en/261.html) pages. No SprutCAM code or documentation text is used; names only, as a checklist.
+The list covers the standard 2 / 2.5 / 3 / 5-axis operation families, plus the stone-specific operations. It serves as a checklist; each row says what exists and what does not.
 
 Status key:
 
@@ -10,7 +10,7 @@ Status key:
 
 ## 2-axis and 2.5-axis
 
-| Operation (SprutCAM name) | lithocam | Status | Builds on |
+| Operation | lithocam | Status | Builds on |
 |---|---|---|---|
 | 2D profiling (2D contouring) | `kerf_path_convex` for convex parts; fibre waterline contours (`examples/pocket_2p5d.py`) | partial | General polygon offsets (Clipper2, BSL-1.0) and the kerf theorems |
 | Face milling | zig-zag at a fixed z with a flat cutter (`zigzag`) | partial | A dedicated op: stock top, stepover from the cutter diameter, lead-in and lead-out |
@@ -66,17 +66,17 @@ Status key:
 | Machine/robot kinematics, limits and singularities | verified IK, joint limits, wrap variants, track and turntable | done | Singularity measure along the path |
 | Robot 6D (UR10e, KR120) | verified IK, track and turntable, collision with the official meshes, URScript and KRL | done | URSim run (blocked on Docker), KUKA and ABB simulation |
 
-## Stone-specific (beyond SprutCAM's milling set)
+## Stone-specific (beyond the milling set)
 
 | Operation | lithocam | Status |
 |---|---|---|
-| Diamond wire, planar and ruled (SprutCAM: wire EDM 2D/4D) | `ruled` labels, `wiresim` (exact planar), `meshsim` (ruled), robot bow saws, Lean wire-tube theorem | done |
-| Disc saw (SprutCAM: disc roughing, disc cutting 2D/6D) | saw-disc routes from features, kerf theorems | planned (toolpaths) |
+| Diamond wire, planar and ruled (as in wire EDM 2D/4D) | `ruled` labels, `wiresim` (exact planar), `meshsim` (ruled), robot bow saws, Lean wire-tube theorem | done |
+| Disc saw (disc roughing, disc cutting 2D/6D) | saw-disc routes from features, kerf theorems | planned (toolpaths) |
 | Jet cutting 2D/5D (waterjet) | contour-cut route for through cutouts | planned |
-| Lathe (stone turning: balusters). SprutCAM lathe set: OD/ID roughing and finishing, facing, hole machining, part-off, OD/ID/face grooving, OD/ID/profile threading | turned-profile route from features | planned |
+| Lathe (stone turning: balusters). Lathe operation set: OD/ID roughing and finishing, facing, hole machining, part-off, OD/ID/face grooving, OD/ID/profile threading | turned-profile route from features | planned |
 | Polishing and grinding (stone surface finish, constant force) | – | planned (robot force control is hardware-gated) |
 | Splitting and guillotine block cutting (quarry) | wire-saw guillotine sequencing exists in Frahan | planned (bridge) |
-| Feature-based machining (SprutCAM: FBM) | quiddity + stone rule table (`features`) | done (recognition and routing) |
+| Feature-based machining | quiddity + stone rule table (`features`) | done (recognition and routing) |
 
 Out of scope for lithocam: cladding, welding, knife cutting.
 

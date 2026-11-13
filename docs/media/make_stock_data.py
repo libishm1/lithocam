@@ -14,6 +14,7 @@ examples/flank_5axis.py (flank_frames.json). Writes flank_stock_layers.json.
 """
 import json
 import math
+import os
 import sys
 from pathlib import Path
 
@@ -105,7 +106,7 @@ for name in ("ur10e", "kr120"):
 
 # flank roughing layers
 fpath = DATA.parent / "flank_frames.json"
-alt = Path("D:/code_ws/outputs/2026-11-12/lithocam_examples/flank/flank_frames.json")
+alt = Path(os.environ.get("LITHOCAM_FLANK_FRAMES", "flank_frames.json"))
 fpath = fpath if fpath.exists() else alt
 if fpath.exists():
     from lithocam import flank

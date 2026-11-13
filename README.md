@@ -33,7 +33,7 @@ Planned and partial operations are listed in `docs/OPERATIONS.md`. The stock-sim
 
 ![lithocam studio](docs/media/studio.jpg)
 
-One window for stone CAM and robot programming. It combines RoboDK's station tree and robot panel with RhinoCAM's machining browser and operation toolbars:
+One window for stone CAM and robot programming. The layout has the work tree and objects browser on the left, machining operation toolbars on top, the 3D cell view in the centre, the robot panel and step properties on the right, and log and posted-program tabs at the bottom:
 
 - **Work tree.** Station, then robot and tools, then work frame, part and stock, then programs and their steps. Drag steps to reorder them, or drop operations from the palette to insert them.
 - **Objects.** An operations palette with stone operations first, then 2.5-axis, 3-axis, 5-axis, holes and finishing. Each icon shows whether the operation is done, partial or planned. Next to it, the tool library, filtered by domain, kind and operation.
@@ -110,6 +110,10 @@ cd python && pytest
 ## Bindings
 
 The C++ core is written once. Python bindings are generated with [rosetta](https://github.com/rosetta-bindings/rosetta), using C++26 reflection on a clang-p2996 host. The generated sources are then compiled with ordinary compilers, including MSVC for Blender's Python. This is in progress.
+
+## Data and cells credited
+
+Quarra Stone published ROBOmove backups of their KUKA KR 480 MT and KR 500 stone-milling cells in the public repository [Q-LAB](https://github.com/brnmsmith/Q-LAB): tool tables, end effectors, work-table frames, parameter ranges, program fragments and meshes. lithocam reads those files from a local clone at run time (`LITHOCAM_QLAB`, default `D:/robot_ws/oss/external/Q-LAB`) and does not redistribute them. The repository has no licence file, so none of its files or contents is in this repository. Imported tools and spindle presets carry the source "Quarra Stone Q-LAB (ROBOmove backup)". The KR 480 R3330 MT and KR 500 R2830 MT cells (`cells/`) use dimensions from KUKA's public KR 500 FORTEC manual. See `docs/ROBOMOVE_IMPORT.md`.
 
 ## Licence
 
