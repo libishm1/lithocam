@@ -902,27 +902,55 @@ def _run_disc(i, st, p, station, robot, tool, backend, q, add, recs, msgs, error
     ns = max(1, int(p.get("spins", 8)))
     spins = [2 * math.pi * k / ns for k in range(ns)]
     step_mm = DISC_STEP_MM
+    # Links between cuts. A joint move from one cut to the next swings the blade wherever the wrist takes it (with a
+    # long spindle that can be far below the table), so a link is Cartesian: straight up until the blade's lowest
+    # point clears the top of the stone by `clearance`, across at that height while the blade axis turns, straight
+    # down to the next lead-in. Every link point is solved and checked; links post as linear moves at the cell's
+    # rapid speed.
+    s_ = station.stock or {}
+    top_ = max([float(s_.get("zmax", 0.0))] + [float(np.asarray(c.start)[2]) for c in cuts[:1]])
+    safe_z = top_ + D / 2.0 + float(p.get("clearance", 20.0))
+
+    def _mid_axis(u, v):
+        m_ = np.asarray(u, dtype=float) + np.asarray(v, dtype=float)
+        return m_ / np.linalg.norm(m_) if np.linalg.norm(m_) > 0.2 else np.array([0.0, 0.0, 1.0])
+
     moves = []
+    prev = None                                                 # (point, axis) where the last cut ended
     for c in cuts:
         n = -np.asarray(c.normal, dtype=float)                 # tool axis (tip to holder) = minus the blade normal
         a, b = np.asarray(c.start, dtype=float), np.asarray(c.end, dtype=float)
+        entry = np.asarray(c.lead_in, dtype=float) if len(c.lead_in) else a
+        if prev is not None:
+            p0, n0 = prev
+            up0 = np.array([p0[0], p0[1], max(p0[2], safe_z)])
+            up1 = np.array([entry[0], entry[1], max(entry[2], safe_z)])
+            moves.append(("rapid", up0, n0))
+            if float(np.dot(n0, n)) < 0.99:                    # turn the blade at the safe height
+                moves.append(("rapid", (up0 + up1) / 2.0, _mid_axis(n0, n)))
+            moves.append(("rapid", up1, n))
         if len(c.lead_in):
-            moves.append(("rapid", np.asarray(c.lead_in, dtype=float), n))
+            moves.append(("rapid", entry, n))
         m = max(1, int(math.ceil(np.linalg.norm(b - a) / step_mm)))
         moves += [("feed", a + (b - a) * t, n) for t in np.linspace(0, 1, m + 1)]
         if len(c.lead_out):
             moves.append(("rapid", np.asarray(c.lead_out, dtype=float), n))
+        prev = (np.asarray(moves[-1][1], dtype=float), n)
+    moves = _sample_links(moves, max(step_mm, 5.0))
     qs, oks, chosen = _solve_five_axis(robot, backend, wk, moves, q, spins)
     add(i, st.title(), qs, [m[0] == "feed" for m in moves], oks)
     recs.append(post.Rec("comment", {"text": "{}: {} cuts with {} (D {:g} mm, kerf {:g} mm)".format(
         st.title(), len(cuts), tool.id, D, kerf)}))
-    for m, qq, sn in zip(moves, qs, chosen):
+    for k, (m, qq, sn) in enumerate(zip(moves, qs, chosen)):
         T = tool_pose(wk, m[1], m[2], sn)
         if m[0] == "feed":
             recs.append(post.Rec("movel", {"q": np.asarray(qq).tolist(), "pose": T.tolist(), "cut": True,
                                            "v": feed / 60.0 if feed > 0 else None}))
-        else:
+        elif k == 0:                                           # the approach from wherever the robot is
             recs.append(post.Rec("movej", {"q": np.asarray(qq).tolist()}))
+        else:                                                  # links: straight lines at the cell's rapid speed
+            recs.append(post.Rec("movel", {"q": np.asarray(qq).tolist(), "pose": T.tolist(),
+                                           "v": float(station.rapid_speed)}))
     bad = len(oks) - int(sum(oks))
     msgs.append("step {}: {}: {} cuts, {} robot samples, {} unreachable or colliding".format(
         i + 1, st.spec.label, len(cuts), len(qs), bad))
@@ -1498,9 +1526,41 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
                     r.data["e1"] = cur
                 else:
                     cur = float(r.data["e1"])
+    below = _links_below_stock(station, segs)
+    if below:
+        errors.append(below)
     for e in errors:
         msgs.append("ERROR " + e)
     return Expansion(segs, recs, msgs, errors, station_key(station, program))
+
+
+def _links_below_stock(station: Station, segs) -> str:
+    """An error text when a non-cutting sample puts the TCP more than BELOW_STOCK_MM below the bottom of the stock
+    (into the table or the fixture), else "". Plunges that finish a through-cut sit a little under the bottom, hence
+    the margin. Collision models usually hold no table, so this is checked on its own."""
+    s = station.stock
+    if not isinstance(s, dict) or "zmin" not in s:
+        return ""
+    Wi = np.linalg.inv(station.work_frame())
+    zmin = float(s["zmin"]) - BELOW_STOCK_MM
+    hits = []
+    k0 = 0
+    for sg in segs:
+        if len(sg.tcp):
+            z = (Wi[2, :3] @ np.asarray(sg.tcp, dtype=float).T + Wi[2, 3]) * 1000.0
+            bad = np.where((~np.asarray(sg.feed, bool)) & (z < zmin))[0]
+            if len(bad):
+                hits.append((sg.label, k0 + int(bad[0]), len(bad), float(z[bad].min())))
+        k0 += len(sg.q)
+    if not hits:
+        return ""
+    lab, first, n, zlow = hits[0]
+    return ("{} non-cutting samples take the TCP below the bottom of the stock (first at sample {} in '{}', lowest "
+            "{:.0f} mm against a stock bottom of {:.0f} mm): the move would enter the table".format(
+                sum(h[2] for h in hits), first, lab, zlow, zmin + BELOW_STOCK_MM))
+
+
+BELOW_STOCK_MM = 5.0     # a non-cutting TCP lower than this under the stock bottom is an error (a through-cut bed)
 
 
 def station_key(station: Station, program: Program) -> str:

@@ -1761,11 +1761,11 @@ class Studio(QMainWindow):
                  "Press Simulate.".format(size + 10))
 
     def _load_part(self):
-        fn, _ = QFileDialog.getOpenFileName(self, "Part", "", "STL (*.stl)")
+        fn, _ = QFileDialog.getOpenFileName(self, "Part", "", "Part (*.stl *.npz);;STL (*.stl);;Height field (*.npz)")
         if not fn:
             return
         try:
-            tris = cam.load_stl(fn)
+            tris = cam.load_part(fn)
             self.part_tris = tris
             self.part = (tris, cam.trimesh(tris))
             self.station.part_path = fn
@@ -1809,9 +1809,25 @@ class Studio(QMainWindow):
         self._yaw = 0.0
         self._refresh_scene()
 
+    def _work_centre(self):
+        """Centre of the stock (else the part, else the work frame origin) in the robot base frame, metres, and the
+        stock diagonal in metres (0 when there is neither)."""
+        W = self.station.work_frame()
+        s = self.station.stock
+        if isinstance(s, dict) and all(k in s for k in ("xmin", "xmax", "ymin", "ymax", "zmin", "zmax")):
+            lo = np.array([s["xmin"], s["ymin"], s["zmin"]], dtype=float)
+            hi = np.array([s["xmax"], s["ymax"], s["zmax"]], dtype=float)
+        elif self.part_tris is not None:
+            p = np.asarray(self.part_tris, dtype=float).reshape(-1, 3)
+            lo, hi = p.min(0), p.max(0)
+        else:
+            return W[:3, 3].copy(), 0.0
+        c = (lo + hi) / 2000.0                                  # mm -> m, work frame
+        return W[:3, :3] @ c + W[:3, 3], float(np.linalg.norm(hi - lo)) / 1000.0
+
     def _fit_part_and_robot(self):
-        """Camera on the cut: centred between the work frame and the robot's reach, close enough to see the part."""
-        w = self.station.work_frame()[:3, 3]
+        """Camera on the cut: centred between the stock and the robot's reach, close enough to see the part."""
+        w, _diag = self._work_centre()
         q = self.sim_q[len(self.sim_q) // 2] if len(self.sim_q) else self.robot_panel.q
         tf = self.robot.link_transforms(q)
         pts = np.array([T[:3, 3] for T in tf.values()] + [w])
@@ -1926,8 +1942,9 @@ class Studio(QMainWindow):
         self._fit_part_and_robot()
         if self.stock_run is not None:          # the cut stock is the subject: closer, centred on the work
             win = self.view.win
-            win.center = 0.25 * win.center + 0.75 * self.station.work_frame()[:3, 3]
-            win.dist *= 0.45
+            c, diag = self._work_centre()
+            win.center = 0.25 * win.center + 0.75 * c
+            win.dist = max(0.5, 3.0 * diag) if diag > 0 else win.dist * 0.45
             win.update_camera()
         idx = [int(round(v)) for v in np.linspace(0, self.sim.maximum(), n)]
         state = {"k": 0}
@@ -1996,6 +2013,99 @@ class Studio(QMainWindow):
             Path(out).with_suffix(".lcs.json").write_text(self.station.to_json())
             QApplication.quit()
         QTimer.singleShot(1200, grab)
+
+    def _teach_record(self, out):
+        """--teach-record DIR: the teach smoke as frames of the whole window. Saves a target, drags the z arrow down,
+        the x arrow along and the z ring through 30 deg (the mouse code path), saves a second target, adds a joint
+        and a linear move to the two, then goes to each target. DIR/frame_000.png ..."""
+        Path(out).mkdir(parents=True, exist_ok=True)
+        self.act_gizmo.setChecked(True)
+        self._toggle_gizmo(True)
+        win = self.view.win
+        QApplication.processEvents()
+        win.center = self.robot.tcp(self.robot_panel.q)[:3, 3].copy()     # the tool tip in the middle, closer
+        win.dist *= 0.55
+        win.update_camera()
+        QApplication.processEvents()
+        cam = win.camera_model()
+        g = win.gizmo
+        acts = []                                  # each entry is one frame: a callable run before the grab
+
+        def hold(n):
+            acts.extend([lambda: None] * n)
+
+        def drag(kind, k, amount, n):
+            box = {}
+
+            def start():
+                L = g.length(cam)
+                H = g.handle_frame()
+                o = H[:3, 3]
+                if kind == "arrow":
+                    a = H[:3, k]
+                    box["pt"] = lambda t: cam.project(o + a * (L * 0.7 + amount * t))[0]
+                else:
+                    i, j = [m for m in range(3) if m != k]
+                    R = L * g.RING
+                    box["pt"] = lambda t: cam.project(o + R * (math.cos(amount * t) * H[:3, i] +
+                                                               math.sin(amount * t) * H[:3, j]))[0]
+                if not g.begin(cam, *box["pt"](0.0)):
+                    raise RuntimeError("teach record: the {} {} was not picked".format(kind, k))
+                self.view.highlight_gizmo(g.mode)
+            acts.append(start)
+            for s in range(1, n + 1):
+                def step(t=s / n, last=(s == n)):
+                    F = g.drag(cam, *box["pt"](t))
+                    if F is not None:
+                        self._gizmo_moved(F, last)
+                    if last:
+                        g.end()
+                        self.view.highlight_gizmo(None)
+                acts.append(step)
+
+        hold(4)
+        acts.append(lambda: self._save_target("approach"))
+        hold(3)
+        drag("arrow", 2, -0.10, 14)
+        hold(2)
+        drag("arrow", 0, 0.12, 14)
+        hold(2)
+        drag("ring", 2, math.radians(30), 12)
+        hold(2)
+        acts.append(lambda: self._save_target("cut_start"))
+        hold(3)
+        acts.append(lambda: self._target_step("movej", "approach"))
+        acts.append(lambda: self._target_step("movel", "cut_start"))
+        hold(3)
+        acts.append(lambda: self._goto_target("approach"))
+        hold(5)
+        acts.append(lambda: self._goto_target("cut_start"))
+        hold(5)
+        state = {"k": 0}
+
+        def shot():
+            k = state["k"]
+            if k >= len(acts):
+                Path(out, "log.txt").write_text(self.log.toPlainText())
+                Path(out, "station.lcs.json").write_text(self.station.to_json())
+                QApplication.quit()
+                return
+            try:
+                acts[k]()
+            except Exception as e:   # noqa: BLE001
+                self.say(str(e))
+                self._batch_exit_on_error()
+                return
+            QApplication.processEvents()
+
+            def grab():
+                g2 = self.frameGeometry()
+                QApplication.primaryScreen().grabWindow(0, g2.x(), g2.y(), g2.width(), g2.height()).save(
+                    str(Path(out) / "frame_{:03d}.png".format(k)))
+                state["k"] += 1
+                QTimer.singleShot(20, shot)
+            QTimer.singleShot(90, grab)
+        shot()
 
     def _play(self, on):
         self.btn_play.setIcon(self.style().standardIcon(QStyle.SP_MediaPause if on else QStyle.SP_MediaPlay))
@@ -2349,7 +2459,7 @@ class Studio(QMainWindow):
                 self._tools_changed()
             self.part_tris, self.part = None, None
             if st.part_path and Path(st.part_path).exists():
-                tris = cam.load_stl(st.part_path)
+                tris = cam.load_part(st.part_path)          # STL or height-field .npz
                 self.part_tris, self.part = tris, (tris, cam.trimesh(tris))
                 if st.stock is None:
                     st.stock = cam.stock_box(tris, 0.0)
@@ -2364,6 +2474,11 @@ class Studio(QMainWindow):
             self._view("iso")
             self.say("Opened {}".format(fn))
         except Exception as e:   # noqa: BLE001
+            if getattr(self, "batch", False):               # no dialog in batch modes: log it and exit
+                self.say("Open {} failed: {}".format(fn, e))
+                print("Open {} failed: {}".format(fn, e), file=sys.stderr)
+                QTimer.singleShot(0, lambda: QApplication.exit(3))
+                return
             QMessageBox.warning(self, "Open", str(e))
 
     def _save(self):
@@ -2396,6 +2511,7 @@ def main(argv=None) -> int:
         w._set_robot(argv[argv.index("--robot") + 1])
         w._demo()
     stations = [a for a in argv[1:] if a.endswith(".json")]
+    w.batch = any(f in argv for f in ("--record", "--smoke", "--teach-smoke", "--teach-record"))
     if stations:
         w.open_station(stations[0])
     w.show()
@@ -2424,7 +2540,17 @@ def main(argv=None) -> int:
         QTimer.singleShot(limit * 1000, lambda: (Path(w.record[0]).mkdir(parents=True, exist_ok=True),
                                                  Path(w.record[0], "log.txt").write_text(
                                                      w.log.toPlainText() + "\nTIMEOUT"), QApplication.exit(4)))
+        # Backstop: a long native call holds the interpreter lock and the Qt timer above cannot run. faulthandler's
+        # watchdog runs without it; it writes every thread's stack to DIR/timeout_stack.txt and exits.
+        Path(w.record[0]).mkdir(parents=True, exist_ok=True)
+        w._watchdog_file = open(Path(w.record[0], "timeout_stack.txt"), "w")
+        faulthandler.dump_traceback_later(limit + 60, exit=True, file=w._watchdog_file)
         QTimer.singleShot(1500, w._simulate)
+    elif "--teach-record" in argv:
+        out = argv[argv.index("--teach-record") + 1]
+        w.record = (out, 0)                               # for _batch_exit_on_error
+        QTimer.singleShot(240 * 1000, lambda: QApplication.exit(4))
+        QTimer.singleShot(1500, lambda: w._teach_record(out))
     elif "--teach-smoke" in argv:
         out = argv[argv.index("--teach-smoke") + 1]
         QTimer.singleShot(1500, lambda: w._teach_smoke(out))

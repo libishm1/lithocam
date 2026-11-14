@@ -172,8 +172,7 @@ G-code and DXF for the station's wire faces (docs/WIRESAW_CNC.md).
 `api.steps()` lists the new steps with their parameters. The check command prints the summary and the time of each
 program:
 
-
-```
+```text
 python -m lithocam.studio.api steps
 python -m lithocam.studio.api schema
 python -m lithocam.studio.api check station.lcs.json [PROGRAM]
@@ -185,3 +184,8 @@ python -m lithocam.studio.api post station.lcs.json PROGRAM DIALECT OUT
 `python -m lithocam.studio --record DIR N [--five-axis-demo] [--no-collisions] [--timeout S] [station.json]`
 generates the program, hides the docks and saves N frames of the 3D view. `docs/media/frames_to_gif.py DIR OUT.gif`
 turns them into a GIF (needs Pillow). Batch modes exit on failure and after the timeout; they never wait for input.
+With `--stock` the camera centres on the stock and frames it by its size.
+
+`python -m lithocam.studio --teach-record DIR` records the teaching sequence as whole-window frames: it saves a
+target, drags the z arrow, the x arrow and the z ring through the same code as the mouse, saves a second target, adds a
+joint and a linear move to the two and goes to each target. DIR also gets the log and the resulting station file.

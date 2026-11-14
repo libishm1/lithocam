@@ -326,3 +326,37 @@ def test_station_json_round_trip():
                          programs=[raster_program()])
     back = program.Station.from_json(st.to_json())
     assert back.to_json() == st.to_json()
+
+
+def test_links_below_the_stock_are_an_error():
+    """A non-cutting sample with the TCP under the stock bottom (into the table) is an error; a cut there is not."""
+    st = program.Station(robot="kr120")
+    st.stock = {"xmin": 0, "xmax": 100, "ymin": 0, "ymax": 100, "zmin": 0, "zmax": 30}
+    W = st.work_frame()
+
+    def seg(z_mm, feed):
+        p = W[:3, :3] @ np.array([0.05, 0.05, z_mm / 1000.0]) + W[:3, 3]
+        return program.Segment(step=0, label="link", q=np.zeros((1, 6)), feed=np.array([feed]),
+                               ok=np.array([True]), tcp=p.reshape(1, 3))
+    assert program._links_below_stock(st, [seg(10.0, False), seg(-50.0, True)]) == ""
+    msg = program._links_below_stock(st, [seg(10.0, False), seg(-50.0, False)])
+    assert "below the bottom of the stock" in msg and "-50" in msg
+
+
+def test_disc_saw_links_stay_above_the_slab():
+    """Disc saw links are Cartesian: up, across with the blade turning, down. On the KR120 example no link takes
+    the blade centre under the slab top plus the blade radius minus the deepest cut, and the expansion has no error."""
+    from pathlib import Path
+    from lithocam.studio import api
+    stn = Path(__file__).resolve().parents[2] / "examples" / "studio" / "disc_saw_kr120.lcs.json"
+    s = api.Session.open(stn)
+    r = s.simulate(s.station.programs[0].name)
+    assert r.ok and not r.errors, r.errors
+    Wi = np.linalg.inv(s.station.work_frame())
+    for sg in r.expansion.segments:
+        if sg.label.startswith("Disc"):
+            z = (Wi[2, :3] @ sg.tcp.T + Wi[2, 3]) * 1000.0
+            f = np.asarray(sg.feed, bool)
+            assert z[~f].min() >= z[f].min() - 1.0          # no link goes lower than the deepest cut
+            links = [rr for rr in r.expansion.records if rr.kind == "movej"]
+            assert len(links) <= 3                          # links post as linear moves, not joint moves
