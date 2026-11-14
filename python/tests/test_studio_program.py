@@ -360,3 +360,32 @@ def test_disc_saw_links_stay_above_the_slab():
             assert z[~f].min() >= z[f].min() - 1.0          # no link goes lower than the deepest cut
             links = [rr for rr in r.expansion.records if rr.kind == "movej"]
             assert len(links) <= 3                          # links post as linear moves, not joint moves
+    assert r.unreachable == 0
+    ql = [np.asarray(rr.data["q"], float) for rr in r.expansion.records if rr.kind == "movel"]
+    jump = max(float(np.degrees(np.abs(b - a).max())) for a, b in zip(ql, ql[1:]))
+    assert jump < 20.0, jump                                  # linear moves never change arm configuration
+
+
+def test_spin_tracks_stay_continuous_through_an_axis_turn():
+    """tool_pose measures spin from the work x axis projected across the tool axis; a horizontal tool axis turning
+    through x flips that reference by 180 degrees. The spin tracks keep the tool x axis continuous instead."""
+    W = np.eye(4)
+    angs = np.radians(np.linspace(-60.0, 60.0, 61))           # axis turns through +x in the horizontal plane
+    moves = [("rapid", [0.0, 0.0, 100.0], [math.cos(a), math.sin(a), 0.0]) for a in angs]
+    spins = [2 * math.pi * k / 8 for k in range(8)]
+    tr = program._spin_tracks(W, moves, spins)
+    for k in range(8):
+        xs = [program.tool_pose(W, m[1], m[2], tr[j][k])[:3, 0] for j, m in enumerate(moves)]
+        steps = [math.degrees(math.acos(min(1.0, float(a @ b)))) for a, b in zip(xs, xs[1:])]
+        assert max(steps) < 3.0, (k, max(steps))
+    raw = [program.tool_pose(W, m[1], m[2], 0.0)[:3, 0] for m in moves]
+    assert max(math.degrees(math.acos(min(1.0, float(a @ b)))) for a, b in zip(raw, raw[1:])) > 90.0
+
+
+def test_centre_winds_moves_ur_wrists_to_the_middle_of_their_range():
+    """A UR wrist at -249 degrees is the same pose as +111 degrees, which leaves more travel either way."""
+    r = program.load_robot("ur10e")
+    q = np.radians([10.0, -80.0, 100.0, -90.0, -249.0, 0.0])
+    q2 = program._centre_winds(r, q)
+    assert np.allclose(np.degrees(q2[4]), 111.0)
+    assert np.allclose(r.tcp(q), r.tcp(q2), atol=1e-9)

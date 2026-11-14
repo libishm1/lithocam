@@ -140,7 +140,13 @@ Generate expands the selected program into robot motion. Post writes the control
 - the table is driven as E1 on a cell without an external axis (the UR10e).
 
 Every joint move between and inside steps is simulated at 2 degree steps and collision-checked when collision
-checks are on. Milling posts every point the step tolerance needs. Passes start with a plunge at the plunge feed
+checks are on.
+
+Disc saw links are linear moves: up until the blade clears the stone by `clearance`, across while the blade axis
+turns, down to the next lead-in. A disc step keeps one arm configuration from its approach to its last cut, as a
+controller does on linear moves. The blade spin follows the turning axis, the long-range wrists start at the wind
+nearest the middle of their range, and comb slots keep the spindle on one side. A point that would need another
+configuration is reported as unreachable. A non-cutting point more than 5 mm under the stock bottom is an error. Milling posts every point the step tolerance needs. Passes start with a plunge at the plunge feed
 from 2 mm above the stone and end with a straight retract. Linear cuts post as linear moves on every controller,
 with the verified joints noted on each line for the read-back check.
 

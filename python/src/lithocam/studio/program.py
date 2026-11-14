@@ -311,31 +311,41 @@ def tool_pose(work: np.ndarray, p_mm: Sequence[float], axis=None, spin: float = 
     return T
 
 
-def _solve_five_axis(robot: Robot, backend, wk, rmoves, q, spins):
+def _solve_five_axis(robot: Robot, backend, wk, rmoves, q, spins, linear_links: bool = False):
     """Joints per move with the spin about the tool axis left to the planner.
 
     With a collision backend: a ladder graph (studio.planner) over spins x IK branches, collision checks lazy on
     the cell meshes (robot links, spindle, part). Without one: damped least squares, trying the spins nearest the
-    previous one first. Returns (joints, ok flags, chosen spin per move)."""
+    previous one first. Returns (joints, ok flags, chosen spin per move).
+
+    `linear_links`: every move after the first posts as a linear move, so it must stay in one arm configuration.
+    A move that needs a jump (a wrist unwind, another IK branch) is marked not ok instead of being joined by a joint
+    move the controller would not run. The spin candidates are then tracks (`_spin_tracks`): each keeps the tool's
+    orientation continuous from move to move, as a linear move does, so an axis turn never reads as a spin jump."""
     from .planner import ladder
+    track = _spin_tracks(wk, rmoves, spins) if linear_links else [list(spins)] * len(rmoves)
     if backend is not None and getattr(backend, "checks_collision", False):
         inv_tcp = np.linalg.inv(robot.tcp_offset)
-        rungs = [[tool_pose(wk, m[1], m[2] if len(m) > 2 else None, s) @ inv_tcp for s in spins] for m in rmoves]
+        rungs = [[tool_pose(wk, m[1], m[2] if len(m) > 2 else None, s) @ inv_tcp for s in track[j]]
+                 for j, m in enumerate(rmoves)]
         res = ladder(rungs, backend, seed=q, max_step=math.radians(10))
         by = {r: (qq, c) for r, qq, c in zip(res.rungs, res.joints, res.choice)}
+        jumps = set(b for b in getattr(res, "breaks", []) if b > 0) if linear_links else set()
         qs, oks, chosen = [], [], []
         last = np.asarray(q, dtype=float)
         for k in range(len(rmoves)):
             if k in by:
                 last, c = np.asarray(by[k][0]), by[k][1]
                 qs.append(last)
-                oks.append(True)
-                chosen.append(spins[c])
+                oks.append(k not in jumps)
+                chosen.append(track[k][c])
             else:
                 qs.append(last)
                 oks.append(False)
                 chosen.append(chosen[-1] if chosen else 0.0)
         return qs, oks, chosen
+    if linear_links:
+        return _solve_tracks_dls(robot, wk, rmoves, q, track)
     qs, oks, chosen = [], [], []
     s_prev = 0.0
     m0 = rmoves[0]
@@ -369,6 +379,82 @@ def _solve_five_axis(robot: Robot, backend, wk, rmoves, q, spins):
             qs.append(q)
             oks.append(True)
             chosen.append(s_prev)
+    return qs, oks, chosen
+
+
+def _spin_tracks(wk, rmoves, spins):
+    """Per move, one spin per candidate track. Track k starts at spins[k] on the first move; on each later move it
+    takes the spin whose tool x axis is nearest the track's x axis on the move before (parallel transport about the
+    turning tool axis). `tool_pose` measures spin from the work x axis projected across the tool axis, which flips
+    when a horizontal tool axis turns through x; the tracks do not."""
+    ax = [m[2] if len(m) > 2 else None for m in rmoves]
+    rows = [np.asarray(spins, dtype=float)]
+    R0 = tool_pose(wk, rmoves[0][1], ax[0], 0.0)[:3, :3]
+    for j in range(1, len(rmoves)):
+        R1 = tool_pose(wk, rmoves[j][1], ax[j], 0.0)[:3, :3]
+        s = rows[-1]
+        xp = np.outer(R0[:, 0], np.cos(s)) + np.outer(R0[:, 1], np.sin(s))   # 3 x ns: previous x axes
+        z = R1[:, 2]
+        d = xp - np.outer(z, z @ xp)
+        new = np.arctan2(R1[:, 1] @ d, R1[:, 0] @ d)
+        keep = np.linalg.norm(d, axis=0) < 1e-9                              # tool axis along the old x: keep
+        rows.append(np.where(keep, s, new))
+        R0 = R1
+    return [r.tolist() for r in rows]
+
+
+def _centre_winds(robot: Robot, q) -> np.ndarray:
+    """The same pose with each joint whose range spans more than one turn (the UR wrists, +-360 degrees) moved by
+    whole turns to the wind nearest the middle of its range, so a long path that keeps turning the wrist one way
+    has the most travel left before a limit."""
+    q = np.asarray(q, dtype=float).copy()
+    lo, hi = np.asarray(robot.lower, float), np.asarray(robot.upper, float)
+    for j in range(len(q)):
+        if hi[j] - lo[j] > 2 * math.pi + 1e-9:
+            mid = 0.5 * (lo[j] + hi[j])
+            v = mid + math.remainder(q[j] - mid, 2 * math.pi)
+            if lo[j] <= v <= hi[j]:
+                q[j] = v
+    return q
+
+
+def _solve_tracks_dls(robot: Robot, wk, rmoves, q, track):
+    """Damped least squares along spin tracks for moves posted as linear moves: only the first move may pick any
+    configuration; every later move must follow from the one before within 20 degrees per joint, else it is marked
+    not ok (the joints move on with the nearest solution so the next points are judged from there)."""
+    ns = len(track[0])
+    qs, oks, chosen = [], [], []
+    c_prev = 0
+    m0 = rmoves[0]
+    q, ok = solve_start(robot, tool_pose(wk, m0[1], m0[2] if len(m0) > 2 else None, track[0][0]), q)
+    q = _centre_winds(robot, q)
+    for k_, m in enumerate(rmoves):
+        order = sorted(range(ns), key=lambda c: min((c - c_prev) % ns, (c_prev - c) % ns))[:4]
+        ax = m[2] if len(m) > 2 else None
+        best = None
+        for c in order:
+            T = tool_pose(wk, m[1], ax, track[k_][c])
+            qq, ok = robot.solve_pose(T, q)
+            if not ok and k_ == 0:
+                qq, ok = solve_start(robot, T, q, tries=8)
+            if ok and k_ == 0:
+                qq = _centre_winds(robot, qq)
+            if ok and (k_ == 0 or float(np.max(np.abs(qq - q))) < math.radians(20)):
+                best = (qq, c)
+                break
+        if best is None:
+            cands = [robot.solve_pose(tool_pose(wk, m[1], ax, track[k_][c]), q) for c in order]
+            cands = [cc for cc, ok in cands if ok]
+            if cands:
+                q = min(cands, key=lambda cc: float(np.max(np.abs(cc - q))))
+            qs.append(q)
+            oks.append(False)
+            chosen.append(track[k_][c_prev])
+        else:
+            q, c_prev = best
+            qs.append(q)
+            oks.append(True)
+            chosen.append(track[k_][c_prev])
     return qs, oks, chosen
 
 
@@ -799,14 +885,18 @@ def _wire_step(i, st, p, station, robot, tools, backend, q, add, recs, msgs, yaw
     return q
 
 
-def _sample_links(moves, step_mm: float):
+def _sample_links(moves, step_mm: float, step_deg: Optional[float] = None):
     """Insert points every `step_mm` along rapid and plunge links (not before the first move), so a link is a
-    straight line in the simulation as it is in the posted program."""
+    straight line in the simulation as it is in the posted program. With `step_deg`, a link that turns the tool axis
+    also gets a point every `step_deg` of the turn, so a turn on a short link is not one joint jump."""
     out = list(moves[:1])
     for a, b in zip(moves, moves[1:]):
         if b[0] in ("rapid", "plunge"):
             pa, pb = np.asarray(a[1], dtype=float), np.asarray(b[1], dtype=float)
             n = int(math.ceil(np.linalg.norm(pb - pa) / step_mm))
+            if step_deg and len(a) > 2 and len(b) > 2:
+                ca = float(np.clip(np.dot(np.asarray(a[2], float), np.asarray(b[2], float)), -1.0, 1.0))
+                n = max(n, int(math.ceil(math.degrees(math.acos(ca)) / step_deg)))
             for t in np.linspace(0, 1, n + 1)[1:-1]:
                 if len(b) > 2:
                     aa = np.asarray(a[2] if len(a) > 2 else b[2], dtype=float)
@@ -919,6 +1009,11 @@ def _run_disc(i, st, p, station, robot, tool, backend, q, add, recs, msgs, error
     prev = None                                                 # (point, axis) where the last cut ended
     for c in cuts:
         n = -np.asarray(c.normal, dtype=float)                 # tool axis (tip to holder) = minus the blade normal
+        if prev is not None and getattr(c, "kind", "") == "comb" and float(np.dot(n, prev[1])) < 0.0:
+            # A comb slot is centred on its line, so the spindle may sit on either side of the blade. Zig-zag slots
+            # reverse direction, which flips their normal; keeping the spindle side saves turning the blade 180
+            # degrees (and the wrist with it) between neighbouring slots.
+            n = -n
         a, b = np.asarray(c.start, dtype=float), np.asarray(c.end, dtype=float)
         entry = np.asarray(c.lead_in, dtype=float) if len(c.lead_in) else a
         if prev is not None:
@@ -936,8 +1031,8 @@ def _run_disc(i, st, p, station, robot, tool, backend, q, add, recs, msgs, error
         if len(c.lead_out):
             moves.append(("rapid", np.asarray(c.lead_out, dtype=float), n))
         prev = (np.asarray(moves[-1][1], dtype=float), n)
-    moves = _sample_links(moves, max(step_mm, 5.0))
-    qs, oks, chosen = _solve_five_axis(robot, backend, wk, moves, q, spins)
+    moves = _sample_links(moves, max(step_mm, 5.0), step_deg=2.0)
+    qs, oks, chosen = _solve_five_axis(robot, backend, wk, moves, q, spins, linear_links=True)
     add(i, st.title(), qs, [m[0] == "feed" for m in moves], oks)
     recs.append(post.Rec("comment", {"text": "{}: {} cuts with {} (D {:g} mm, kerf {:g} mm)".format(
         st.title(), len(cuts), tool.id, D, kerf)}))
