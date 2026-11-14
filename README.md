@@ -67,6 +67,10 @@ Teaching by mouse: save a target, drag the move handle along z and x and turn it
 | ![five-axis dome](docs/media/five_axis_stock.gif) | ![temple relief](docs/media/temple_relief_kr120.gif) |
 | UR10e on the built-in dome: roughing, raster, then 5-axis ball finishing with the tool tilted along the surface normal, in the stock simulation | KR120 on the 600 mm padma relief panel: face, plane roughing, steep and shallow, 5-axis surfacing. Recorded with a coarse plan (8 mm stepovers) to keep the recording short; the example uses 2 mm and 1.5 mm (`temple_relief_kr120`) |
 
+![temple relief finish](docs/media/relief_finish_zmap.gif)
+
+The temple relief finished on the KR120, step by step, in a 0.5 mm Z-map cut along the robot's own joint samples (left: the cut surface; right: stone left over the part, white 0 to red 0.3 mm). Inside the panel the stone left after the B6 5-axis finish is at most 0.62 mm (mean 0.032 mm); the B3 rest and pencil passes bring it to 0.16 mm (mean 0.029 mm), nothing more than 0.05 mm below the part (`process.zmap_stock`, `docs/media/render_zmap.py`).
+
 Studio jogging does not check collisions. `lithocam.robot` (Tesseract) checks programs against the cell meshes. Robot programs are for simulators (URSim, KUKA.OfficeLite, RobotStudio) until a hardware gate is passed.
 
 ## Examples

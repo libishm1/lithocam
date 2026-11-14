@@ -13,6 +13,7 @@ The GIFs are generated from lithocam's own output; nothing is drawn by hand.
 | `disc_comb_ur10e.gif` | UR10e disc-saw comb roughing with a cross set | studio `--record DIR 60 --stock --no-collisions examples/studio/disc_comb_ur10e.lcs.json` |
 | `five_axis_stock.gif` | the built-in dome: roughing, raster and 5-axis finishing in the stock simulation | studio `--record DIR 60 --five-axis-demo --stock` |
 | `temple_relief_kr120.gif` | the padma relief panel on the KR120, recorded with 8 mm finishing stepovers | studio `--record DIR 70 --stock` on a copy of `temple_relief_kr120` with coarser stepovers |
+| `relief_finish_zmap.gif` | the temple relief per finishing step in a 0.5 mm Z-map, with the stone left over the part | `process.zmap_stock` on a `temple_relief_kr120` run, then `python docs/media/render_zmap.py RUN.npz DIR 0,0,600,600 0.3`, then `frames_to_gif.py DIR OUT.gif 1280 1400` |
 
 Studio frames become GIFs with `python docs/media/frames_to_gif.py DIR OUT.gif [width] [ms] [crop l,t,r,b]`.
 
