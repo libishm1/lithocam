@@ -21,7 +21,7 @@
  },
  "tool_library": "../data/saw_tools.csv",
  "tool_length": 0.0,
- "spindle": null,
+ "spindle": "kr120_saw_head",
  "material": "granite",
  "rapid_speed": 100.0,
  "robot_factor": 1.0,

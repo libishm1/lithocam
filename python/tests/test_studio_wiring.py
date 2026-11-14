@@ -179,9 +179,12 @@ def test_rest_takes_the_previous_milling_tool_and_an_empty_region_is_a_message(t
         program.Step("rest", {"tool": "S2", "stepover": 3.0, "feed": 500, "rpm": 8000, "tolerance": 0.05}),
     ])
     ex = program.expand(st, program.load_robot("kr120"), prog, tools, part)
-    assert any("rest: the previous tool is S2" in m for m in ex.messages), ex.messages
+    assert "step 2: rest: leftover from a Z-map of steps 1..1 at 1 mm" in ex.messages, ex.messages
     assert any("step 2: Rest machining: " in m and "CL points" in m for m in ex.messages)
-    # the same tool again leaves nothing: an empty move list is accepted
+    assert not ex.errors
+    # with an explicit radius equal to the tool's own, nothing is left: an empty move list is accepted
+    prog.steps[2].params["previous_tool_radius"] = 25.4
+    ex = program.expand(st, program.load_robot("kr120"), prog, tools, part)
     assert any("step 3" in m and "nothing to cut" in m for m in ex.messages), ex.messages
     assert not ex.errors
 
@@ -357,8 +360,9 @@ def milled(tools):
 
 def test_wear_is_reported_per_tool_only_with_constants(milled, tools):
     st, robot, ex, run, prog = milled
+    # granite has a sourced G-ratio since the 2026-11-14 constants review: refuse it (None) to test the skip path
     rep = process.process_check(st, run, ex, robot, tools, {"specific_energy": 1.0, "radial_ratio": 0.0,
-                                                            "axial_ratio": 0.0}, prog=prog)
+                                                            "axial_ratio": 0.0, "g_ratio": None}, prog=prog)
     assert rep.life is not None and rep.life.evaluated == 0
     assert any("tool life: not evaluated" in m and "g_ratio" in m for m in rep.messages), rep.messages
     rep = process.process_check(st, run, ex, robot, tools, {"specific_energy": 1.0, "radial_ratio": 0.0,

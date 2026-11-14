@@ -458,16 +458,10 @@ class CellView:
         holder = Qt3DCore.QEntity(self.root)
         tf = Qt3DCore.QTransform(holder)
         holder.addComponent(tf)
-        ox, oy = spindle.axis_offset
-        for name, d, z0, length in spindle.parts():
-            if d > 0 and length > 0:
-                t = cylinder_tris(d / 2000, length / 1000, 28, z0=z0 / 1000) + np.array([ox, oy, 0]) / 1000
-                mesh_entity(holder, t, self.SPINDLE_RGB[name])
-        g = spindle.gauge()
-        for name, d, z0, length in cutter_parts:
-            if d > 0 and length > 0:
-                t = cylinder_tris(d / 2000, length / 1000, 20, z0=(g + z0) / 1000) + np.array([ox, oy, 0]) / 1000
-                mesh_entity(holder, t, self.SPINDLE_RGB[name])
+        for name, d, length, F in spindle.solids(cutter_parts):   # coaxial stack, angle head or side mount
+            t = cylinder_tris(d / 2000, length / 1000, 40 if d > 150 else 28, z0=0.0)
+            t = t @ F[:3, :3].T + F[:3, 3] / 1000
+            mesh_entity(holder, t, self.SPINDLE_RGB.get(name, self.SPINDLE_RGB["body"]))
         self._replace("tool", [holder])
         self._tool_tf = tf
 

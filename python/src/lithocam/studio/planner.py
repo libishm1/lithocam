@@ -163,9 +163,13 @@ class CellBackend(TesseractBackend):
         super().__init__(cell)
         self.work = np.eye(4) if work is None else np.asarray(work, dtype=float)
         if spindle is not None:
-            ox, oy = spindle.axis_offset
-            cell.attach_tool("spindle", [(d / 1000, z0 / 1000, ln / 1000, ox / 1000, oy / 1000)
-                                         for _, d, z0, ln in spindle.parts() if d > 0 and ln > 0])
+            cyl = []
+            for _, d, ln, F in spindle.solids():     # the cutter is not collision geometry: it touches the stone
+                M = np.asarray(F, dtype=float).copy()
+                M[:3, 3] /= 1000
+                cyl.append((d / 1000, ln / 1000, M))
+            if cyl:
+                cell.attach_tool("spindle", cyl)
         self.has_part = bool(part_stl)
         self.e1 = 0.0
         if turntable and str(turntable.get("driven", "operator")) == "e1":
@@ -245,13 +249,14 @@ class LadderResult:
 
 def ladder(rungs: Sequence[Sequence[np.ndarray]], backend, seed: Optional[Sequence[float]] = None,
            max_step: float = math.radians(25), check_collision: bool = True, ext=None, ext_seed=None,
-           ext_max_step: float = math.inf, ext_weight: float = 1.0) -> LadderResult:
+           ext_max_step: float = math.inf, ext_weight: float = 1.0, node_cost=None) -> LadderResult:
     """rungs[k] = candidate tool0 poses (4x4) of path point k. Returns the least-motion joint path.
 
     `ext[k][c]`: the external-axis value (turntable angle, radians) candidate c of rung k was built for; None = no
     external axis. With it a node is (arm joints, table angle): an edge needs the arm step <= max_step and the table
     step <= ext_max_step, and costs the summed squared arm steps plus ext_weight times the squared table step.
-    `ext_seed` is the table angle before the first rung.
+    `ext_seed` is the table angle before the first rung. `node_cost(Q) -> (n,)`: an extra cost per node (e.g. a
+    penalty near a wrist singularity), added once for every rung on the path.
 
     Collision checks are lazy: the graph is built from IK alone, the least-motion path is found, only the nodes on
     it are checked, colliding nodes are removed and the search repeats until the path is clear. A collision check
@@ -268,10 +273,11 @@ def ladder(rungs: Sequence[Sequence[np.ndarray]], backend, seed: Optional[Sequen
         if qs:
             Q = np.asarray(qs)
             I = np.asarray(idx)
-            layers.append((Q, I, None if ext is None else np.asarray(ext[k], dtype=float)[I]))
+            layers.append((Q, I, None if ext is None else np.asarray(ext[k], dtype=float)[I],
+                           None if node_cost is None else np.asarray(node_cost(Q), dtype=float)))
             prev_hint = Q[0] if prev_hint is None else Q[np.argmin(np.abs(Q - prev_hint).max(1))]
         else:
-            layers.append((None, None, None))
+            layers.append((None, None, None, None))
     nodes = sum(len(L[0]) for L in layers if L[0] is not None)
     lazy = check_collision and backend.checks_collision
     checked = {}                                         # (rung, joint bytes, table) -> collides
@@ -304,10 +310,11 @@ def ladder(rungs: Sequence[Sequence[np.ndarray]], backend, seed: Optional[Sequen
         if not bad:
             break
         for r, rows in bad.items():
-            Q, idx, E = layers[r]
+            Q, idx, E, C = layers[r]
             keep = np.setdiff1d(np.arange(len(Q)), rows)
             rejected += len(rows)
-            layers[r] = (Q[keep], idx[keep], None if E is None else E[keep]) if len(keep) else (None, None, None)
+            layers[r] = (Q[keep], idx[keep], None if E is None else E[keep], None if C is None else C[keep]) \
+                if len(keep) else (None, None, None, None)
             alive[r] = alive[r][keep] if len(keep) else None
     res.nodes = nodes
     res.collisions_rejected = rejected
@@ -341,6 +348,8 @@ def _solve_layers(layers, seed, max_step, ext_seed=None, ext_max_step=math.inf, 
         # one run of consecutive rungs connected by steps <= max_step
         Q0 = layers[k][0]
         cost = np.zeros(len(Q0)) if start is None else np.sum((Q0 - start) ** 2, axis=1)
+        if layers[k][3] is not None:
+            cost = cost + layers[k][3]
         if layers[k][2] is not None and estart is not None:
             cost = cost + ext_weight * (layers[k][2] - estart) ** 2
         back = []
@@ -351,6 +360,8 @@ def _solve_layers(layers, seed, max_step, ext_seed=None, ext_max_step=math.inf, 
             w = edge(j) if edge is not None else _edge_w(layers[run[-1]][0], Qb, layers[run[-1]][2], layers[j][2],
                                                          max_step, ext_max_step, ext_weight)
             tot = cost[:, None] + w
+            if layers[j][3] is not None:
+                tot = tot + layers[j][3][None, :]
             arg = np.argmin(tot, axis=0)
             new = tot[arg, np.arange(len(Qb))]
             if not np.isfinite(new).any():

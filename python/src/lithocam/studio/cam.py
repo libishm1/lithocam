@@ -145,20 +145,155 @@ def _zigzag(tool, mesh, rect, stepover, tol, floor) -> List[np.ndarray]:
 ENTRY_HEIGHT = 2.0   # mm above the pass start where the plunge at plunge feed begins
 
 
-def _link(passes: List[np.ndarray], clear_z: float) -> List[Move]:
+ENTRY_KINDS = ("plunge", "ramp", "helix")
+
+
+class Entry:
+    """How a pass enters the stone: "plunge" (a vertical plunge at the plunge feed), "ramp" (a descent at `angle`
+    degrees along the pass itself, bouncing along a short pass) or "helix" (a descent on a circle of `radius` mm
+    with at most `pitch` mm per turn, the circle kept inside `rect` = (xmin, xmax, ymin, ymax) for the tool centre
+    when given). `floor(x, y)`: the lowest tip height allowed at a point (the part plus the allowance, or the
+    level); the helix never goes below it. Without it the floor is the pass start height."""
+
+    def __init__(self, kind="plunge", angle=3.0, radius=0.0, pitch=1.0, rect=None, floor=None, tolerance=0.01):
+        if kind not in ENTRY_KINDS:
+            raise ValueError("entry must be one of {} (got '{}')".format(", ".join(ENTRY_KINDS), kind))
+        if kind == "ramp" and not 0.0 < float(angle) < 90.0:
+            raise ValueError("ramp angle must be between 0 and 90 degrees (got {:g})".format(float(angle)))
+        if kind == "helix" and (float(pitch) <= 0 or float(radius) <= 0):
+            raise ValueError("helix entry needs radius > 0 and pitch > 0")
+        self.kind, self.angle, self.radius, self.pitch = kind, float(angle), float(radius), float(pitch)
+        self.rect, self.floor, self.tolerance = rect, floor, max(float(tolerance), 1e-4)
+
+
+def make_entry(entry, tool, ramp_angle=3.0, helix_radius=0.0, helix_pitch=1.0, rect=None, floor=None,
+               tolerance=0.01) -> "Entry":
+    """The Entry of a step: `entry` is a kind name; helix_radius 0 means the tool radius."""
+    if isinstance(entry, Entry):
+        return entry
+    r = float(helix_radius) if helix_radius and float(helix_radius) > 0 else float(tool.diameter) / 2
+    return Entry(str(entry or "plunge"), ramp_angle, r, helix_pitch, rect, floor, tolerance)
+
+
+def _ramp_in(ps: np.ndarray, clear_z: float, entry: Entry) -> List[Move]:
+    """Feed moves from the entry height above ps[0] down a ramp that follows the pass (bouncing between its ends
+    when it is short), then back along the pass at its own height to ps[0]. Every point is at or above the pass
+    height at its xy, so the ramp stays inside the region of the pass and above its floor."""
+    n = len(ps)
+    seg = np.linalg.norm(np.diff(ps[:, :2], axis=0), axis=1) if n > 1 else np.zeros(0)
+    if n < 2 or float(seg.sum()) <= 1e-9:
+        return [("plunge", ps[0])]
+    t = math.tan(math.radians(entry.angle))
+    top = min(clear_z, ps[0, 2] + ENTRY_HEIGHT)
+    out: List[Move] = []
+    k, d, length = 0, 1, 0.0
+    for _ in range(100000):
+        if not 0 <= k + d < n:
+            d = -d
+        k2 = k + d
+        s = float(seg[min(k, k2)])
+        line2 = top - (length + s) * t
+        if s > 0 and line2 <= ps[k2, 2] + 1e-12:
+            # the ramp line meets the pass inside this segment: end the ramp exactly there
+            line0 = top - length * t
+            u = (line0 - ps[k, 2]) / (s * t + ps[k2, 2] - ps[k, 2])
+            u = min(max(u, 0.0), 1.0)
+            xy = ps[k, :2] + u * (ps[k2, :2] - ps[k, :2])
+            out.append(("feed", np.array([xy[0], xy[1], ps[k, 2] + u * (ps[k2, 2] - ps[k, 2])])))
+            back = range(k2, -1, -1) if d < 0 else range(k, -1, -1)       # on to the pass start, along the pass
+            out += [("feed", ps[j]) for j in back]
+            return out
+        length += s
+        k = k2
+        out.append(("feed", np.array([ps[k, 0], ps[k, 1], max(ps[k, 2], top - length * t)])))
+    return [("plunge", ps[0])]
+
+
+def _helix_in(ps: np.ndarray, clear_z: float, entry: Entry) -> List[Move]:
+    """The approach of a helix entry: rapid over the circle's start, rapid down to the entry height, the helix, then
+    a short straight run at the floor to ps[0]. The circle passes through ps[0] along the pass direction and is moved
+    inwards when it would leave entry.rect."""
+    p0 = ps[0]
+    r = entry.radius
+    d = np.array([1.0, 0.0])
+    for q in ps[1:]:
+        v = q[:2] - p0[:2]
+        if np.hypot(*v) > 1e-9:
+            d = v / np.hypot(*v)
+            break
+    c = p0[:2] + r * d
+    if entry.rect is not None:
+        x0, x1, y0, y1 = entry.rect
+        if x1 - x0 < 2 * r - 1e-9 or y1 - y0 < 2 * r - 1e-9:
+            raise ValueError("helix radius {:g} mm does not fit the region ({:g} x {:g} mm)".format(r, x1 - x0, y1 - y0))
+        c = np.array([min(max(c[0], x0 + r), x1 - r), min(max(c[1], y0 + r), y1 - r)])
+    a0 = math.atan2(p0[1] - c[1], p0[0] - c[0])
+    h0 = c + r * np.array([math.cos(a0), math.sin(a0)])     # the circle point nearest ps[0] (ps[0] itself unmoved)
+    fl = (lambda x, y: max(float(p0[2]), float(entry.floor(x, y)))) if entry.floor is not None \
+        else (lambda x, y: float(p0[2]))
+    top = min(clear_z, fl(h0[0], h0[1]) + ENTRY_HEIGHT)
+    turns = max(int(math.ceil((top - p0[2]) / entry.pitch - 1e-9)), 1)
+    step = 2 * math.acos(max(1 - entry.tolerance / r, -1.0)) if entry.tolerance < r else math.pi / 2
+    step = min(max(step, math.radians(2.0)), math.pi / 6)
+    m = max(int(math.ceil(2 * math.pi * turns / step)), 8 * turns)
+    a = a0 + np.linspace(0.0, 2 * math.pi * turns, m + 1)
+    zh = np.linspace(top, p0[2], m + 1)
+    out: List[Move] = [("rapid", np.array([h0[0], h0[1], clear_z]))]
+    if top < clear_z - 1e-9:
+        out.append(("rapid", np.array([h0[0], h0[1], top])))
+    for ang, z in zip(a[1:], zh[1:]):
+        x, y = c[0] + r * math.cos(ang), c[1] + r * math.sin(ang)
+        out.append(("feed", np.array([x, y, max(z, fl(x, y))])))
+    gap = float(np.hypot(*(p0[:2] - h0)))
+    if gap > 1e-9:                                              # the circle was moved: run to the pass start
+        n = max(int(math.ceil(gap / 0.5)), 1)
+        for f in np.linspace(0.0, 1.0, n + 1)[1:]:
+            x, y = h0[0] + (p0[0] - h0[0]) * f, h0[1] + (p0[1] - h0[1]) * f
+            out.append(("feed", np.array([x, y, fl(x, y)])))
+    out[-1] = ("feed", p0.copy())                               # ends exactly on the pass start
+    return out
+
+
+def _link(passes: List[np.ndarray], clear_z: float, entry: Entry = None, skim=None) -> List[Move]:
     """Links between passes: rapid at the clearance plane over the pass start, rapid down to ENTRY_HEIGHT above
     it, plunge to the start at the plunge feed, feed along the pass, straight retract to the clearance plane.
-    Rapids are posted as straight lines (not joint moves), so the tool never sweeps sideways near the stone."""
+    Rapids are posted as straight lines (not joint moves), so the tool never sweeps sideways near the stone.
+    `entry` (see Entry): a ramp or a helix replaces the plunge.
+
+    `skim(p_end, p_start) -> z or None`: a safe height for a direct link between two passes (above every stone the
+    tool can meet along it). When it is below the clearance plane the tool lifts to it, crosses and plunges there
+    instead of going up to the clearance plane; None keeps the clearance-plane link."""
     moves: List[Move] = []
+    prev = None
     for ps in passes:
         if len(ps) == 0:
             continue
         s = ps[0]
-        moves.append(("rapid", np.array([s[0], s[1], clear_z])))
-        entry = np.array([s[0], s[1], min(clear_z, s[2] + ENTRY_HEIGHT)])
-        if entry[2] > s[2] + 1e-9:
-            moves.append(("rapid", entry))
-        moves.append(("plunge", s))
+        zs = skim(prev, s) if (skim is not None and prev is not None) else None
+        if zs is not None and zs < clear_z - 1e-9:
+            zs = max(zs, prev[2], s[2])
+            if moves and moves[-1][0] == "rapid":
+                moves.pop()                                  # the retract to the clearance plane is not needed
+            moves.append(("rapid", np.array([prev[0], prev[1], zs])))
+            moves.append(("rapid", np.array([s[0], s[1], zs])))
+            if zs > s[2] + 1e-9:
+                moves.append(("plunge", s))
+            moves += [("feed", p) for p in ps[1:]]
+            moves.append(("rapid", np.array([ps[-1, 0], ps[-1, 1], clear_z])))
+            prev = ps[-1]
+            continue
+        prev = ps[-1]
+        if entry is not None and entry.kind == "helix" and len(ps) > 1:
+            moves += _helix_in(ps, clear_z, entry)
+        else:
+            moves.append(("rapid", np.array([s[0], s[1], clear_z])))
+            enter = np.array([s[0], s[1], min(clear_z, s[2] + ENTRY_HEIGHT)])
+            if enter[2] > s[2] + 1e-9:
+                moves.append(("rapid", enter))
+            if entry is not None and entry.kind == "ramp" and enter[2] > s[2] + 1e-9:
+                moves += _ramp_in(ps, clear_z, entry)
+            else:
+                moves.append(("plunge", s))
         moves += [("feed", p) for p in ps[1:]]
         moves.append(("rapid", np.array([ps[-1, 0], ps[-1, 1], clear_z])))
     return moves
@@ -430,8 +565,20 @@ def raster(tris, mesh, tool, stock, stepover=2.0, scallop=0.0, allowance=0.0, to
     return _link(passes, stock["zmax"] + clearance)
 
 
+def _floor_fn(tool, mesh, level, allowance):
+    """Lowest tip height at (x, y) for a pass at `level`: max(level, drop-cutter height + allowance)."""
+    cutter = lc.cutter_of(tool)
+
+    def floor(x, y):
+        z = lc.drop_cutter(cutter, mesh, float(x), float(y))
+        return max(level, z + allowance) if math.isfinite(z) else level
+    return floor
+
+
 def rough_plane(tris, mesh, tool, stock, stepdown=5.0, stepover=4.0, allowance=0.5, tolerance=0.01, clearance=20.0,
-                **_) -> List[Move]:
+                entry="plunge", ramp_angle=3.0, helix_radius=0.0, helix_pitch=1.0, **_) -> List[Move]:
+    """Z-level roughing. entry: "plunge" (default), "ramp" (ramp_angle deg) or "helix" (helix_radius mm, 0 = the
+    tool radius; helix_pitch mm per turn at most); see Entry."""
     lo = tris.reshape(-1, 3).min(0)
     rect = (stock["xmin"], stock["xmax"], stock["ymin"], stock["ymax"])
     base = _zigzag(tool, mesh, rect, max(stepover, 0.05), tolerance, lo[2])
@@ -455,12 +602,15 @@ def rough_plane(tris, mesh, tool, stock, stepdown=5.0, stepover=4.0, allowance=0
             tip = ps.copy()
             tip[:, 2] = np.maximum(level, ps[:, 2] + allowance)
             cut += _clamp_runs(tip, level, top)
-        moves += _link(cut, top + clearance)
+        ent = make_entry(entry, tool, ramp_angle, helix_radius, helix_pitch, rect,
+                         _floor_fn(tool, mesh, level, allowance), tolerance) if entry != "plunge" else None
+        moves += _link(cut, top + clearance, ent)
     return moves
 
 
 def face(tris, mesh, tool, stock, depth=1.0, stepover=0.0, allowance=0.0, tolerance=0.01, clearance=20.0,
-         **_) -> List[Move]:
+         entry="plunge", ramp_angle=3.0, helix_radius=0.0, helix_pitch=1.0, **_) -> List[Move]:
+    """Face milling at stock top - depth. entry: see rough_plane."""
     R = tool.diameter / 2
     so = stepover if stepover > 0 else 0.7 * tool.diameter
     rect = (stock["xmin"] - R, stock["xmax"] + R, stock["ymin"] - R, stock["ymax"] + R)
@@ -471,7 +621,9 @@ def face(tris, mesh, tool, stock, depth=1.0, stepover=0.0, allowance=0.0, tolera
         tip = ps.copy()
         tip[:, 2] = np.maximum(level, ps[:, 2] + allowance)
         cut.append(tip)
-    return _link(cut, stock["zmax"] + clearance)
+    ent = make_entry(entry, tool, ramp_angle, helix_radius, helix_pitch, rect,
+                     _floor_fn(tool, mesh, level, allowance), tolerance) if entry != "plunge" else None
+    return _link(cut, stock["zmax"] + clearance, ent)
 
 
 def _limit_axis_rate(A: np.ndarray, C: np.ndarray, rate: float) -> np.ndarray:

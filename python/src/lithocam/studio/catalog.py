@@ -45,6 +45,12 @@ _CUT = (("stepdown", "Step-down", "float", 5.0, "mm"), ("stepover", "Stepover", 
         ("rpm", "Spindle", "float", 0.0, "rev/min (0 = tool)"))
 _LINK = (("clearance", "Clearance height", "float", 20.0, "mm above stock"),
          ("tolerance", "Path tolerance", "float", 0.01, "mm"))
+# how a pass enters the stone (cam.Entry): plunge, a ramp along the pass, or a helix; the ramp angle, helix radius and
+# helix pitch are example values, to be set for the tool and the stone
+_ENTRY = (("entry", "Entry", "choice:plunge|ramp|helix", "plunge", "plunge: vertical; ramp: along the pass; helix: a circle"),
+          ("ramp_angle", "Ramp angle", "float", 3.0, "deg (ramp entry; an example value)"),
+          ("helix_radius", "Helix radius", "float", 0.0, "mm, 0 = the tool radius (helix entry)"),
+          ("helix_pitch", "Helix pitch", "float", 1.0, "mm per turn at most (helix entry; an example value)"))
 
 STEPS: List[StepSpec] = [
     # ---------------------------------------------------------------- robot instructions
@@ -74,7 +80,7 @@ STEPS: List[StepSpec] = [
                      ("tilt", "Tool tilt (3+2)", "float", 0.0, "deg about the table x axis"))),
     StepSpec("tool_change", "Tool change", "Setup", "TC", "done", "any", params=(("tool", "Tool", "tool", "", ""),)),
     # ---------------------------------------------------------------- stone (the niche, first)
-    StepSpec("wire_ruled", "Diamond wire: ruled surface", "Stone", "W", "partial", "wire_cut",
+    StepSpec("wire_ruled", "Diamond wire: ruled surface", "Stone", "W", "done", "wire_cut",
              params=(("feed", "Feed", "float", 0.0, "mm/min across the stone (0 = tool)"),
                      ("faces", "Faces", "text", "all", "all, or face indices 1,4,7"),
                      ("rolls", "Wire rolls tried", "text", ",".join(str(a) for a in range(-90, 91, 10)), "deg"),
@@ -89,7 +95,7 @@ STEPS: List[StepSpec] = [
                       "cost of a table step relative to an arm joint step of the same angle; E1 only")),
              doc="Sweeps the diamond wire over the part's ruled faces (Station.ruled_path, from lithocam.ruled)."),
     StepSpec("wire_planar", "Diamond wire: planar cut", "Stone", "W|", "partial", "wire_cut"),
-    StepSpec("disc_cut", "Disc saw: profile with kerf", "Stone", "D", "partial", "disc_cut",
+    StepSpec("disc_cut", "Disc saw: profile with kerf", "Stone", "D", "done", "disc_cut",
              (("outline", "Outline", "text", "", "x,y; x,y; ... mm, CCW, work frame (empty = stock box)"),
               ("depth", "Depth", "float", 0.0, "mm along the blade (0 = through)"),
               ("stepdown", "Step-down", "float", 10.0, "mm"),
@@ -97,11 +103,12 @@ STEPS: List[StepSpec] = [
               ("flange_diameter", "Flange diameter", "float", 100.0, "mm"),
               ("feed", "Feed", "float", 0.0, "mm/min (0 = tool / cutting data)"),
               ("rpm", "Spindle", "float", 0.0, "rev/min (0 = tool / cutting data)"),
-              ("spins", "Blade spins tried", "int", 8, "per point (planner)")),
+              ("spins", "Blade spins tried", "int", 8, "per point (planner)"),
+              ("approach_deg", "Arm approach from vertical", "float", 45.0, "deg (angle head only)")),
              doc="Kerf-compensated saw cuts around a part outline (lithocam.discsaw): the blade's part-side face on "
                  "each edge, full depth into convex corners, stops short of reflex corners and reports the uncut "
                  "wedge."),
-    StepSpec("disc_comb", "Disc saw: comb roughing", "Stone", "Dc", "partial", "disc_cut",
+    StepSpec("disc_comb", "Disc saw: comb roughing", "Stone", "Dc", "done", "disc_cut",
              (("region", "Region", "text", "", "x,y; x,y; ... mm, CCW, work frame"),
               ("pitch", "Pitch", "float", 15.0, "mm"), ("depth", "Depth", "float", 10.0, "mm"),
               ("stepdown", "Step-down", "float", 5.0, "mm"), ("angle", "Angle", "float", 0.0, "deg"),
@@ -109,7 +116,8 @@ STEPS: List[StepSpec] = [
               ("flange_diameter", "Flange diameter", "float", 40.0, "mm"),
               ("feed", "Feed", "float", 0.0, "mm/min (0 = tool / cutting data)"),
               ("rpm", "Spindle", "float", 0.0, "rev/min (0 = tool / cutting data)"),
-              ("spins", "Blade spins tried", "int", 8, "per point (planner)")),
+              ("spins", "Blade spins tried", "int", 8, "per point (planner)"),
+              ("approach_deg", "Arm approach from vertical", "float", 45.0, "deg (angle head only)")),
              doc="Parallel saw kerfs across a region (and an optional cross pass) to break out stone before "
                  "finishing."),
     StepSpec("disc_ruled", "Disc saw: ruled faces", "Stone", "Dr", "done", "disc_cut",
@@ -122,7 +130,8 @@ STEPS: List[StepSpec] = [
               ("flange_diameter", "Flange diameter", "float", 100.0, "mm"),
               ("feed", "Feed", "float", 0.0, "mm/min (0 = tool / cutting data)"),
               ("rpm", "Spindle", "float", 0.0, "rev/min (0 = tool / cutting data)"),
-              ("spins", "Blade spins tried", "int", 8, "per point (planner)")),
+              ("spins", "Blade spins tried", "int", 8, "per point (planner)"),
+              ("approach_deg", "Arm approach from vertical", "float", 45.0, "deg (angle head only)")),
              doc="Saw cuts along the rulings of the part's ruled faces (lithocam.discsaw.ruled_disc_cuts). The log "
                  "says per face how many rulings can be cut, the depth, the twist and the tilt; a ruling that cannot "
                  "be cut is left out with its reason. The blade spin is chosen by the planner."),
@@ -133,15 +142,45 @@ STEPS: List[StepSpec] = [
     StepSpec("calibrate", "Calibrate slab", "Stone", "Ca", "planned", "calibrate", _CUT + _LINK),
     # ---------------------------------------------------------------- 2.5-axis
     StepSpec("face", "Face", "2.5-axis", "Fa", "done", "face",
-             (("depth", "Depth", "float", 1.0, "mm"),) + _CUT + _LINK),
+             (("depth", "Depth", "float", 1.0, "mm"),) + _CUT + _ENTRY + _LINK,
+             doc="Zig-zag at the stock top minus the depth. The entry is a plunge, a ramp or a helix."),
     StepSpec("profile", "Profile (2D contour)", "2.5-axis", "Pr", "partial", "profile", _CUT + _LINK),
     StepSpec("pocket", "Pocket", "2.5-axis", "Pk", "partial", "pocket", _CUT + _LINK),
     StepSpec("slot", "Slot", "2.5-axis", "Sl", "planned", "slot", _CUT + _LINK),
-    StepSpec("chamfer", "Chamfer", "2.5-axis", "Ch", "planned", "chamfer", _LINK),
-    StepSpec("engrave", "Engrave / lettering", "2.5-axis", "En", "planned", "engrave", _LINK),
+    StepSpec("chamfer", "Chamfer", "2.5-axis", "Ch", "done", "chamfer",
+             (("width", "Chamfer width", "float", 0.0, "mm on the top face, required; at most the tool radius"),
+              ("paths", "Edges", "text", "", "x,y; x,y | x,y; ... mm (empty = the outline of the part's highest flat top)"),
+              ("max_slope_deg", "Flat top within", "float", 1.0, "deg of +z (the outline search)"),
+              ("step", "Sample spacing", "float", 0.5, "mm"),
+              ("feed", "Feed", "float", 0.0, "mm/min (0 = tool / cutting data)"),
+              ("rpm", "Spindle", "float", 0.0, "rev/min (0 = tool / cutting data)")) + _LINK,
+             doc="A V-bit or chamfer bit runs along the top edge of the part (or the edges you give) at the chamfer "
+                 "width; the tip sits on the wall below the edge. Given edges follow a non-flat top."),
+    StepSpec("engrave", "Engrave / lettering", "2.5-axis", "En", "done", "engrave",
+             (("paths", "Paths", "text", "", "x,y; x,y | x,y; ... mm, polylines separated by |"),
+              ("width", "Groove width", "float", 0.0, "mm at the surface; sets the depth from the V angle (0 = use depth)"),
+              ("depth", "Depth", "float", 0.0, "mm below the top surface (used when the width is 0)"),
+              ("text", "Text", "text", "", "not available: lithocam ships no single-stroke font; give the strokes as paths"),
+              ("step", "Sample spacing", "float", 0.5, "mm"),
+              ("feed", "Feed", "float", 0.0, "mm/min (0 = tool / cutting data)"),
+              ("rpm", "Spindle", "float", 0.0, "rev/min (0 = tool / cutting data)")) + _LINK,
+             doc="V-bit engraving along polylines. The tip follows the part's top surface at the depth, or at the "
+                 "depth that gives the groove width. Letters need a single-stroke font, which is not shipped: "
+                 "give the strokes as paths."),
+    StepSpec("flat_land", "Flat lands (horizontal areas)", "2.5-axis", "FL", "done", "pocket",
+             (("max_slope_deg", "Flat within", "float", 1.0, "deg of +z"),
+              ("stepover", "Stepover", "float", 0.0, "mm, 0 = 0.7 x the tool diameter"),
+              ("allowance", "Stock to leave", "float", 0.0, "mm"),
+              ("cell", "Grid cell", "float", 0.0, "mm, 0 = from the tool"),
+              ("feed", "Feed", "float", 0.0, "mm/min (0 = tool / cutting data)"),
+              ("rpm", "Spindle", "float", 0.0, "rev/min (0 = tool / cutting data)")) + _ENTRY + _LINK,
+             doc="Finishes the horizontal faces of the part with a flat or bull end mill: a zig-zag at the height of "
+                 "each land, highest first. The tool stays a radius from walls that rise above the land and may "
+                 "overhang an open edge."),
     StepSpec("adaptive", "Adaptive clearing", "2.5-axis", "Ad", "planned", "pocket", _CUT + _LINK),
     # ---------------------------------------------------------------- 3-axis
-    StepSpec("rough_plane", "Plane roughing (z-level)", "3-axis", "R", "done", "raster", _CUT + _LINK),
+    StepSpec("rough_plane", "Plane roughing (z-level)", "3-axis", "R", "done", "raster", _CUT + _ENTRY + _LINK,
+             doc="Z-level roughing over the stock. The entry is a plunge, a ramp or a helix."),
     StepSpec("raster", "Raster finishing", "3-axis", "Ra", "done", "raster",
              (("stepover", "Stepover", "float", 2.0, "mm"), ("scallop", "Scallop (ball)", "float", 0.0, "mm, 0 = off"),
               ("allowance", "Stock to leave", "float", 0.0, "mm"), ("feed", "Feed", "float", 0.0, "mm/min"),
@@ -167,7 +206,7 @@ STEPS: List[StepSpec] = [
                  "raster along x on shallow ground, with an overlap band cut by both."),
     StepSpec("rest", "Rest machining", "3-axis", "Re", "done", "rest",
              (("previous_tool_radius", "Previous tool radius", "float", 0.0,
-               "mm, 0 = the tool of the previous milling step in the program (or the stock simulation)"),
+               "mm, 0 = the stock simulation, else a Z-map of the earlier milling steps"),
               ("threshold", "Leftover threshold", "float", 0.05, "mm the previous tool left"),
               ("mode", "Mode", "choice:raster|waterline", "raster", ""),
               ("stepover", "Stepover", "float", 1.0, "mm (raster)"),
@@ -176,10 +215,14 @@ STEPS: List[StepSpec] = [
               ("allowance", "Stock to leave", "float", 0.0, "mm"),
               ("direction", "Direction", "choice:climb|conventional", "climb", "clockwise spindle (M3)"),
               ("cell", "Grid cell", "float", 0.0, "mm, 0 = from the tool"),
+              ("leftover_cell", "Z-map cell", "float", 1.0, "mm, the Z-map of the earlier milling steps"),
+              ("low_links", "Low links", "bool", False, "nearest run first; links 2 mm above the stone left, "
+                                                        "not at the clearance plane"),
               ("feed", "Feed", "float", 0.0, "mm/min (0 = tool / cutting data)"),
               ("rpm", "Spindle", "float", 0.0, "rev/min (0 = tool / cutting data)")) + _LINK,
-             doc="Cuts only where the previous tool left more than the threshold (docs/OPERATIONS_HOLES_REST.md). "
-                 "The previous tool is the tool of the previous milling step in the program unless a radius is set."),
+             doc="Cuts only where the earlier steps left more than the threshold (docs/OPERATIONS_HOLES_REST.md). "
+                 "The material comes from the last stock simulation (the state before this step), else from a "
+                 "Z-map of the earlier milling steps, else from the previous tool radius; the log says which."),
     StepSpec("pencil", "Pencil / corners", "3-axis", "Pe", "done", "raster",
              (("min_angle_deg", "Crease angle", "float", 15.0, "deg of slope change that counts as a crease"),
               ("min_length", "Shortest path", "float", 0.0, "mm"),
@@ -206,7 +249,7 @@ STEPS: List[StepSpec] = [
              (("tilt", "Tilt", "float", 0.0, "deg"), ("yaw", "Turntable", "float", 0.0, "deg"))),
     StepSpec("flank", "Flank (swarf)", "5-axis", "Fl", "partial", "flank",
              doc="lithocam.flank; needs a STEP part with ruled faces (OCP)"),
-    StepSpec("surfacing5", "5-axis surfacing (ball, lead angle)", "5-axis", "5D", "partial", "raster",
+    StepSpec("surfacing5", "5-axis surfacing (ball, lead angle)", "5-axis", "5D", "done", "raster",
              (("stepover", "Stepover", "float", 2.0, "mm"), ("lead", "Lead angle", "float", 15.0,
                                                               "deg, tool leans back from the surface normal"),
               ("max_tilt", "Largest tilt from the setup axis", "float", 45.0, "deg"),

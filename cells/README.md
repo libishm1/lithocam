@@ -10,6 +10,7 @@ python cells/make_cells.py
 |---|---|---|---|
 | `ur10e` | Universal Robots UR10e | published DH parameters (d1 0.1807, a2 -0.6127, a3 -0.57155, d4 0.17415, d5 0.11985, d6 0.11655) | Tesseract UR solver, verified, with a KDL fallback |
 | `kr120` | KUKA KR120 R2500 PRO | ROS-Industrial `kuka_experimental` (BSD) joint origins, axes and limits | OPW, verified, with a KDL fallback |
+| `irb6700` | ABB IRB 6700-200/2.60 | ROS-Industrial `abb_irb6700_support` (Apache-2.0) joint origins, axes, limits and meshes; the two balancer mimic joints are left out | OPW, verified, with a KDL fallback; RAPID post, turntable as E1 |
 
 ## How IK is verified
 

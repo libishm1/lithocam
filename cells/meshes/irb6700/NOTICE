@@ -1,0 +1,12 @@
+ABB IRB 6700 model from ROS-Industrial abb_irb6700_support, Apache-2.0.
+
+Source: https://github.com/ros-industrial/abb, branch noetic-devel, package abb_irb6700_support 1.5.0
+(package.xml licence field: Apache-2.0; LICENSE in this folder is the package's licence text).
+
+Files here are the package's meshes, unchanged and renamed by link:
+  <link>.stl          from meshes/irb6700/collision (base_link, link_1, link_5, link_6) and
+                      meshes/irb6700_200_260/collision (link_2, link_3, link_4)
+  visual/<link>.stl   the same from the visual folders
+The mesh files cylinder.stl and piston.stl (the A2 balancer) are not copied: the joints that move them are mimic
+joints, which the cell files leave out. The joint data is in cells/irb6700.urdf, written by cells/make_cells.py
+from urdf/irb6700_200_260_macro.xacro and config/joint_names_irb6700_200_260.yaml of the same package.

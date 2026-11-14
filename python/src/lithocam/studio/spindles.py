@@ -40,14 +40,35 @@ class Spindle:
     # Side-mounted spindle whose end-effector TCP is given in the flange frame (x y z mm, a b c degrees): the cutter
     # axis is the TCP frame z axis, not the flange axis. None = the coaxial stack above.
     tcp_flange: Optional[Tuple[float, ...]] = None
+    # Angle head: a column of `head_drop` mm along the flange z axis, then the spindle turned by `head_angle_deg` about
+    # the flange y axis (90 = a right-angle head: the cutter axis along the flange x axis, as on the side-mounted stone
+    # spindles of the Q-LAB cells). 0 = the coaxial stack. The body, nose and cutter follow the turned axis.
+    head_angle_deg: float = 0.0
+    head_drop: float = 0.0
 
     def gauge(self) -> float:
-        """Flange face to collet face, mm."""
+        """Flange face to collet face, mm (an angle head: column end to collet face along the cutter axis)."""
         return self.plate_thickness + self.body_length + self.nose_length
+
+    def head_frame(self) -> np.ndarray:
+        """Start of the spindle body in the flange frame (mm): z along the cutter axis."""
+        a = np.radians(self.head_angle_deg)
+        T = np.eye(4)
+        T[:3, :3] = np.array([[np.cos(a), 0.0, np.sin(a)], [0.0, 1.0, 0.0], [-np.sin(a), 0.0, np.cos(a)]])
+        T[:3, 3] = [self.axis_offset[0], self.axis_offset[1], self.head_drop]
+        return T
+
+    def is_angle_head(self) -> bool:
+        return self.tcp_flange is None and abs(self.head_angle_deg) > 1e-9
 
     def tcp(self, tool_stickout_mm: float) -> np.ndarray:
         """TCP (cutter tip) in the flange frame, metres."""
         T = np.eye(4)
+        if self.is_angle_head():
+            H = self.head_frame()
+            T[:3, :3] = H[:3, :3]
+            T[:3, 3] = (H[:3, 3] + H[:3, 2] * (self.gauge() + tool_stickout_mm)) / 1000
+            return T
         if self.tcp_flange is not None:
             from lithocam.robomove import rpy_matrix
             x, y, z, a, b, c = self.tcp_flange[:6]
@@ -60,8 +81,8 @@ class Spindle:
 
     def parts(self) -> List[Tuple[str, float, float, float]]:
         """(name, diameter mm, z0 mm, length mm) of the coaxial cylinders, in the flange frame along z."""
-        if self.tcp_flange is not None:
-            return []   # side-mounted: the coaxial stack does not describe it; the cutter is still drawn
+        if self.tcp_flange is not None or self.is_angle_head():
+            return []   # side-mounted or angle head: see solids(); the coaxial stack does not describe it
         z = 0.0
         out = [("plate", self.plate_diameter, z, self.plate_thickness)]
         z += self.plate_thickness
@@ -70,10 +91,59 @@ class Spindle:
         out.append(("nose", self.nose_diameter, z, self.nose_length))
         return out
 
+    def solids(self, cutter=()) -> List[Tuple[str, float, float, np.ndarray]]:
+        """Every cylinder of the spindle and the cutter as (name, diameter mm, length mm, base frame in the flange
+        frame, mm; the cylinder runs from the base along its z). `cutter`: cutter_parts(...) measured from the collet
+        face. Covers the coaxial stack, the angle head and (cutter only) a side-mounted tcp_flange spindle."""
+        out = []
+        if self.tcp_flange is not None:
+            B = self.tcp(0.0).copy()
+            B[:3, 3] *= 1000                    # collet face = the TCP with no stickout
+        else:
+            if self.is_angle_head():
+                col = np.eye(4)
+                col[:3, 3] = [self.axis_offset[0], self.axis_offset[1], 0.0]
+                out.append(("plate", self.plate_diameter, self.plate_thickness, col))
+                c2 = col.copy()
+                c2[2, 3] = self.plate_thickness
+                out.append(("column", self.nose_diameter * 2, max(self.head_drop - self.plate_thickness, 0.0), c2))
+                H = self.head_frame()
+                z, parts = 0.0, [("body", self.body_diameter, self.plate_thickness + self.body_length),
+                                 ("nose", self.nose_diameter, self.nose_length)]
+                H0 = H.copy()
+                H0[:3, 3] -= H[:3, 2] * self.body_diameter / 2   # the body starts behind the column axis
+                for name, d, ln in parts:
+                    F = H0.copy()
+                    F[:3, 3] += H[:3, 2] * z
+                    out.append((name, d, ln + (self.body_diameter / 2 if name == "body" else 0.0), F))
+                    z += ln + (self.body_diameter / 2 if name == "body" else 0.0)
+                B = H.copy()
+                B[:3, 3] += H[:3, 2] * self.gauge()
+            else:
+                for name, d, z0, ln in self.parts():
+                    F = np.eye(4)
+                    F[:3, 3] = [self.axis_offset[0], self.axis_offset[1], z0]
+                    out.append((name, d, ln, F))
+                B = np.eye(4)
+                B[:3, 3] = [self.axis_offset[0], self.axis_offset[1], self.gauge()]
+        for name, d, z0, ln in cutter:
+            F = B.copy()
+            F[:3, 3] += B[:3, 2] * z0
+            out.append((name, d, ln, F))
+        return [s for s in out if s[1] > 0 and s[2] > 0]
+
 
 def cutter_parts(tool, stickout_mm: float) -> List[Tuple[str, float, float, float]]:
-    """(name, diameter mm, z0 mm from the collet face, length mm): the shank, then the cutting part to the tip."""
+    """(name, diameter mm, z0 mm from the collet face, length mm): the shank, then the cutting part to the tip.
+    A saw blade (a tool with a kerf and an arbor bore) is an arbor to the blade, then the blade, its kerf thick and
+    centred on the TCP."""
     D = float(getattr(tool, "diameter", 0.0) or 0.0)
+    kerf = float(getattr(tool, "kerf", 0.0) or 0.0)
+    bore = float(getattr(tool, "bore_diameter", 0.0) or 0.0)
+    if kerf > 0 and bore > 0 and "disc" in str(getattr(tool, "kind", "")).lower():
+        arbor = max(stickout_mm - kerf / 2, 0.0)
+        out = [("shank", bore, 0.0, arbor)] if arbor > 0 else []
+        return out + [("flutes", D, arbor, kerf)]
     flute = float(getattr(tool, "flute_length", 0.0) or 0.0)
     flute = min(flute if flute > 0 else stickout_mm, stickout_mm)
     shank_d = float(getattr(tool, "shank_diameter", 0.0) or 0.0) or min(D, 12.0) or D
@@ -116,8 +186,34 @@ PRESETS: Dict[str, Spindle] = {
                              plate_thickness=25, plate_diameter=200, body_diameter=150, body_length=330,
                              nose_diameter=50, nose_length=45, collet="ER32", max_collet_mm=20.0,
                              control="VFD: $OUT start, $ANOUT speed (set per cell)"),
+    "irb6700_example": Spindle("irb6700_example", "Milling electrospindle, ER32 (example size, IRB 6700)",
+                               plate_thickness=25, plate_diameter=200, body_diameter=150, body_length=330,
+                               nose_diameter=50, nose_length=45, collet="ER32", max_collet_mm=20.0,
+                               control="VFD: SetDO start, SetAO speed (set per cell)"),
+    # Right-angle saw heads: the blade axis 90 degrees from the flange axis, so the blade stays vertical while the arm
+    # comes in from above. The layout follows the side-mounted spindles of the Quarra Stone Q-LAB cells (the cutter
+    # axis along the flange x axis, the same head carrying mills and 632-840 mm blades). Sizes are examples.
+    "kr120_saw_head": Spindle("kr120_saw_head", "Right-angle saw head, 50 mm arbor (example size, KR120)",
+                              plate_thickness=25, plate_diameter=200, body_diameter=150, body_length=180,
+                              nose_diameter=60, nose_length=40, collet="arbor 50", max_collet_mm=50.0,
+                              head_angle_deg=90.0, head_drop=180.0,
+                              control="VFD: $OUT start, $ANOUT speed (set per cell)",
+                              source="example size; side-mounted layout as in the Quarra Stone Q-LAB end effectors"),
+    "ur10e_saw_head": Spindle("ur10e_saw_head", "Right-angle saw head, 22.23 mm arbor (example size, UR10e)",
+                              plate_thickness=12, plate_diameter=80, body_diameter=70, body_length=110,
+                              nose_diameter=35, nose_length=25, collet="arbor 22.23", max_collet_mm=22.23,
+                              head_angle_deg=90.0, head_drop=90.0,
+                              control="digital out on / analog speed (set per cell)",
+                              source="example size; side-mounted layout as in the Quarra Stone Q-LAB end effectors"),
 }
-DEFAULT_FOR_ROBOT = {"ur10e": "cm_pds", "kr120": "hx3c"}
+DEFAULT_FOR_ROBOT = {"ur10e": "cm_pds", "kr120": "hx3c", "irb6700": "irb6700_example"}
+
+
+def preset(key: str) -> Spindle:
+    """A preset by key; ValueError names the valid keys."""
+    if key not in PRESETS:
+        raise ValueError("unknown spindle preset '{}'; valid: {}".format(key, ", ".join(sorted(PRESETS))))
+    return PRESETS[key]
 
 
 def to_dict(s: Spindle) -> Dict:

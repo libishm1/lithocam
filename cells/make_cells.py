@@ -8,12 +8,14 @@ Robots
   d4 0.17415, d5 0.11985, d6 0.11655), in the joint-frame layout of the ROS ur_description.
 - KUKA KR120 R2500 PRO: joint origins, axes and limits from ROS-Industrial kuka_experimental
   (kuka_kr120_support/urdf/kr120r2500pro_macro.xacro, BSD).
+- ABB IRB 6700-200/2.60: joint origins, axes, limits and meshes from ROS-Industrial abb
+  (abb_irb6700_support/urdf/irb6700_200_260_macro.xacro, Apache-2.0).
 
 Collision geometry is primitive (cylinders and boxes) sized to enclose each link roughly. It is for reachability
 and gross collision checks, not for clearance work near the robot; swap in the vendor meshes for that.
 
 Cells (each arm on a fixed base, with its diamond-wire bow on tool0)
-- ur10e, kr120, kr480_r3330_mt, kr500_r2830_mt
+- ur10e, kr120, kr480_r3330_mt, kr500_r2830_mt, irb6700
 
 The turntable is not in these files: its place is the station's work frame, so it is added at run time. With the
 table driven as a coordinated external axis E1 (KUKA, ABB) lithocam.robot.Cell.add_rotary_table puts it into the
@@ -44,10 +46,14 @@ def link(name, geom=""):
     return '  <link name="{}">{}</link>\n'.format(name, geom)
 
 
+VISUAL_STL = ("irb6700",)   # robots whose official visual meshes are STL, not COLLADA
+
+
 def visual_path(collision_path):
-    """cells/meshes/<robot>/<name>.stl (collision) -> cells/meshes/<robot>/visual/<name>.dae (visual)."""
+    """cells/meshes/<robot>/<name>.stl (collision) -> cells/meshes/<robot>/visual/<name>.dae (visual; .stl for the
+    robots in VISUAL_STL)."""
     robot, name = collision_path.split("/")
-    return "{}/visual/{}.dae".format(robot, name.rsplit(".", 1)[0])
+    return "{}/visual/{}.{}".format(robot, name.rsplit(".", 1)[0], "stl" if robot in VISUAL_STL else "dae")
 
 
 def mesh(path, xyz="0 0 0", rpy="0 0 0"):
@@ -211,6 +217,59 @@ def fortec_plugins(p_):
     return KR_PLUGINS.replace(KR_OPW, opw)
 
 
+# ---------------------------------------------------------------- ABB IRB 6700-200/2.60
+# Joint origins, axes and limits from ROS-Industrial abb (Apache-2.0), abb_irb6700_support,
+# urdf/irb6700_200_260_macro.xacro, expanded here by hand (prefix "", no xacro tool): A1 on z at 0.78 m, A2 offset
+# 0.32 m, A2 to A3 1.125 m, A3 to the wrist offset 0.2 m up and 1.1425 m along the forearm, wrist to flange 0.2 m.
+# Limits (deg, deg/s) are the xacro's, and equal the ABB IRB 6700 product specification for the 200/2.60 variant:
+# A1 +-170, A2 +85/-65, A3 +70/-180, A4 +-300, A5 +-130, A6 +-360; 110, 110, 110, 190, 150, 210 deg/s.
+# The xacro also has two mimic joints (cylinder_joint, piston_joint) that animate the A2 balancer. Both are
+# left out: Tesseract's kinematic group and the studio's chain take no mimic joints, and a balancer frozen at the zero
+# pose would be wrong at every other pose. Their meshes are not copied.
+IRB_LIMITS = [(-170, 170, 110), (-65, 85, 110), (-180, 70, 110), (-300, 300, 190), (-130, 130, 150),
+              (-360, 360, 210)]
+IRB_MESH = {n: ("irb6700/{}.stl".format(n), "0 0 0", "0 0 0") for n in KR_LINKS}
+IRB = dict(c1=0.78, a1=0.32, c2=1.125, a2=0.2, c3=1.1425, c4=0.2)
+
+
+def irb6700_body():
+    s = ""
+    for n in KR_LINKS:
+        s += link(n, mesh(*IRB_MESH[n]))
+    s += link("flange") + link("tool0")
+    org = ["0 0 {}".format(IRB["c1"]), "{} 0 0".format(IRB["a1"]), "0 0 {}".format(IRB["c2"]),
+           "0 0 {}".format(IRB["a2"]), "{} 0 0".format(IRB["c3"]), "{} 0 0".format(IRB["c4"])]
+    axes = ["0 0 1", "0 1 0", "0 1 0", "1 0 0", "0 1 0", "1 0 0"]
+    parents = ["base_link", "link_1", "link_2", "link_3", "link_4", "link_5"]
+    for i in range(6):
+        lo, hi, v = IRB_LIMITS[i]
+        s += joint("joint_{}".format(i + 1), "revolute", parents[i], "link_{}".format(i + 1), org[i], axis=axes[i],
+                   lo=math.radians(lo), hi=math.radians(hi), vel=math.radians(v))
+    s += joint("joint_6-flange", "fixed", "link_6", "flange")
+    s += joint("link_6-tool0", "fixed", "flange", "tool0", rpy="0 {} 0".format(PI / 2))
+    return s
+
+
+# OPW parameters (spherical wrist, offset arm): a1 shoulder offset, a2 = minus the wrist height above the A3 axis,
+# c1..c4 link lengths. The URDF has the forearm along +x at zero joints, OPW has it up, hence the A3 offset of
+# -pi/2 (found by trying the offset and sign combinations against forward kinematics, as for the KR120). Checked against KDL forward kinematics by tests/test_irb6700.py.
+IRB_OPW = """          class: OPWInvKinFactory
+          config:
+            base_link: base_link
+            tip_link: tool0
+            params:
+              a1: 0.320
+              a2: -0.200
+              b: 0.000
+              c1: 0.780
+              c2: 1.125
+              c3: 1.1425
+              c4: 0.200
+              offsets: [0, 0, -1.57079632679, 0, 0, 0]
+              sign_corrections: [1, 1, 1, 1, 1, 1]
+"""
+
+
 
 # ---------------------------------------------------------------- files
 
@@ -227,6 +286,8 @@ WIRE_TOOLS = {
 }
 # the KR 480 and KR 500 MT cells carry the same steel bow (480 and 500 kg payload)
 WIRE_TOOLS["kr480_r3330_mt"] = WIRE_TOOLS["kr500_r2830_mt"] = WIRE_TOOLS["kr120"]
+# the IRB 6700-200/2.60 (200 kg payload) carries it too
+WIRE_TOOLS["irb6700"] = WIRE_TOOLS["kr120"]
 
 
 def wire_tool_parts(t):
@@ -350,6 +411,7 @@ KR_PLUGINS = """kinematic_plugins:
           config: {base_link: base_link, tip_link: tool0}
         OPWInvKin:
 """ + KR_OPW
+IRB_PLUGINS = KR_PLUGINS.replace(KR_OPW, IRB_OPW)
 
 CONTACT = """contact_manager_plugins:
   search_libraries:
@@ -405,6 +467,13 @@ def main():
         (HERE / (name + ".srdf")).write_text(srdf(name, '  <group name="manipulator"><chain base_link="base_link" '
                                                   'tip_link="tool0"/></group>\n', name + "_plugins.yaml", KR_LINKS,
                                                   tool_disable("link_6", ["link_5"])), encoding="utf-8")
+    # ABB IRB 6700-200/2.60 with the same bow
+    (HERE / "irb6700.urdf").write_text(urdf("irb6700", joint("world-base", "fixed", "world", "base_link") +
+                                            irb6700_body() + wire_tool_xml("irb6700")), encoding="utf-8")
+    (HERE / "irb6700_plugins.yaml").write_text(IRB_PLUGINS, encoding="utf-8")
+    (HERE / "irb6700.srdf").write_text(srdf("irb6700", '  <group name="manipulator"><chain base_link="base_link" '
+                                            'tip_link="tool0"/></group>\n', "irb6700_plugins.yaml", KR_LINKS,
+                                            tool_disable("link_6", ["link_5"])), encoding="utf-8")
     print("wrote", sorted(p.name for p in HERE.iterdir() if p.suffix in (".urdf", ".srdf", ".yaml")))
 
 

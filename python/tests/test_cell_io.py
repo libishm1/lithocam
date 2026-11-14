@@ -15,7 +15,8 @@ from lithocam import cell_io, post  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 CELLS = ROOT / "cells"
-NATIVE = {"ur10e": "urscript", "kr120": "krl", "kr480_r3330_mt": "krl", "kr500_r2830_mt": "krl"}
+NATIVE = {"ur10e": "urscript", "kr120": "krl", "kr480_r3330_mt": "krl", "kr500_r2830_mt": "krl",
+          "irb6700": "rapid"}
 
 # a filled-in definition per controller (test values, not a real cell)
 FULL = {

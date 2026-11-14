@@ -3,7 +3,7 @@
 <package format="3">
   <name>cells</name>
   <version>0.0.1</version>
-  <description>Robot cells for lithocam simulation: UR10e, KUKA KR120 R2500 PRO (fixed, on a linear track, with a turntable).</description>
+  <description>Robot cells for lithocam simulation: UR10e, KUKA KR120 R2500 PRO, ABB IRB 6700-200/2.60 (fixed, on a linear track, with a turntable).</description>
   <maintainer email="noreply@example.com">The lithocam authors</maintainer>
   <license>Apache-2.0</license>
 </package>

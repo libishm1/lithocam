@@ -41,11 +41,14 @@ CELLS = _cells_dir()
 ROBOTS = {"ur10e": ("UR10e", "ur10e.urdf", "urscript"), "kr120": ("KUKA KR120 R2500 PRO", "kr120.urdf", "krl"),
           # dimensions from the public KUKA KR 500 FORTEC manual (cells/make_cells.py); KRL post
           "kr480_r3330_mt": ("KUKA KR 480 R3330 MT", "kr480_r3330_mt.urdf", "krl"),
-          "kr500_r2830_mt": ("KUKA KR 500 R2830 MT", "kr500_r2830_mt.urdf", "krl")}
+          "kr500_r2830_mt": ("KUKA KR 500 R2830 MT", "kr500_r2830_mt.urdf", "krl"),
+          # ROS-Industrial abb_irb6700_support (Apache-2.0), cells/meshes/irb6700; RAPID post
+          "irb6700": ("ABB IRB 6700-200/2.60", "irb6700.urdf", "rapid")}
 # Controller base frame in the URDF base_link frame. UR controllers' "base" is base_link turned by pi about z
 # (ur_description); KUKA and ABB writers post joint targets only, so their base frame is not needed yet.
 CONTROLLER_BASE = {"ur10e": np.diag([-1.0, -1.0, 1.0, 1.0])}
-POST_OPTIONS = {"ur10e": {"cut_motion": "movep", "blend": 0.0005}, "kr120": {}, "kr480_r3330_mt": {}, "kr500_r2830_mt": {}}
+POST_OPTIONS = {"ur10e": {"cut_motion": "movep", "blend": 0.0005}, "kr120": {}, "kr480_r3330_mt": {}, "kr500_r2830_mt": {},
+                "irb6700": {}}
 def post_options(robot: str, dialect: str) -> Dict[str, object]:
     """Writer options for a cell: cutting motion, blend and the controller base frame (URScript only)."""
     if dialect != "urscript" or robot not in CONTROLLER_BASE:
@@ -54,7 +57,9 @@ def post_options(robot: str, dialect: str) -> Dict[str, object]:
 
 
 HOME = {"ur10e": [0.0, -1.5708, 1.5708, -1.5708, -1.5708, 0.0], "kr120": [0.0, -1.5708, 1.5708, 0.0, 0.5, 0.0],
-        "kr480_r3330_mt": [0.0, -1.5708, 1.5708, 0.0, 0.5, 0.0], "kr500_r2830_mt": [0.0, -1.5708, 1.5708, 0.0, 0.5, 0.0]}
+        "kr480_r3330_mt": [0.0, -1.5708, 1.5708, 0.0, 0.5, 0.0], "kr500_r2830_mt": [0.0, -1.5708, 1.5708, 0.0, 0.5, 0.0],
+        # IRB 6700 zero pose: upper arm vertical, forearm horizontal; wrist bent 30 degrees (flange 2.1 m up)
+        "irb6700": [0.0, 0.0, 0.0, 0.0, 0.5236, 0.0]}
 
 
 @dataclass
@@ -90,7 +95,7 @@ class Station:
     stock: Optional[Dict[str, float]] = None                                  # mm, work frame
     tool_library: str = ""                                                    # CSV; "" = built-in survey tools
     tool_length: float = 0.0                                                  # mm; 0 = from the tool
-    spindle: Optional[Dict[str, object]] = None                               # None = the cell's default preset
+    spindle: Optional[object] = None    # None = the cell's default preset; a preset key; or a Spindle as a dict
     material: str = "granite"     # workpiece material class (lithocam.cutting_data.MATERIALS)
     rapid_speed: float = 100.0    # mm/s for links and retracts near the stone (a cell setting; set it for your cell)
     robot_factor: float = 1.0     # feed factor for robot stiffness (user-set; no published value)
@@ -130,6 +135,8 @@ class Station:
         return transform(self.work_xyz, [math.radians(a) for a in self.work_rpy])
 
     def spindle_model(self) -> "spindles.Spindle":
+        if isinstance(self.spindle, str):
+            return spindles.preset(self.spindle)               # a preset by key, e.g. "kr120_saw_head"
         if self.spindle:
             return spindles.from_dict(self.spindle)
         return spindles.PRESETS[spindles.DEFAULT_FOR_ROBOT.get(self.robot, "ur10e_example")]
@@ -311,6 +318,10 @@ def tool_pose(work: np.ndarray, p_mm: Sequence[float], axis=None, spin: float = 
     return T
 
 
+WRIST_MARGIN = 0.5      # |sin q5| below this (q5 within 30 deg of the wrist singularity) is penalised on linear links
+WRIST_WEIGHT = 1.0      # rad^2 at the singularity itself: far above a 10 deg joint step (0.03 rad^2)
+
+
 def _solve_five_axis(robot: Robot, backend, wk, rmoves, q, spins, linear_links: bool = False):
     """Joints per move with the spin about the tool axis left to the planner.
 
@@ -328,7 +339,11 @@ def _solve_five_axis(robot: Robot, backend, wk, rmoves, q, spins, linear_links: 
         inv_tcp = np.linalg.inv(robot.tcp_offset)
         rungs = [[tool_pose(wk, m[1], m[2] if len(m) > 2 else None, s) @ inv_tcp for s in track[j]]
                  for j, m in enumerate(rmoves)]
-        res = ladder(rungs, backend, seed=q, max_step=math.radians(10))
+        # linear links: a node with the wrist inside WRIST_MARGIN of its singularity (|sin q5| small) costs extra, so
+        # the ladder keeps a disc step on the side of the blade the wrist can follow
+        nc = (lambda Q: WRIST_WEIGHT * np.maximum(0.0, WRIST_MARGIN - np.abs(np.sin(Q[:, 4]))) ** 2) \
+            if linear_links else None
+        res = ladder(rungs, backend, seed=q, max_step=math.radians(10), node_cost=nc)
         by = {r: (qq, c) for r, qq, c in zip(res.rungs, res.joints, res.choice)}
         jumps = set(b for b in getattr(res, "breaks", []) if b > 0) if linear_links else set()
         qs, oks, chosen = [], [], []
@@ -489,6 +504,7 @@ class Expansion:
     messages: List[str]
     errors: List[str] = field(default_factory=list)    # posting is refused while any error stands
     key: str = ""                                       # hash of the station and program it was made from
+    ops: List[dict] = field(default_factory=list)       # per cutting step: feed, rpm, time (studio.sheet reads it)
 
     def joints(self) -> np.ndarray:
         qs = [s.q for s in self.segments if len(s.q)]
@@ -622,7 +638,7 @@ class ProcessState:
         self.rpm = 0.0
 
 
-WIRE_BOW = {"ur10e": 0.25, "kr120": 0.6, "kr480_r3330_mt": 0.6, "kr500_r2830_mt": 0.6}   # wire depth along tool0 z of each cell's bow saw (cells/make_cells.py)
+WIRE_BOW = {"ur10e": 0.25, "kr120": 0.6, "kr480_r3330_mt": 0.6, "kr500_r2830_mt": 0.6, "irb6700": 0.6}   # wire depth along tool0 z of each cell's bow saw (cells/make_cells.py)
 
 
 def wire_rungs(face, work: np.ndarray, yaw: float, wire_radius: float, bow: float, rolls_deg: Sequence[float],
@@ -1032,6 +1048,18 @@ def _run_disc(i, st, p, station, robot, tool, backend, q, add, recs, msgs, error
             moves.append(("rapid", np.asarray(c.lead_out, dtype=float), n))
         prev = (np.asarray(moves[-1][1], dtype=float), n)
     moves = _sample_links(moves, max(step_mm, 5.0), step_deg=2.0)
+    approach = p.get("approach_deg")
+    if approach is not None and moves:
+        sp_ = _approach_spins(robot, wk, moves[0], float(approach))
+        if sp_ is None:
+            msgs.append("step {}: the approach angle needs an angle head (the spindle axis is along the flange "
+                        "axis); the planner chooses the blade spin".format(i + 1))
+        else:
+            spins, err = sp_
+            spins, margins = _order_by_wrist_margin(robot, wk, moves, q, spins)
+            msgs.append("step {}: angle head: the arm comes in {:g} deg from vertical (closest spin {:.1f} deg "
+                        "off); wrist margin |sin a5| min {:.2f} on the chosen side, {:.2f} on the other".format(
+                            i + 1, float(approach), err, margins[0], margins[1]))
     qs, oks, chosen = _solve_five_axis(robot, backend, wk, moves, q, spins, linear_links=True)
     add(i, st.title(), qs, [m[0] == "feed" for m in moves], oks)
     recs.append(post.Rec("comment", {"text": "{}: {} cuts with {} (D {:g} mm, kerf {:g} mm)".format(
@@ -1050,6 +1078,62 @@ def _run_disc(i, st, p, station, robot, tool, backend, q, add, recs, msgs, error
     msgs.append("step {}: {}: {} cuts, {} robot samples, {} unreachable or colliding".format(
         i + 1, st.spec.label, len(cuts), len(qs), bad))
     return qs[-1] if qs else q
+
+
+def _approach_spins(robot: Robot, wk, move, approach_deg: float, n: int = 144, near_deg: float = 10.0):
+    """Blade spins that bring the arm in at `approach_deg` from vertical (the flange z axis pointing down and
+    tilted by that angle). Only an angle head makes the spin move the arm; with the spindle axis along the flange
+    axis (|R_tcp[2, 2]| > 0.9) the result is None. Returns (spins, error of the best spin in degrees): both spins
+    at the angle (tilted one way or the other along the cut) and each +-near_deg, best first."""
+    off = getattr(robot, "tcp_offset", None)
+    if off is None or abs(float(np.asarray(off)[2, 2])) > 0.9:
+        return None
+    inv = np.linalg.inv(np.asarray(off, dtype=float))
+    ss = np.linspace(0.0, 2 * math.pi, n, endpoint=False)
+    ang = np.empty(n)
+    for k, s in enumerate(ss):
+        a = (tool_pose(wk, move[1], move[2] if len(move) > 2 else None, s) @ inv)[:3, 2]
+        ang[k] = math.degrees(math.acos(max(-1.0, min(1.0, -float(a[2])))))
+    err = np.abs(ang - approach_deg)
+    best = []
+    for k in np.argsort(err):
+        if all(abs(math.remainder(ss[k] - ss[b], 2 * math.pi)) > math.radians(30) for b in best):
+            best.append(int(k))
+        if len(best) == 2:
+            break
+    d = math.radians(near_deg)
+    out = [ss[b] for b in best] + [ss[b] + e for b in best for e in (d, -d)]
+    return out, float(err[best[0]])
+
+
+def _order_by_wrist_margin(robot: Robot, wk, moves, q, spins, samples: int = 40):
+    """Of the two approach sides from _approach_spins (spins[0] and spins[1], each followed by its +-near spins in
+    spins[2:4] and spins[4:6]), put first the one whose spin track keeps the wrist furthest from its singularity
+    (min |sin q5| over a subsample of the step; a5 = 0 on a KUKA, q5 = 0 or 180 deg on a UR). An unreachable sample
+    counts as margin 0. Returns (spins, (margin chosen, margin other))."""
+    idx = np.unique(np.linspace(0, len(moves) - 1, min(samples, len(moves))).astype(int))
+    sub = [moves[k] for k in idx]
+    res = []
+    for side in (0, 1):
+        tr = _spin_tracks(wk, sub, [spins[side]])
+        qq, worst = np.asarray(q, dtype=float), 1.0
+        for k_, m in enumerate(sub):
+            T = tool_pose(wk, m[1], m[2] if len(m) > 2 else None, tr[k_][0])
+            if k_ == 0:
+                qn, ok = solve_start(robot, T, qq, tries=8)
+                qn = _centre_winds(robot, qn) if ok else qn
+            else:
+                qn, ok = robot.solve_pose(T, qq)
+            if not ok:
+                worst = 0.0
+                continue
+            qq = qn
+            worst = min(worst, abs(math.sin(float(qq[4]))))
+        res.append(worst)
+    if res[1] > res[0] + 0.02:
+        spins = [spins[1], spins[0]] + list(spins[4:6]) + list(spins[2:4])
+        return spins, (res[1], res[0])
+    return spins, (res[0], res[1])
 
 
 def _gen_params(kind: str, p: dict) -> dict:
@@ -1185,14 +1269,64 @@ def _polish_groups(i, p, station, tool, tools, tris, mesh, stock_f, msgs, errors
     return out
 
 
+def _rest_source(i, p, gp, leftover, tilt, mill_log, last_tool, stock_f, msgs, has_cutter):
+    """Choose what a rest step compares with and put it in the generator arguments `gp`; say which in `msgs`.
+    In order: an explicit previous tool radius (step parameter); the stock before this step from the stock
+    simulation (`leftover`: a callable f(step) or a stock); a Z-map cut along the earlier milling steps
+    (`mill_log`, cell = parameter leftover_cell); the previous milling step's tool radius. A tilted setup skips
+    the stock and the Z-map: both are vertical-axis height fields."""
+    from . import ops
+
+    def with_previous():
+        """The stock is compared at the tool centre only; the previous tool adds the corners it could not reach."""
+        if last_tool is not None:
+            gp["also_previous"] = True
+            if has_cutter(last_tool):
+                gp["previous_tool"] = last_tool
+            else:
+                gp["previous_tool_radius"] = float(last_tool.diameter) / 2
+    if gp.get("previous_tool_radius"):
+        msgs.append("step {}: rest: previous tool radius {:g} mm (no stock)".format(
+            i + 1, float(gp["previous_tool_radius"])))
+        return
+    if "leftover" in gp:
+        return
+    if leftover is not None and not tilt:
+        stock = leftover(i) if callable(leftover) else leftover
+        if stock is not None:
+            gp["leftover"] = stock
+            if callable(leftover):
+                with_previous()
+            msgs.append("step {}: rest: leftover from the stock simulation before step {}".format(i + 1, i + 1)
+                        if callable(leftover) else
+                        "step {}: rest: leftover from the stock given to the expansion".format(i + 1))
+            return
+    if mill_log and not tilt:
+        cell = float(p.get("leftover_cell") or 1.0)
+        gp["leftover"] = ops.zmap_leftover([(t, m) for _, t, m in mill_log], stock_f, cell)
+        with_previous()
+        msgs.append("step {}: rest: leftover from a Z-map of steps {}..{} at {:g} mm".format(
+            i + 1, mill_log[0][0] + 1, mill_log[-1][0] + 1, cell))
+        return
+    if last_tool is not None:
+        if has_cutter(last_tool):
+            gp["previous_tool"] = last_tool
+        else:
+            gp["previous_tool_radius"] = float(last_tool.diameter) / 2
+        msgs.append("step {}: rest: previous tool radius {:g} mm (no stock; the tool of the previous milling "
+                    "step, {})".format(i + 1, float(last_tool.diameter) / 2, last_tool.id))
+
+
 def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, object], part=None,
            q0: Optional[Sequence[float]] = None, max_feed_points: int = 4000, progress=None,
            backend=None, leftover=None) -> Expansion:
     """Expand a program. `part` = (tris, trimesh) in mm, needed by machining steps. `tools` maps id -> Tool.
     `backend`: a planner backend (studio.planner) for IK branches and collision checks; None = numpy IK only.
-    `leftover`: the stock after the earlier operations (an SdfStock, or an (xs, ys, Z) height field in mm, work
-    frame), used by rest machining when no previous tool radius is given; without it rest uses the tool of the
-    previous milling step in the program."""
+    `leftover`: the stock after the earlier operations, used by rest machining when no previous tool radius is
+    given: an SdfStock or an (xs, ys, Z) height field in mm (work frame) for the stock at the end, or a callable
+    f(step index) -> SdfStock or height field or None for the stock just before that step (livestock.LiveStock,
+    from the studio's stock run). Without one rest cuts a Z-map of the earlier milling steps (step parameter
+    leftover_cell), and when none can be built it uses the tool of the previous milling step."""
     from . import cam
     from .planner import collides
 
@@ -1204,6 +1338,8 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
     errors: List[str] = []
     tool = None
     last_mill = [None]              # the tool of the previous milling step (what a rest step compares with)
+    mill_log = []                   # (step index, tool, moves) of earlier vertical-axis milling steps (rest Z-map)
+    ops_log: List[dict] = []        # per cutting step: feed, rpm, time (Expansion.ops)
     # who turns the table: "" (no table), "operator", "e1" (coordinated external axis) or "io" (PLC through I/O)
     table_mode, terr, twarn = check_table(station)
     errors.extend(terr)
@@ -1458,6 +1594,20 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
         msgs.append("step {}: {}: {} CL points, feed {:.0f} mm, rapid {:.0f} mm{}".format(
             i + 1, label, len(moves), feed_len, rapid_len,
             ", {:g} s of dwell".format(dwell_total) if dwell_total else ""))
+        # the estimate for the setup sheet: every move at its own feed, rapids at the cell's rapid speed, plus dwells
+        secs = float(dwell_total)
+        known = True
+        for ma, mb in zip(rmoves, rmoves[1:]):
+            L = float(np.linalg.norm(np.asarray(mb[1], float) - np.asarray(ma[1], float)))
+            v = float(mb[3]) if mb[0] in ("tap_in", "tap_out") else \
+                feed if mb[0] == "feed" else plunge if mb[0] == "plunge" else float(station.rapid_speed) * 60.0
+            if v > 0:
+                secs += L / v * 60.0
+            elif L > 0:
+                known = False
+        ops_log.append({"step": i, "label": label, "tool": tid, "feed": feed, "plunge_feed": plunge, "rpm": rpm,
+                        "feed_mm": feed_len, "rapid_mm": rapid_len, "dwell_s": float(dwell_total),
+                        "seconds": secs if known else None, "points": len(moves)})
         return q
 
     def lc_has_cutter(t):
@@ -1587,23 +1737,19 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
                 continue
             try:
                 gp = _gen_params(st.kind, p)
-                if st.kind == "rest" and not gp.get("previous_tool_radius") and "leftover" not in gp:
-                    if leftover is not None and not tilt[0]:
-                        gp["leftover"] = leftover                      # the stock after the earlier operations
-                    elif last_mill[0] is not None:
-                        pt = last_mill[0]
-                        if lc_has_cutter(pt):
-                            gp["previous_tool"] = pt
-                        else:
-                            gp["previous_tool_radius"] = float(pt.diameter) / 2
-                        msgs.append("step {}: rest: the previous tool is {} of the previous milling step".format(
-                            i + 1, pt.id))
+                if st.kind == "rest":
+                    _rest_source(i, p, gp, leftover, tilt[0], mill_log, last_mill[0], stock_f, msgs, lc_has_cutter)
                 moves = cam.GENERATORS[st.kind](tris, mesh, tool, stock_f, **gp)
             except Exception as e:   # noqa: BLE001 - report generator errors in the program log
                 msgs.append("step {}: {} failed: {}".format(i + 1, spec.label, e))
                 continue
+            if st.kind == "rest" and not moves:
+                msgs.append("step {}: rest: the region is empty, {} leaves no more than {:g} mm that the previous "
+                            "tool did not cut".format(i + 1, tool.id, float(p.get("threshold", 0.05))))
             if st.kind not in ("drill", "core_drill", "tap"):
                 last_mill[0] = tool
+                if moves and not tilt[0] and not any(_tilted(m) for m in moves) and lc_has_cutter(tool):
+                    mill_log.append((i, tool, moves))
             q = run_cl(i, st, p, spec, tid, tool, moves, F, wk_turn(F), q)
         else:
             recs.append(post.Rec("comment", {"text": "{} ({}): no generator yet".format(spec.label, spec.status)}))
@@ -1626,7 +1772,7 @@ def expand(station: Station, robot: Robot, program: Program, tools: Dict[str, ob
         errors.append(below)
     for e in errors:
         msgs.append("ERROR " + e)
-    return Expansion(segs, recs, msgs, errors, station_key(station, program))
+    return Expansion(segs, recs, msgs, errors, station_key(station, program), ops_log)
 
 
 def _links_below_stock(station: Station, segs) -> str:

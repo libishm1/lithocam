@@ -24,6 +24,8 @@
     {"kind": "rough_plane", "params": {"tool": "S1", "stepdown": 4.0, "stepover": 9.0, "allowance": 1.0, "feed": 1000.0, "rpm": 6000.0, "clearance": 10.0}, "label": "Rough S1 z-levels, 1 mm allowance (example feed)"},
     {"kind": "steep_shallow", "params": {"tool": "B8", "threshold_deg": 40.0, "overlap": 1.0, "stepover": 2.0, "allowance": 0.2, "feed": 1500.0, "rpm": 10000.0, "clearance": 10.0, "boundary": "0,0,600,600"}, "label": "Semi-finish B8 steep / shallow, 0.2 mm allowance, inside the panel border (example feed)"},
     {"kind": "surfacing5", "params": {"tool": "B6", "stepover": 1.5, "lead": 15.0, "max_tilt": 30.0, "tolerance": 0.02, "feed": 1200.0, "rpm": 12000.0, "clearance": 10.0, "boundary": "0,0,600,600"}, "label": "Finish B6 5-axis, lead 15 deg, inside the panel border (example feed)"},
+    {"kind": "rest", "params": {"tool": "B3", "previous_tool_radius": 3.0, "threshold": 0.05, "mode": "raster", "stepover": 0.5, "overlap": 0.5, "allowance": 0.0, "feed": 900.0, "rpm": 15000.0, "clearance": 10.0}, "label": "Detail B3: rest where the B6 ball left more than 0.05 mm (example feed)"},
+    {"kind": "pencil", "params": {"tool": "B3", "min_angle_deg": 15.0, "min_length": 3.0, "allowance": 0.0, "feed": 900.0, "rpm": 15000.0, "clearance": 10.0}, "label": "Detail B3: pencil along the lotus creases (example feed)"},
     {"kind": "movej", "params": {"joints": [0.0, -90.0, 90.0, 0.0, 28.6, 0.0], "speed": 50.0}, "label": "Home"}
    ]
   }

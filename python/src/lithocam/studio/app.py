@@ -741,10 +741,11 @@ class Expander(QObject):
     done = Signal(object, object)   # expansion, error text
     progress = Signal(str)
 
-    def __init__(self, station, robot, prog, tools, part, q0, collisions=False):
+    def __init__(self, station, robot, prog, tools, part, q0, collisions=False, leftover=None):
         super().__init__()
         self.args = (station, robot, prog, tools, part, q0)
         self.collisions = collisions
+        self.leftover = leftover      # livestock.LiveStock of the last stock run: the stock before each rest step
 
     def run(self):
         try:
@@ -754,7 +755,7 @@ class Expander(QObject):
                 from .planner import make_backend
                 self.progress.emit("Loading the Tesseract cell (collision meshes) ...")
                 backend = make_backend(st, program.CELLS)
-            ex = program.expand(st, robot, prog, tools, part, q0, backend=backend,
+            ex = program.expand(st, robot, prog, tools, part, q0, backend=backend, leftover=self.leftover,
                                 progress=lambda i, n, t: self.progress.emit("{}/{} {}".format(i + 1, n, t)))
             self.done.emit(ex, None)
         except Exception:   # noqa: BLE001
@@ -1127,6 +1128,9 @@ class Studio(QMainWindow):
         mt.addWidget(self.stock_box)
         self._act(mt, "Process check", glyph_icon("F", "#6a1b9a", 22), self._process_check,
                   "Forces, robot deflection, wire bow and a voxel FEA strength check of the cut stock")
+        self._act(mt, "Setup sheet", glyph_icon("Sh", "#455a64", 22), self._setup_sheet,
+                  "Write a Markdown sheet of the generated program: tool, feed, spindle, path lengths, time and, with "
+                  "the Stock box on, the removed volume per step")
         self.collisions = QCheckBox("Check collisions")
         try:
             import tesseract_robotics  # noqa: F401
@@ -1207,7 +1211,7 @@ class Studio(QMainWindow):
         self.robot_panel.combo.setCurrentIndex(self.robot_panel.combo.findData(name))
         self.robot_panel.combo.blockSignals(False)
         self.robot_panel.set_robot(self.robot, program.HOME.get(name, [0.0] * self.robot.dof))
-        if name.startswith("kr") and first is False:
+        if (name.startswith("kr") or name == "irb6700") and first is False:
             self.station.work_xyz = [1.6, 0.0, 0.3]
         elif name == "ur10e" and first is False:
             self.station.work_xyz = [0.7, 0.0, 0.0]
@@ -1852,9 +1856,18 @@ class Studio(QMainWindow):
         prog = prog or self._current_program()
         self._expanded_prog = prog
         self.say("Expanding '{}' on the {} ...".format(prog.name, program.ROBOTS[self.station.robot][0]))
+        import copy
+        from . import livestock
+        new_sig = livestock.signature(self.station, prog)
+        live = None
+        if self.stock_run is not None and self.expansion is not None and getattr(self, "_exp_sig", None):
+            # a rest step gets the stock of the last simulation just before it, while the steps before it are unchanged
+            live = livestock.LiveStock(self.stock_run, self.expansion, self._tools(), copy.deepcopy(self.station),
+                                       program.load_robot(self.station.robot), self._exp_sig, new_sig)
+        self._pending_sig = new_sig
         th = QThread(self)
         wk = Expander(self.station, program.load_robot(self.station.robot), prog, self._tools(), self.part,
-                      self.robot_panel.q, self.collisions.isChecked())
+                      self.robot_panel.q, self.collisions.isChecked(), live)
         wk.moveToThread(th)
         th.started.connect(wk.run)
         wk.progress.connect(self._progress)   # a bound slot runs queued in the GUI thread; a lambda would not
@@ -1876,6 +1889,7 @@ class Studio(QMainWindow):
                 QApplication.exit(3)
             return
         self.expansion = ex
+        self._exp_sig = getattr(self, "_pending_sig", None)    # what this expansion was made from (livestock)
         self._clear_stock()                 # the cut stock belongs to the previous expansion
         for m in ex.messages:
             self.say("  " + m)
@@ -2360,6 +2374,21 @@ class Studio(QMainWindow):
         self.view.show_part(False)               # the cut stock is the part being made; the model would z-fight
         self.view.show_path(False)               # and it shows where the tool has been
 
+    def _setup_sheet(self):
+        """Save studio.sheet.setup_sheet of the generated program (with removed volumes when the stock run is in)."""
+        if self.expansion is None:
+            self.say("Setup sheet: generate the program first (F5)")
+            return
+        from . import sheet
+        prog = self._expanded_prog
+        text = sheet.setup_sheet(self.station, self.expansion, prog, self._tools(), self.stock_run)
+        fn, _ = QFileDialog.getSaveFileName(self, "Save setup sheet", prog.name + "_setup_sheet.md", "Markdown (*.md)")
+        if not fn:
+            return
+        Path(fn).write_text(text, encoding="utf-8")
+        self.say("Setup sheet written to {}{}".format(fn, "" if self.stock_run is not None else
+                                                         " (no removed volumes: switch the Stock box on first)"))
+
     def _process_check(self):
         if self.expansion is None:
             self.say("Process check: simulate first")
@@ -2496,7 +2525,7 @@ def _examples_dir() -> Path:
 
 
 def main(argv=None) -> int:
-    """Options: --robot ur10e|kr120; --smoke OUT.png [FRACTION]: simulate the demo, capture, exit (CI and docs);
+    """Options: --robot ur10e|kr120|kr480_r3330_mt|kr500_r2830_mt|irb6700; --smoke OUT.png [FRACTION]: simulate the demo, capture, exit (CI and docs);
     --record DIR N [--five-axis-demo] [--no-collisions] [--stock] [--process [--constants k=v,...]] [--timeout S]:
     N frames of the simulation (with --stock the cut stock, with --process stress colours on the final stock)."""
     import faulthandler

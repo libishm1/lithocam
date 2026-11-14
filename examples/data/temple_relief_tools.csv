@@ -1,6 +1,7 @@
-# temple relief tools: S1 from the lithocam stone library; R12, B8, B6 example sizes (not from a datasheet)
+# temple relief tools: S1 from the lithocam stone library; R12, B8, B6, B3 example sizes (not from a datasheet)
 id,name,kind,material,bond,grit,source,diameter,flute_length,shank_diameter,stickout
 S1,"Diamond finger bit 3/4 in x 1-1/2 in, 50/60",flat_end_mill,diamond,,50/60,docs/TOOLING.md S1,19.05,38.1,0,0
 R12,diamond finger bit D12 roughing (example size),flat_end_mill,diamond,sintered,,example,12,30,12,45
 B8,diamond ball nose D8 semi-finishing (example size),ball_end_mill,diamond,electroplated,,example,8,20,8,40
 B6,diamond ball nose D6 finishing (example size),ball_end_mill,diamond,electroplated,,example,6,15,6,35
+B3,diamond ball nose D3 detail (example size),ball_end_mill,diamond,electroplated,,example,3,8,3,25

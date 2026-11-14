@@ -397,7 +397,7 @@ def _stock_top(stock, xs, ys) -> np.ndarray:
 
 
 def rest_region(tris, mesh, tool, previous_tool_radius=None, previous_tool=None, leftover=None, threshold=0.05,
-                allowance=0.0, cell=0.0):
+                allowance=0.0, cell=0.0, also_previous=False):
     """(field, mask): the xy region the tool must still cut. field is the tool's cam._Field (grid xs, ys, h, H);
     mask is a boolean grid on it.
 
@@ -405,15 +405,18 @@ def rest_region(tris, mesh, tool, previous_tool_radius=None, previous_tool=None,
     reaches lower than the previous one where h_small < h_large - threshold (h is the drop-cutter tip height, so the
     difference is the material the larger tool could not reach). From `leftover`: an SdfStock, or (xs, ys, Z)
     height-field tuple of the stock after the earlier operations: the region is where its top lies above
-    h_small + threshold. leftover wins when both are given. Samples where the tool is off the part (h = -inf)
-    are never in the region."""
+    h_small + threshold. leftover wins when both are given, unless also_previous is set: then the region is the
+    union of both. The stock is compared at the tool centre only, so material beside the centre path (the fillet a
+    larger round tool leaves in an inside corner) shows only through the previous tool; also_previous adds it.
+    Samples where the tool is off the part (h = -inf) are never in the region."""
     fld = cam._Field(tris, mesh, tool, allowance, cell)
     Hs = fld.H
+    mask = np.zeros(Hs.shape, bool)
     if leftover is not None:
         top = _stock_top(leftover, fld.xs, fld.ys)
         with np.errstate(invalid="ignore"):
             mask = np.isfinite(Hs) & np.isfinite(top) & (top - Hs > threshold)
-    else:
+    if leftover is None or (also_previous and (previous_tool is not None or previous_tool_radius)):
         base = lc.cutter_of(tool)
         if previous_tool is not None:
             big = lc.cutter_of(previous_tool)
@@ -423,19 +426,86 @@ def rest_region(tris, mesh, tool, previous_tool_radius=None, previous_tool=None,
             raise ValueError("rest needs previous_tool_radius, previous_tool or leftover")
         Hl = _field_on(fld, big, allowance)
         with np.errstate(invalid="ignore"):
-            mask = np.isfinite(Hs) & np.isfinite(Hl) & (Hl - Hs > threshold)
+            mask = mask | (np.isfinite(Hs) & np.isfinite(Hl) & (Hl - Hs > threshold))
+        fld.ceiling = Hl if leftover is None else np.fmax(top, Hl)
+    elif leftover is not None:
+        fld.ceiling = top
     mask &= Hs >= fld.floor - cam._EPS
     return fld, mask
 
 
+SKIM_GAP = 2.0      # mm above the highest stone a skim link can meet (above the previous tool's scallop)
+
+
+def _max_filter(A: np.ndarray, r: int) -> np.ndarray:
+    """Max over a (2r+1)^2 window (edges padded with -inf); -inf stays -inf only where the whole window is."""
+    out = A.copy()
+    for dj in range(-r, r + 1):
+        for di in range(-r, r + 1):
+            if dj == 0 and di == 0:
+                continue
+            S = np.full_like(A, -math.inf)
+            ys = slice(max(dj, 0), A.shape[0] + min(dj, 0))
+            yd = slice(max(-dj, 0), A.shape[0] + min(-dj, 0))
+            xs = slice(max(di, 0), A.shape[1] + min(di, 0))
+            xd = slice(max(-di, 0), A.shape[1] + min(-di, 0))
+            S[yd, xd] = A[ys, xs]
+            out = np.fmax(out, S)
+    return out
+
+
+def _skim_fn(fld, tool, clear_z: float):
+    """skim(p0, p1) for cam._link: the highest stone along the straight link (the surface the previous tool left, or
+    the leftover stock top: no stone above it can remain), grown by this tool's radius, plus SKIM_GAP. None where
+    the link crosses a cell with no known ceiling (off the part), or no ceiling is known at all."""
+    C = getattr(fld, "ceiling", None)
+    if C is None:
+        return None
+    G = _max_filter(np.where(np.isfinite(C), C, -math.inf), int(math.ceil(tool.diameter / 2 / fld.cell)) + 1)
+    x0, y0, c = float(fld.xs[0]), float(fld.ys[0]), float(fld.cell)
+
+    def skim(p0, p1):
+        n = max(2, int(math.ceil(math.hypot(p1[0] - p0[0], p1[1] - p0[1]) / c)) + 1)
+        t = np.linspace(0.0, 1.0, n)
+        i = np.clip(np.rint((p0[0] + (p1[0] - p0[0]) * t - x0) / c).astype(int), 0, G.shape[1] - 1)
+        j = np.clip(np.rint((p0[1] + (p1[1] - p0[1]) * t - y0) / c).astype(int), 0, G.shape[0] - 1)
+        g = G[j, i]
+        if not np.all(np.isfinite(g)):
+            return None
+        z = float(g.max()) + SKIM_GAP
+        return z if z < clear_z else None
+    return skim
+
+
+def _order_runs(runs: List[np.ndarray]) -> List[np.ndarray]:
+    """Greedy nearest-neighbour order of the runs (each keeps its direction): from the end of one run to the
+    closest start of a run not yet cut."""
+    if len(runs) < 3:
+        return runs
+    S = np.array([r[0, :2] for r in runs])
+    left = np.ones(len(runs), bool)
+    out, k = [], 0
+    for _ in range(len(runs)):
+        left[k] = False
+        out.append(runs[k])
+        if not left.any():
+            break
+        d = np.hypot(*(S - runs[k][-1, :2]).T)
+        d[~left] = np.inf
+        k = int(np.argmin(d))
+    return out
+
+
 def rest(tris, mesh, tool, stock, previous_tool_radius=None, previous_tool=None, leftover=None, threshold=0.05,
          mode="raster", stepover=1.0, stepdown=1.0, overlap=0.5, allowance=0.0, tolerance=0.01, clearance=20.0,
-         direction="climb", cell=0.0, **_) -> List[Move]:
+         direction="climb", cell=0.0, also_previous=False, low_links=False, **_) -> List[Move]:
     """Rest machining: finishing paths of `tool` only where the previous tool left more than `threshold` mm (see
     rest_region). mode "raster": zig-zag passes along x at `stepover` mm, clipped to the region grown by `overlap`
-    mm. mode "waterline": constant-z loops `stepdown` apart, clipped the same way. Empty region: no moves."""
+    mm. mode "waterline": constant-z loops `stepdown` apart, clipped the same way. Empty region: no moves.
+    low_links: order the runs nearest first and link them SKIM_GAP above the highest stone along the link (see
+    _skim_fn) instead of at the clearance plane; off the part, or with no known ceiling, the clearance plane."""
     fld, mask = rest_region(tris, mesh, tool, previous_tool_radius, previous_tool, leftover, threshold, allowance,
-                            cell)
+                            cell, also_previous)
     mask = cam._dilate(mask, int(math.ceil(max(overlap, 0.0) / fld.cell)))
     if not mask.any():
         return []
@@ -454,7 +524,12 @@ def rest(tris, mesh, tool, stock, previous_tool_radius=None, previous_tool=None,
             runs += cam._runs(P, contact & fld.lookup(mask, P[:, 0], P[:, 1]))
     else:
         raise ValueError("rest mode must be 'raster' or 'waterline'")
-    return cam._link(runs, stock["zmax"] + clearance)
+    clear_z = stock["zmax"] + clearance
+    if not low_links:
+        return cam._link(runs, clear_z)
+    # the region is scattered: link the runs nearest first and skim between them just above the stone the previous
+    # tool left, instead of climbing to the clearance plane after every short run
+    return cam._link(_order_runs([r for r in runs if len(r)]), clear_z, skim=_skim_fn(fld, tool, clear_z))
 
 
 # ------------------------------------------------------------------------------------------------------------------
@@ -774,7 +849,334 @@ def adaptive_raster(tris, mesh, tool, stock, scallop=0.0, adaptive=True, stepove
     return cam._link(passes, stock["zmax"] + clearance)
 
 
+# ------------------------------------------------------------------------------------------------------------------
+# Leftover from a Z-map of earlier milling steps (rest machining without a stock simulation)
+
+def cl_passes(moves: Sequence[Move]):
+    """Cutting passes (lists of lc.CLPoint) of a move list: the feed and plunge moves, split at every other move."""
+    passes, cur = [], []
+    for m in moves:
+        if m[0] in ("feed", "plunge"):
+            c = lc.CLPoint()
+            c.x, c.y, c.z, c.contact = float(m[1][0]), float(m[1][1]), float(m[1][2]), True
+            cur.append(c)
+        elif cur:
+            passes.append(cur)
+            cur = []
+    if cur:
+        passes.append(cur)
+    return passes
+
+
+def zmap_leftover(cuts, stock, cell: float = 1.0):
+    """The stock top after earlier milling: (xs, ys, Z) with Z in mm (rows y, columns x), the form `rest` takes as
+    `leftover`. cuts: [(tool, moves), ...] in program order, vertical-axis paths of tools with a drop-cutter model.
+    The Z-map starts as the stock box (a dict xmin .. zmax) cut along every feed and plunge move at `cell` mm."""
+    if cell <= 0:
+        raise ValueError("leftover_cell must be > 0")
+    zm = lc.make_stock(stock["xmin"], stock["xmax"], stock["ymin"], stock["ymax"], float(cell), stock["zmax"])
+    for tool, moves in cuts:
+        passes = cl_passes(moves)
+        if passes:
+            lc.cut_passes(zm, lc.cutter_of(tool), passes)
+    xs = zm.x0 + zm.cell * np.arange(zm.nx)
+    ys = zm.y0 + zm.cell * np.arange(zm.ny)
+    return xs, ys, np.asarray(zm.z, dtype=float).reshape(zm.ny, zm.nx)
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# Engraving and chamfering with a V-bit (cone cutter)
+
+_RAY = None
+
+
+def _ray_cutter():
+    """A flat cutter of 1 micrometre radius: its drop-cutter height is the part's height straight under the tip."""
+    global _RAY
+    if _RAY is None:
+        c = lc.Cutter()
+        c.kind = lc.CutterKind.Flat
+        c.radius = 1e-3
+        _RAY = c
+    return _RAY
+
+
+def surface_z(mesh, x: float, y: float) -> float:
+    """Height of the part straight under (x, y), or -inf where the part is not."""
+    return float(lc.drop_cutter(_ray_cutter(), mesh, float(x), float(y)))
+
+
+def parse_paths(text) -> List[np.ndarray]:
+    """Polylines (n, 2) from text 'x,y; x,y; ... | x,y; ...' (mm, polylines separated by '|'; repeat the first point
+    to close one). None or empty text gives []. A list of point lists passes through."""
+    if text is None:
+        return []
+    if not isinstance(text, str):
+        return [np.asarray(p, dtype=float).reshape(-1, 2) for p in text] if len(text) else []
+    out = []
+    for chunk in text.replace("\n", "|").split("|"):
+        pts = []
+        for s in chunk.split(";"):
+            if not s.strip():
+                continue
+            v = [float(x) for x in s.split(",")]
+            if len(v) != 2:
+                raise ValueError("a path point is 'x,y' in mm (got '{}')".format(s.strip()))
+            pts.append(v)
+        if not pts:
+            continue
+        if len(pts) < 2:
+            raise ValueError("a path needs at least 2 points (got 1: '{}')".format(chunk.strip()))
+        out.append(np.asarray(pts, dtype=float))
+    return out
+
+
+def _densify(P: np.ndarray, step: float) -> np.ndarray:
+    """Points along the polyline P (n, 2), at most `step` apart, keeping every vertex."""
+    out = [P[0]]
+    for a, b in zip(P[:-1], P[1:]):
+        L = float(np.hypot(*(b - a)))
+        k = max(int(math.ceil(L / step - 1e-9)), 1)
+        out += [a + (b - a) * (i / k) for i in range(1, k + 1)]
+    return np.asarray(out)
+
+
+def _cone(tool, what: str):
+    """(half angle rad, tip flat radius mm, tool radius mm) of a V-bit or chamfer bit."""
+    ang = float(getattr(tool, "tip_angle", 0.0) or 0.0)
+    if ang <= 0 or ang >= 180:
+        raise ValueError("{} needs a V-bit or chamfer bit with a tip angle in (0, 180) degrees (tool {} has {:g})"
+                         .format(what, tool.id, ang))
+    return math.radians(ang / 2), float(tool.tip_diameter or 0.0) / 2, float(tool.diameter) / 2
+
+
+def engrave_depth(tool, width: float) -> float:
+    """Depth (mm) at which a V-bit cuts a groove `width` mm wide at the surface: the cone flank gives
+    width = tip_diameter + 2 depth tan(half angle)."""
+    half, t, R = _cone(tool, "engraving by width")
+    if width > 2 * R + 1e-9:
+        raise ValueError("width {:g} mm exceeds the tool diameter {:g} mm".format(width, 2 * R))
+    if width <= 2 * t:
+        raise ValueError("width {:g} mm is not above the tip flat {:g} mm".format(width, 2 * t))
+    return (width - 2 * t) / (2 * math.tan(half))
+
+
+def _surface_runs(P2: np.ndarray, mesh, dz: float, step: float, tol: float, top=None) -> List[np.ndarray]:
+    """Tip runs (n, 3) over the xy polyline P2: tip z = the part height under the point + dz, runs split where the
+    part is absent. `top(x, y)` overrides the part height."""
+    D = _densify(P2, step)
+    f = top or (lambda x, y: surface_z(mesh, x, y))
+    zs = np.array([f(x, y) for x, y in D])
+    return cam._runs(np.column_stack([D, zs + dz]), np.isfinite(zs))
+
+
+def engrave(tris, mesh, tool, stock, paths="", width=0.0, depth=0.0, text="", height=0.0, step=0.5, tolerance=0.01,
+            clearance=20.0, **_) -> List[Move]:
+    """V-bit engraving along polylines. paths: 'x,y; x,y | x,y; ...' (mm). The tip follows the part's top surface
+    (the height straight under each sample, drop-cutter of a pointed cutter) at `depth` below it. width > 0 sets
+    the depth from the groove width at the surface (engrave_depth; it needs a tool with a tip angle); otherwise
+    `depth` (mm) is used with any tool. step: the largest spacing of the samples (mm).
+
+    text and height: lettering needs a single-stroke font, and lithocam ships none, so a non-empty text is refused:
+    give the letter strokes as paths."""
+    if text and str(text).strip():
+        raise ValueError("lettering needs a single-stroke font and lithocam ships none: give the strokes as 'paths'")
+    pl = parse_paths(paths)
+    if not pl:
+        raise ValueError("engrave needs paths 'x,y; x,y | x,y; ...' (mm)")
+    d = engrave_depth(tool, float(width)) if width and width > 0 else float(depth)
+    if d <= 0:
+        raise ValueError("engrave needs width (> 0) or depth (> 0)")
+    runs: List[np.ndarray] = []
+    for P in pl:
+        runs += _surface_runs(P, mesh, -d, max(float(step), 0.05), tolerance)
+    return cam.simplify(cam._link(runs, stock["zmax"] + clearance), tolerance)
+
+
+def top_outline(tris: np.ndarray, max_slope_deg: float = 1.0, tol: float = 0.05) -> List[np.ndarray]:
+    """Closed outlines (n, 3), first point repeated, of the part's highest flat top: the boundary of the upward
+    faces (normal within max_slope_deg of +z) whose mean height is within `tol` of the highest such face. Each loop
+    runs with the material on its right (clockwise round the part, counter-clockwise round a hole), the climb
+    direction for a clockwise spindle."""
+    tris = np.asarray(tris, dtype=float).reshape(-1, 3, 3)
+    n = _unit_normals(tris)
+    flat = n[:, 2] >= math.cos(math.radians(max_slope_deg))
+    if not flat.any():
+        raise ValueError("the part has no upward face within {:g} degrees of +z".format(max_slope_deg))
+    zc = tris[:, :, 2].mean(axis=1)
+    ztop = float(zc[flat].max())
+    sel = np.nonzero(flat & (zc >= ztop - tol))[0]
+
+    def key(p):
+        return tuple(np.round(p, 6))
+    count: Dict[frozenset, int] = {}
+    directed: Dict[tuple, List[tuple]] = {}
+    pos: Dict[tuple, np.ndarray] = {}
+    for t in sel:
+        for a, b in ((0, 1), (1, 2), (2, 0)):
+            ka, kb = key(tris[t, a]), key(tris[t, b])
+            pos[ka], pos[kb] = tris[t, a], tris[t, b]
+            e = frozenset((ka, kb))
+            count[e] = count.get(e, 0) + 1
+    for t in sel:
+        for a, b in ((0, 1), (1, 2), (2, 0)):
+            ka, kb = key(tris[t, a]), key(tris[t, b])
+            if count[frozenset((ka, kb))] == 1:
+                directed.setdefault(kb, []).append(ka)       # reversed: material on the right
+    loops, used = [], set()
+    for s in list(directed):
+        for first in list(directed[s]):
+            if (s, first) in used:
+                continue
+            loop, cur, nxt = [s], s, first
+            used.add((s, first))
+            while True:
+                loop.append(nxt)
+                cur = nxt
+                if cur == s:
+                    break
+                cand = [k for k in directed.get(cur, []) if (cur, k) not in used]
+                if not cand:
+                    break
+                used.add((cur, cand[0]))
+                nxt = cand[0]
+            if loop[-1] == s and len(loop) >= 4:
+                loops.append(np.array([pos[k] for k in loop]))
+    if not loops:
+        raise ValueError("the highest flat top has no closed outline")
+    return loops
+
+
+def chamfer(tris, mesh, tool, stock, width=0.0, paths="", max_slope_deg=1.0, step=0.5, tolerance=0.01,
+            clearance=20.0, **_) -> List[Move]:
+    """Chamfer with a V-bit or chamfer bit. `width`: the chamfer's horizontal width on the top face (mm, required).
+    The tool axis runs along the edge; the cone flank passes through the top edge's inner line `width` in from the
+    edge, so the tip sits (width - tip flat radius) / tan(half angle) below the top, on the wall plane. With a flat
+    tip a ledge of the tip radius stays on the wall. paths: polylines 'x,y; x,y | ...' (mm) on the edge; empty means
+    the outline of the part's highest flat top (top_outline, max_slope_deg). Given polylines take the top height
+    from the part under each point (the highest of the point and four 0.01 mm neighbours, so an edge point reads the
+    top face, not the wall). The width must not exceed the tool radius. Corners: the tool follows the vertex, so an
+    inside miter of the two chamfers is left rounded."""
+    half, t, R = _cone(tool, "chamfer")
+    w = float(width)
+    if w <= 0:
+        raise ValueError("chamfer needs width (mm) > 0")
+    if w > R + 1e-9:
+        raise ValueError("chamfer width {:g} mm exceeds the tool radius {:g} mm".format(w, R))
+    if w <= t:
+        raise ValueError("chamfer width {:g} mm is not above the tip flat radius {:g} mm".format(w, t))
+    c = (w - t) / math.tan(half)
+    step = max(float(step), 0.05)
+    runs: List[np.ndarray] = []
+    pl = parse_paths(paths)
+    if pl:
+        def top(x, y):
+            return max(surface_z(mesh, x + dx, y + dy) for dx, dy in ((0, 0), (0.01, 0), (-0.01, 0), (0, 0.01),
+                                                                      (0, -0.01)))
+        for P in pl:
+            runs += _surface_runs(P, mesh, -c, step, tolerance, top)
+    else:
+        for L in top_outline(tris, max_slope_deg):
+            D = _densify(L[:, :2], step)
+            runs.append(np.column_stack([D, np.full(len(D), float(L[0, 2]) - c)]))
+    return cam.simplify(cam._link(runs, stock["zmax"] + clearance), tolerance)
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# Flat lands: 2.5D finishing of horizontal areas
+
+def flat_lands(tris: np.ndarray, max_slope_deg: float = 1.0, tol: float = 0.01):
+    """[(z, triangle indices)] of the horizontal faces, highest first. A face is horizontal when its normal is within
+    max_slope_deg of +z; faces are grouped by their highest vertex, a new group starting where the heights differ by
+    more than max(tol, 1e-3) mm; z is the group's highest vertex, so a tool resting there never gouges."""
+    tris = np.asarray(tris, dtype=float).reshape(-1, 3, 3)
+    n = _unit_normals(tris)
+    idx = np.nonzero(n[:, 2] >= math.cos(math.radians(max_slope_deg)))[0]
+    if not len(idx):
+        return []
+    zt = tris[idx, :, 2].max(axis=1)
+    order = np.argsort(-zt)
+    idx, zt = idx[order], zt[order]
+    gap = max(float(tol), 1e-3)
+    groups, start = [], 0
+    for k in range(1, len(idx) + 1):
+        if k == len(idx) or zt[k - 1] - zt[k] > gap:
+            groups.append((float(zt[start:k].max()), idx[start:k]))
+            start = k
+    return groups
+
+
+def _land_mask(tris, tri_ids, xs, ys) -> np.ndarray:
+    """Grid mask (len(ys), len(xs)) of the sample points that lie inside any of the faces (xy projection)."""
+    mask = np.zeros((len(ys), len(xs)), bool)
+    for t in tri_ids:
+        A, B, C = tris[t, 0, :2], tris[t, 1, :2], tris[t, 2, :2]
+        i0, i1 = np.searchsorted(xs, min(A[0], B[0], C[0]) - 1e-9), np.searchsorted(xs, max(A[0], B[0], C[0]) + 1e-9)
+        j0, j1 = np.searchsorted(ys, min(A[1], B[1], C[1]) - 1e-9), np.searchsorted(ys, max(A[1], B[1], C[1]) + 1e-9)
+        if i1 <= i0 or j1 <= j0:
+            continue
+        X, Y = np.meshgrid(xs[i0:i1], ys[j0:j1])
+        den = (B[1] - C[1]) * (A[0] - C[0]) + (C[0] - B[0]) * (A[1] - C[1])
+        if abs(den) < 1e-14:
+            continue
+        a = ((B[1] - C[1]) * (X - C[0]) + (C[0] - B[0]) * (Y - C[1])) / den
+        b = ((C[1] - A[1]) * (X - C[0]) + (A[0] - C[0]) * (Y - C[1])) / den
+        inside = (a >= -1e-9) & (b >= -1e-9) & (1 - a - b >= -1e-9)
+        mask[j0:j1, i0:i1] |= inside
+    return mask
+
+
+def flat_land(tris, mesh, tool, stock, max_slope_deg=1.0, stepover=0.0, allowance=0.0, cell=0.0, tolerance=0.01,
+              clearance=20.0, entry="plunge", ramp_angle=3.0, helix_radius=0.0, helix_pitch=1.0,
+              **_) -> List[Move]:
+    """2.5D finishing of the horizontal areas of the part with a flat or bull end mill. Faces within max_slope_deg
+    of +z are grouped by height (flat_lands); at each height, highest first, a zig-zag along x at `stepover` mm
+    (0 = 0.7 x the tool diameter) rides at that height wherever the tool centre is over the faces (grown by one grid
+    cell) and the drop-cutter height there is that height within max(tolerance, 0.02) mm. That keeps the tool a
+    radius off any wall that rises above the land (the inset) and lets it overhang an open edge, and it never
+    gouges. allowance lifts every pass. cell: grid of the face mask, mm (0 = min(0.5, tool radius / 5))."""
+    if tool.kind not in (lc.ToolKind.FlatEndMill, lc.ToolKind.BullNoseMill):
+        raise ValueError("flat_land needs a flat or bull end mill (got {})".format(lc.tool_kind_name(tool.kind)))
+    R = float(tool.diameter) / 2
+    so = float(stepover) if stepover and stepover > 0 else 0.7 * float(tool.diameter)
+    cell = float(cell) if cell and cell > 0 else min(0.5, max(R / 5.0, 0.02))
+    eps = max(float(tolerance), 0.02)
+    cutter = lc.cutter_of(tool)
+    tris = np.asarray(tris, dtype=float).reshape(-1, 3, 3)
+    runs: List[np.ndarray] = []
+    entries: List[tuple] = []
+    for z, ids in flat_lands(tris, max_slope_deg, tolerance):
+        sub = tris[ids]
+        lo, hi = sub.reshape(-1, 3)[:, :2].min(axis=0), sub.reshape(-1, 3)[:, :2].max(axis=0)
+        xs = np.arange(lo[0] - cell, hi[0] + 1.5 * cell, cell)
+        ys = np.arange(lo[1] - cell, hi[1] + 1.5 * cell, cell)
+        land = cam._dilate(_land_mask(tris, ids, xs, ys), 1)
+        y_lines = list(np.arange(lo[1], hi[1], so)) + [hi[1]]
+        sample = cell / 2
+        xl = np.arange(xs[0], xs[-1] + sample / 2, sample)
+        for n, y in enumerate(y_lines):
+            j = int(np.clip(np.rint((y - ys[0]) / cell), 0, len(ys) - 1))
+            ii = np.clip(np.rint((xl - xs[0]) / cell).astype(int), 0, len(xs) - 1)
+            on = np.array([bool(land[j, i]) and abs(lc.drop_cutter(cutter, mesh, float(x), float(y)) - z) <= eps
+                           for i, x in zip(ii, xl)])
+            P = np.column_stack([xl, np.full(len(xl), y), np.full(len(xl), z + float(allowance))])
+            for r in cam._runs(P, on):
+                runs.append(r if n % 2 == 0 else r[::-1])
+                entries.append((z, (xs[0], xs[-1], ys[0], ys[-1])))
+    if not runs:
+        return []
+    top = float(stock["zmax"]) + clearance
+    if entry == "plunge":
+        return cam._link(runs, top)
+    moves: List[Move] = []
+    for r, (z, rect) in zip(runs, entries):
+        ent = cam.make_entry(entry, tool, ramp_angle, helix_radius, helix_pitch, rect,
+                             (lambda x, y, zz=z + float(allowance): zz), tolerance)
+        moves += cam._link([r], top, ent)
+    return moves
+
+
 GENERATORS = {"drill": drill, "core_drill": core_drill, "tap": tap, "bore": bore, "rest": rest, "pencil": pencil,
-              "adaptive_raster": adaptive_raster}
+              "adaptive_raster": adaptive_raster, "engrave": engrave, "chamfer": chamfer, "flat_land": flat_land}
 
 cam.GENERATORS.update(GENERATORS)   # registered with the studio's generators (cam.py imports this module last)

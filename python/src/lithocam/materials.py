@@ -522,7 +522,7 @@ def feed_limit(tool, material, engagement, rpm: float, spindle=None, robot: Opti
         if present and v is not None:
             kq = [v] * (np.asarray(J).shape[1] if J is not None else 0)
     if kq is None and robot.get("robot_name"):
-        rows = [r for r in materials_mechanics.lookup(robot["robot_name"], "joint_stiffness") if r["low"] is not None
+        rows = [r for r in materials_mechanics.robot_stiffness_rows(robot["robot_name"]) if r["low"] is not None
                 and r["unit"] == "Nm/rad"]
         if rows:
             r = min(rows, key=lambda x: x["low"])

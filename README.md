@@ -11,7 +11,7 @@ Status: **0.0.1, early.** Main pieces so far:
 - verified stepover and kerf, and a Lean-proved wire against a planar face;
 - a milling kernel (drop-cutter for four cutter shapes, adaptive zig-zag, Z-map stock simulation), checked against OpenCAMLib;
 - ruled-surface extraction for wire saw and flank milling, and a diamond-wire cutting simulation;
-- UR10e and KUKA KR120 cells in Tesseract, with a track and turntable, diamond-wire bow saws and collision checks against the official meshes;
+- UR10e, KUKA KR120, KUKA KR 480 and KR 500 MT, and ABB IRB 6700-200/2.60 cells in Tesseract, with a track and turntable, diamond-wire bow saws and collision checks against the official meshes (`cells/README.md`);
 - 5-axis flank milling with stepped roughing, and stock removal simulated on meshes (Manifold);
 - a tool library of 38 kinds and 63 stone and wood tools, from a sourced survey (`docs/TOOLING.md`);
 - post-processing to URScript, KRL, RAPID and a neutral CL text, with a read-back check (`docs/POSTPROCESSORS.md`);
@@ -134,6 +134,8 @@ The C++ core is written once. Python bindings are generated with [rosetta](https
 ## Data and cells credited
 
 Quarra Stone published ROBOmove backups of their KUKA KR 480 MT and KR 500 stone-milling cells in the public repository [Q-LAB](https://github.com/brnmsmith/Q-LAB): tool tables, end effectors, work-table frames, parameter ranges, program fragments and meshes. lithocam reads those files from a local clone at run time (`LITHOCAM_QLAB`, default `external/Q-LAB` beside the checkout) and does not redistribute them. The repository has no licence file, so none of its files or contents is in this repository. Imported tools and spindle presets carry the source "Quarra Stone Q-LAB (ROBOmove backup)". The KR 480 R3330 MT and KR 500 R2830 MT cells (`cells/`) use dimensions from KUKA's public KR 500 FORTEC manual. See `docs/ROBOMOVE_IMPORT.md`.
+
+ABB IRB 6700 model from ROS-Industrial abb_irb6700_support, Apache-2.0 ([ros-industrial/abb](https://github.com/ros-industrial/abb), branch noetic-devel, package version 1.5.0). The `irb6700` cell (`cells/irb6700.urdf`) takes its joint origins, axes and limits from `urdf/irb6700_200_260_macro.xacro`, expanded by hand into a plain URDF, and `cells/meshes/irb6700/` holds the package's visual and collision STL meshes unchanged, with the licence text (`LICENSE`) and the credit (`NOTICE`). The two balancer mimic joints of the xacro are left out.
 
 ## Licence
 

@@ -169,11 +169,18 @@ class Cell:
         from tesseract_robotics.tesseract_scene_graph import Collision, Joint, JointType_FIXED, Link, Visual
 
         link = Link(name)
-        for d, z0, length, x, y in cylinders:
+        for cyl in cylinders:
             c, v = Collision(), Visual()
+            if len(cyl) == 3:            # (diameter m, length m, base frame 4x4 in m): a cylinder along the base z
+                d, length, B = cyl
+                M = np.asarray(B, dtype=float).copy()
+                M[:3, 3] = M[:3, 3] + M[:3, 2] * float(length) / 2
+                c.origin = _iso(M)
+            else:
+                d, z0, length, x, y = cyl
+                c.origin = Isometry3d.Identity() * Translation3d(float(x), float(y), float(z0) + float(length) / 2)
             g = Cylinder(float(d) / 2, float(length))
             c.geometry, v.geometry = g, g
-            c.origin = Isometry3d.Identity() * Translation3d(float(x), float(y), float(z0) + float(length) / 2)
             v.origin = c.origin
             link.collision.push_back(c)
             link.visual.push_back(v)

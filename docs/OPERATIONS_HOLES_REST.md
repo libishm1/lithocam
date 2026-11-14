@@ -62,8 +62,10 @@ catalog.py (operation entries)
 - `drill`, `core_drill`, `tap`, `bore`: tool kinds `drill`, `flat_bottom_drill`, `step_drill`, `core_drill` (tap: a
   tap tool, or any drill kind until a tap kind exists; bore: end mills). Parameters as the table above. Defaults
   for `peck`, `dwell`, `pitch`, `rpm` come from the cutting-data tables, not from here.
-- `rest`: any tool the part has a drop-cutter model for; needs the previous operation's tool radius (from the
-  previous program step) or the simulated stock as `leftover`.
+- `rest`: any tool the part has a drop-cutter model for. In the studio the material comes from the stock simulation
+  before the step, else a Z-map of the earlier milling steps (`leftover_cell`, default 1 mm), else the previous tool
+  radius; see `docs/STUDIO.md`. Called directly it needs `previous_tool_radius`, `previous_tool` or `leftover`; with
+  `also_previous` the region is the union of the stock and the previous-tool criteria.
 - `pencil`, `adaptive_raster`: ball-end mill only.
 
 ## Method notes

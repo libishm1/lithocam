@@ -33,7 +33,7 @@ from typing import Dict, List, Optional, Sequence
 import numpy as np
 
 from .. import post
-from . import catalog, program
+from . import catalog, program, sheet
 
 
 class ApiError(ValueError):
@@ -398,6 +398,20 @@ class Session:
             Path(path).write_text(text, encoding="utf-8")
         return text
 
+    def setup_sheet(self, program_name: str = "Main", stock: bool = False, path=None) -> str:
+        """Markdown setup sheet of the program: per cutting step the tool, feed, spindle speed, path lengths,
+        estimated time and, with stock=True, the removed volume (a stock simulation, which takes a while). Simulates
+        first; a program with errors still gets a sheet, with the errors listed. See studio.sheet."""
+        r = self.simulate(program_name)
+        run = None
+        if stock:
+            from . import process
+            run = process.simulate_stock(self.station, self.robot, r.expansion, self._tool_map())
+        text = sheet.setup_sheet(self.station, r.expansion, self._prog(program_name), self._tool_map(), run)
+        if path:
+            Path(path).write_text(text, encoding="utf-8")
+        return text
+
 
 WIRE_FRAMES = [("z", "y", "-x"), ("z", "x", "y"), ("z", "-y", "x"), ("z", "-x", "-y")]
 
@@ -500,7 +514,7 @@ def station_schema() -> Dict[str, object]:
             "part_path": {"type": "string"}, "ruled_path": {"type": "string"}, "tool_library": {"type": "string"},
             "stock": {"type": ["object", "null"], "properties": {k: {"type": "number"} for k in
                                                                  ("xmin", "xmax", "ymin", "ymax", "zmin", "zmax")}},
-            "tool_length": {"type": "number"}, "spindle": {"type": ["object", "null"]},
+            "tool_length": {"type": "number"}, "spindle": {"type": ["object", "string", "null"]},
             "material": {"type": "string"}, "robot_factor": {"type": "number"},
             "turntable": {"type": ["object", "null"]},
             "targets": {"type": "array", "items": {"type": "object", "required": ["name", "joints", "pose"],
@@ -518,7 +532,8 @@ def station_schema() -> Dict[str, object]:
 
 
 def main(argv=None) -> int:
-    """python -m lithocam.studio.api steps|schema|check STATION [PROGRAM]|post STATION PROGRAM DIALECT OUT"""
+    """python -m lithocam.studio.api steps|schema|check STATION [PROGRAM]|post STATION PROGRAM DIALECT OUT|
+    sheet STATION PROGRAM OUT.md"""
     import sys
     a = list(sys.argv[1:] if argv is None else argv)
     try:
@@ -539,8 +554,14 @@ def main(argv=None) -> int:
             s = Session.open(a[1])
             s.post(a[2], a[3], path=a[4])
             print(json.dumps({"written": a[4]}))
+        elif a[0] == "sheet":
+            if len(a) != 4:
+                raise ApiError("sheet needs STATION PROGRAM OUT.md")
+            Session.open(a[1]).setup_sheet(a[2], path=a[3])
+            print(json.dumps({"written": a[3]}))
         else:
-            raise ApiError("commands: steps, schema, check STATION [PROGRAM], post STATION PROGRAM DIALECT OUT")
+            raise ApiError("commands: steps, schema, check STATION [PROGRAM], post STATION PROGRAM DIALECT OUT, "
+                           "sheet STATION PROGRAM OUT.md")
     except ApiError as e:
         print(json.dumps({"error": str(e)}))
         return 2

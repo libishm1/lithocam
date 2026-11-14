@@ -2,7 +2,8 @@
 
 The studio is a desktop program for stone CAM on industrial robots. It holds a cell (robot, spindle, turntable),
 a part and its stock, a tool library and programs. It simulates the programs and writes controller code.
-Robots: UR10e, KUKA KR120 R2500, KUKA KR 480 R3330 MT and KR 500 R2830 MT. The robot programs are for simulation
+Robots: UR10e (URScript), KUKA KR120 R2500, KUKA KR 480 R3330 MT and KR 500 R2830 MT (KRL), and ABB IRB 6700-200/2.60
+(key `irb6700`, RAPID; the turntable can be driven as external axis E1). The robot programs are for simulation
 until a cell passes its hardware gate.
 
 Start it with `python -m lithocam.studio [station.lcs.json]` (needs the `studio` extra: PySide6).
@@ -54,7 +55,10 @@ program, posted as a comment). Steps added with the hole, rest and finishing wor
 | `core_drill` | Holes | Stone core drilling: a clearing retract per peck (`peck` is required), optional entry orbit |
 | `tap` | Holes | Rigid tapping. In at pitch x rpm, dwell, out with the spindle reversed. `pitch` and `rpm` are required |
 | `bore` | Holes | An end mill bores a hole larger than itself on a helix |
-| `rest` | 3-axis | Cuts only where the previous tool left more than the threshold. The previous tool is the tool of the previous milling step of the program unless `previous_tool_radius` is set |
+| `rest` | 3-axis | Cuts only where the earlier steps left more than the threshold: from the last stock simulation, else a Z-map of the earlier milling steps, else `previous_tool_radius` |
+| `engrave` | 2.5-axis | V-bit along polylines `x,y; x,y \| x,y; ...`, depth from the groove `width` or a `depth`; the tip follows the top surface |
+| `chamfer` | 2.5-axis | V-bit or chamfer bit along the top outline of the part (or given `paths`) at a chamfer `width` |
+| `flat_land` | 2.5-axis | Flat or bull end mill on the horizontal faces of the part, one height at a time |
 | `pencil` | 3-axis | Traces the concave creases a ball-end mill touches at two or more points |
 | `adaptive_raster` | 3-axis | Raster along x with the cross-feed set from the local curvature so the scallop stays below the limit |
 | `polish` | Finishing | One pad pass per grit, a pad change before each, the pad axis along the surface normal |
@@ -69,10 +73,42 @@ spindle in reverse: a robot post (URScript, KRL, RAPID) refuses with a clear mes
 defines `spindle.reverse` (`docs/CELL_IO.md`); G-code posts `M4` and `M3`. Posting a program with `tap` on a robot
 without that output stays refused until the output is set.
 
-**Rest.** The previous tool comes from the previous milling step (face, rough, raster, waterline, steep and shallow,
-5-axis, rest, pencil, adaptive raster) in the same program. `expand(..., leftover=stock)` takes the stock after the
-earlier operations instead (an `SdfStock` or an `(xs, ys, Z)` height field); with no previous tool and no radius the
-step reports what is missing. An empty region (the same tool twice) is a message, not an error.
+**Rest.** The step takes its material from the first source that applies, and the log says which:
+
+1. `previous_tool_radius` set on the step: "rest: previous tool radius r mm (no stock)".
+2. A stock run from the previous simulation (the Stock box): the next Generate gives the step the stock just before it,
+   replayed from the run's recorded cuts (`studio/livestock.py`): "rest: leftover from the stock simulation before step
+   N". It is used only while the steps before the rest step and the station are unchanged since that run.
+3. Otherwise a Z-map of the earlier vertical-axis milling steps of the program, cut from the station stock box at
+   `leftover_cell` (default 1 mm): "rest: leftover from a Z-map of steps a..b at 1 mm".
+4. With no earlier milling step, the tool of the previous one if any ("previous tool radius r (no stock)"); else the
+   step reports what is missing.
+
+A tilted setup skips 2 and 3 (they are height fields). The stock is compared at the tool centre, so the fillet a larger
+round tool leaves in an inside corner would be missed; the previous tool's reach is added to sources 2 and 3 for that.
+`expand(..., leftover=...)` takes an `SdfStock`, an `(xs, ys, Z)` height field, or a function of the step index. An empty
+region (the same tool twice) is a message, not an error.
+
+**Entry moves.** `face`, `rough_plane` and `flat_land` take `entry`: `plunge` (vertical, at the plunge feed), `ramp`
+(descends at `ramp_angle` along the pass itself, bouncing along a short pass, then returns at depth to the pass start)
+or `helix` (a circle of `helix_radius`, 0 = the tool radius, at most `helix_pitch` per turn, kept inside the stock
+region and never below the part). The ramp angle (3 deg) and helix pitch (1 mm) are example values.
+
+**Engrave and chamfer.** `engrave` follows polylines given as text, `x,y; x,y | x,y; ...` in mm. With `width` the depth
+comes from the V angle (`width = tip flat + 2 depth tan(half angle)`); otherwise `depth` is used with any tool. The tip
+rides the part's top surface (the height straight under it), so it follows a curved top. Lettering (`text`) is refused:
+lithocam ships no single-stroke font, so give the strokes as paths. `chamfer` runs the cone along the top outline of the
+part's highest flat top, or along `paths`; the chamfer `width` may not exceed the tool radius, and the tip sits on the
+wall below the edge. A flat tip leaves a ledge of its radius.
+
+**Flat lands.** `flat_land` groups the faces within `max_slope_deg` of +z by height and zig-zags at each, highest first.
+The tool stays a radius off any wall that rises above the land and may overhang an open edge; it never gouges.
+
+**Setup sheet.** The toolbar action Setup sheet (after Generate) writes a Markdown sheet: per cutting step the tool, kind,
+feed, spindle speed, feed and rapid path lengths, an estimated time and, with the Stock box on, the removed volume. Feeds
+and speeds are the ones posted; the time has no acceleration, tool changes or table turns. From code:
+`Session.setup_sheet("Main", stock=False, path=None)`, or
+`python -m lithocam.studio.api sheet station.lcs.json Main sheet.md`.
 
 **Polish.** The grit sequence comes from the station material (`lithocam.materials`, sourced for granite only). A
 material without a sourced sequence needs `grits` on the step; the step reports the module's message and refuses to
@@ -146,7 +182,23 @@ Disc saw links are linear moves: up until the blade clears the stone by `clearan
 turns, down to the next lead-in. A disc step keeps one arm configuration from its approach to its last cut, as a
 controller does on linear moves. The blade spin follows the turning axis, the long-range wrists start at the wind
 nearest the middle of their range, and comb slots keep the spindle on one side. A point that would need another
-configuration is reported as unreachable. A non-cutting point more than 5 mm under the stock bottom is an error. Milling posts every point the step tolerance needs. Passes start with a plunge at the plunge feed
+configuration is reported as unreachable. A non-cutting point more than 5 mm under the stock bottom is an error.
+
+**Saw heads.** A blade cuts a vertical kerf with its spindle axis level. With the spindle in line with the flange
+the wrist then reaches down level with the stone, and on the UR10e it passes close to its wrist singularity. Stone
+cells mount the spindle at a right angle to the flange instead (the side-mounted spindles of the Q-LAB cells credited
+in the README). The presets `kr120_saw_head` and `ur10e_saw_head` (example sizes) are such heads: a column of
+`head_drop` mm along the flange axis, then the spindle turned by `head_angle_deg` (90). A station selects one by
+key: `"spindle": "kr120_saw_head"`. The head is drawn and collision-checked as its plate, column, body and nose.
+With an angle head the blade spin sets where the arm sits, so the disc steps take `approach_deg` (default 45): the
+arm comes in that far from vertical. Of the two sides (tilted forward or back along the cut) the planner takes the
+one that keeps the wrist further from its singularity, and the collision planner adds a cost to wrist poses within
+30 degrees of it. The log names the angle and the wrist margin. With an in-line spindle the parameter has no
+effect and the log says so. On the example stations the head keeps the UR10e wrist at least 45 degrees from
+singular (it reached 0.1 degree with the in-line spindle). The KR120 wrist stays at least 24 degrees from singular
+with collision checks on and 15 degrees without (the faster planner orders the sides but adds no cost).
+
+Milling posts every point the step tolerance needs. Passes start with a plunge at the plunge feed
 from 2 mm above the stone and end with a straight retract. Linear cuts post as linear moves on every controller,
 with the verified joints noted on each line for the read-back check.
 

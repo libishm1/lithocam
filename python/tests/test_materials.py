@@ -75,7 +75,8 @@ def test_report_statuses():
     assert tab[("granite", "specific_cutting_energy")] == "sourced"
     assert tab[("granite", "density")] == "missing"
     assert tab[("marble", "youngs_modulus")] == "snippet"
-    assert tab[("granite", "g_ratio")] == "missing"
+    assert tab[("granite", "g_ratio")] == "sourced"          # Huang et al. 2004 (2026-11-14 constants review)
+    assert tab[("granite", "wear_per_area")] == "sourced"    # Rajpurohit et al. 2024
     txt = mt.report(["granite", "oak"])
     assert "granite (stone)" in txt and "oak (wood)" in txt and "missing:" in txt
 
@@ -293,11 +294,15 @@ def test_wear_per_area_for_saws():
 
 
 def test_wear_missing_constants_skip_never_default():
-    w = mt.wear("flat_end_mill", "granite", removed_mm3=1000.0)
+    # marble has no sourced G-ratio or wear per area: the check is skipped, never given a default
+    w = mt.wear("flat_end_mill", "marble", removed_mm3=1000.0)
     assert w.model == "none" and w.tool_volume_mm3 is None and w.life_fraction is None
     assert "g_ratio" in w.skipped[0][1]
-    w = mt.wear("disc_saw", "granite", cut_area_mm2=1e6)
+    w = mt.wear("disc_saw", "marble", cut_area_mm2=1e6)
     assert w.model == "none" and "wear_per_area" in w.skipped[0][1]
+    # granite has sourced rows since the 2026-11-14 review; the life fraction still needs a usable amount
+    w = mt.wear("flat_end_mill", "granite", removed_mm3=1000.0)
+    assert w.model == "g_ratio" and w.tool_volume_mm3 == pytest.approx(1000.0 / 5032) and w.life_fraction is None
     w = mt.wear("flat_end_mill", None, removed_mm3=1.0, constants={"g_ratio": None})
     assert w.model == "none"
     with pytest.raises(ValueError):

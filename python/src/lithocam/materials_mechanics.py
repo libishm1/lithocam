@@ -284,7 +284,7 @@ TABLE: List[Dict] = [
     _r("marble", "polish_removal_rate", None, None, "um/min", APP318, "paper", "page read",
        "no removal rate in the text of Appl Sci 15:318. The 2024 Huang et al. Appl Sci 14:8314 (six marbles, sol-gel diamond pad) was seen only as an abstract; MDPI refused the fetch."),
     # ---- item 4: robot stiffness
-    _r("KUKA LBR iiwa 14 R820 (PROXY, a 14 kg cobot; not a UR10 or KR120)", "joint_stiffness", 3800, 42000, "Nm/rad", L10099, "paper", "page read",
+    _r("KUKA LBR iiwa 14 R820 (PROXY, a 14 kg cobot)", "joint_stiffness", 3800, 42000, "Nm/rad", L10099, "paper", "page read",
        "'Task-oriented rigidity optimization for 7 DOF redundant manipulators', IFAC-PapersOnLine 50(1) 2017 (pipeline ID L10099), Table 2 p.3. MEASURED with the joint torque sensors, position control mode: "
        "k1-k7 = 4.2e4, 3.96e4, 1.22e4, 2.02e4, 0.8e4, 0.38e4, 0.48e4 Nm/rad. Joint 2 loading and unloading fits gave 3.96e4 and 4.19e4 (Fig. 5). Impedance mode would give lower values. "
        "The only measured set found for a collaborative arm; no UR10 or UR10e set found."),
@@ -306,7 +306,65 @@ TABLE: List[Dict] = [
        "(forum.universal-robots.com/t/stiffness-adjustable/27583)"),
     _r("industrial robots in general", "stiffness_ratio", 0.01, 0.01, "x CNC machine", "https://arxiv.org/pdf/2101.04992.pdf",
        "paper", "snippet", "stated as up to 100 times lower than a CNC machine, pose dependent; 0.01 is the inverse"),
+    # ---- 2026-11-14 constants review (outputs of the review are kept outside the repo; every row names its locator)
+    _r("KUKA KR210 R2700 (PROXY for a KR120-class arm)", "joint_stiffness", 1.01e5, 3.24e6, "Nm/rad",
+       "https://doi.org/10.1016/j.rcim.2020.101953", "paper", "page read",
+       "Table 1: k1-k6 = 1.89e6, 2.89e6, 3.24e6, 1.01e5, 1.38e5, 1.28e5 Nm/rad, identified with a laser tracker. A larger arm "
+       "than the KR120 R2500, so a proxy; the wrist joints (k4-k6) set the low end."),
+    _r("KUKA KR 500-3 (PROXY for the KR 480 / KR 500 MT cells)", "joint_stiffness", 1.4e5, 2.86e6, "Nm/rad",
+       "https://doi.org/10.1016/j.rcim.2020.101992", "paper", "page read",
+       "Cvitanic et al. 2020, Table 2, model 2: 2.86, 2.36, 1.67, 0.24, 0.16, 0.14 MNm/rad (model 1: 3.93, 3.46, 2.77, 1.57, "
+       "0.24, 0.17). Laser-tracker identification of a KR 500-3, not the MT variants."),
+    _r("ABB IRB 6660 (PROXY for an IRB 6700-class arm)", "joint_stiffness", 4e5, 2e6, "Nm/rad",
+       "corpus K294 Table II and L1178 Table 1 (Subrin et al., Dumas method)", "paper", "page read",
+       "k1-k6 = 1e6, 2e6, 2e6, 4e5, 4e5, 4e5 Nm/rad; two papers agree. The IRB 6660 is a stiffer parallel-arm machine, so "
+       "this proxy is optimistic for an IRB 6700."),
+    _r("bluestone (lithology not stated), robotic grinding", "specific_cutting_energy", 0.277, 0.385, "J/mm3",
+       "https://doi.org/10.1038/s41598-025-92941-6", "paper", "page read",
+       "Cheng et al. 2025 Sci Rep 15:8544, Tables 8-9: u = 60 P/(ae ap f) over six runs (KUKA KR240-2900, ae 10-25 mm, ap 1-2 mm, "
+       "f 3000-4800 mm/min), P = spindle minus no-load power. Derived here; the paper's power fit gives D = 50.39 mm for all six "
+       "runs, which checks the pairing."),
+    _r("granite, black Jinan (sintered diamond mill)", "g_ratio", 5032, 7716, "mm3/mm3",
+       "https://doi.org/10.4028/www.scientific.net/MSF.471-472.469", "paper", "page read",
+       "Huang et al. 2004 Table 1: mill M2, 54 mm, 12 sectors 46x8x4 mm, about 4.5 mm diameter loss over about 50000 cm3. Derived "
+       "from diameter loss, removed volume and segment size; the text also says about 5 mm for both mills, so low confidence."),
+    _r("granite, red Shidao (sintered diamond mill)", "g_ratio", 15851, 29167, "mm3/mm3",
+       "https://doi.org/10.4028/www.scientific.net/MSF.471-472.469", "paper", "page read",
+       "Huang et al. 2004 Table 1: mill M1, 59 mm, 16 sectors 46x6x4 mm, about 4 mm diameter loss over about 140000 cm3. Derived; "
+       "low confidence, as the black Jinan row."),
+    _r("granite (nine Indian granites, multi-blade circular saw)", "wear_per_area", 0.005069, 0.013462, "mm/m2",
+       "https://doi.org/10.1038/s41598-024-54625-5", "paper", "page read",
+       "Rajpurohit et al. 2024 Sci Rep 14:4590, Table 2, printed as 5.069-13.462 um/m2: Fe-based multilayer segments, 40/50 mesh, "
+       "343 rpm, traverse 50-100 mm/s, 20-25 mm per pass. Read through the Europe PMC full text. Saw segments, not wire beads."),
+    _r("granite (coarse diamond lapping, PROXY for polishing)", "preston_coefficient", 1.79e-6, 1.96e-6, "mm2/N",
+       "https://doi.org/10.3103/S1063457608060087", "paper", "page read",
+       "Sidorko et al. 2008, Tables 4 and 6: k_p = Q/(F v), F 600 N at 60 kPa on a 100 x 100 mm plate, v = 1000 m in 55 min = "
+       "303 mm/s, AS400 1000/800 diamond. A coarse lapping test, not resin-pad polishing per grit."),
+    _r("marble (coarse diamond lapping, PROXY for polishing)", "preston_coefficient", 3.23e-5, 7.33e-5, "mm2/N",
+       "https://doi.org/10.3103/S1063457608060087", "paper", "page read",
+       "Sidorko et al. 2008, as the granite row; marble onyx 1.21e-4 and quartzite 4.3-6.4e-7 mm2/N in the same tables."),
+    _r("stones (lapping test, Sidorko 2008)", "polish_pressure", 60, 60, "kPa",
+       "https://doi.org/10.3103/S1063457608060087", "paper", "page read",
+       "600 N on a 100 x 100 mm plate = 60 kPa; the lapping test of the Preston rows."),
 ]
+
+# Joint stiffness rows by lithocam robot key. Robots match their row EXACTLY: a substring match let a row that named
+# other robots in its text ("not a ... KR120") supply a 14 kg cobot's stiffness to the KR120. A robot without an
+# entry has no sourced stiffness and the deflection check says so.
+ROBOT_STIFFNESS_ROW = {
+    "kr120": "KUKA KR210 R2700 (PROXY for a KR120-class arm)",
+    "kr480_r3330_mt": "KUKA KR 500-3 (PROXY for the KR 480 / KR 500 MT cells)",
+    "kr500_r2830_mt": "KUKA KR 500-3 (PROXY for the KR 480 / KR 500 MT cells)",
+    "irb6700": "ABB IRB 6660 (PROXY for an IRB 6700-class arm)",
+}
+
+
+def robot_stiffness_rows(robot_name: str) -> List[Dict]:
+    """joint_stiffness rows for a robot: the row of its lithocam key (ROBOT_STIFFNESS_ROW), else rows whose material
+    equals the name exactly. Never a substring match."""
+    name = robot_name.strip().lower()
+    want = ROBOT_STIFFNESS_ROW.get(name, robot_name).strip().lower()
+    return [r for r in TABLE if r["quantity"] == "joint_stiffness" and r["material"].lower() == want]
 
 
 def lookup(material: str, quantity: Optional[str] = None) -> List[Dict]:

@@ -352,8 +352,12 @@ def sourced_constants(material: str, robot_name: str = "") -> Dict[str, Sourced]
             continue
         rows = [r for r in materials_mechanics.TABLE if r["quantity"] == c.quantity and r["low"] is not None
                 and r["unit"] == c.unit]
-        exact = [r for r in rows if r["material"].lower() == name]
-        rows = exact or [r for r in rows if name in r["material"].lower()]
+        if c.by_robot:     # robots match their own row exactly (materials_mechanics.ROBOT_STIFFNESS_ROW)
+            keep = {id(r) for r in materials_mechanics.robot_stiffness_rows(name)}
+            rows = [r for r in rows if id(r) in keep]
+        else:
+            exact = [r for r in rows if r["material"].lower() == name]
+            rows = exact or [r for r in rows if name in r["material"].lower()]
         if not rows:
             continue
         if c.end == "high":
@@ -834,3 +838,136 @@ def process_check(station: program.Station, run: StockRun, expansion: program.Ex
     rep.seconds = time.perf_counter() - t0
     msgs.append("Process check done in {:.1f} s".format(rep.seconds))
     return rep
+
+
+# ---------------------------------------------------------------- fine Z-map of top-down programs
+@dataclass
+class ZmapRun:
+    """A Z-map (height field) cut along the robot's own feed samples: fine enough to show a 1-2 mm finishing
+    stepover, which the voxel stock cannot at a usable size. Only for programs that cut from above (no undercut)."""
+    cell: float
+    x0: float
+    y0: float
+    heights: List[Tuple[str, np.ndarray]]        # (step title, heights (ny, nx) mm) after each cutting step
+    target: Optional[np.ndarray]                 # part heights on the same grid (None without a part)
+    stats: List[Tuple[str, float, float, float]]  # (step title, leftover max, leftover mean, gouge) mm, over the part
+    msgs: List[str]
+    seconds: float
+
+
+def _zmap_heights(zm) -> np.ndarray:
+    return np.asarray(zm.z, dtype=float).reshape(int(zm.ny), int(zm.nx))
+
+
+def zmap_stock(station: program.Station, robot, expansion: program.Expansion, tools: Dict[str, object],
+               part_tris: Optional[np.ndarray] = None, cell: float = 0.5, window: Optional[Sequence[float]] = None,
+               max_tilt_flat_deg: float = 1.0) -> ZmapRun:
+    """Cut a Z-map of the stock box along the feed samples of the expansion, through the forward kinematics of
+    each sample (so the result is what the planned joints do, not what the CL data asks for).
+
+    Ball ends cut as their ball whatever the tilt: the CL point is the ball centre minus the radius along z.
+    Flat, bull and tapered cutters are cut only while their axis is within `max_tilt_flat_deg` of vertical; tilted
+    samples of those are counted and reported. Passes are densified to cell / 2 so a sparse straight line still
+    cuts every cell it crosses. `window` = (xmin, xmax, ymin, ymax) mm for the statistics (default: the part's
+    xy box). The turntable must not turn during the program (a Z-map has one up direction)."""
+    from .core import lc
+    t0 = time.perf_counter()
+    s = station.stock
+    if s is None:
+        raise ValueError("the station has no stock")
+    zm = lc.make_stock(s["xmin"], s["xmax"], s["ymin"], s["ymax"], float(cell), s["zmax"])
+    target = None
+    if part_tris is not None:
+        from . import cam
+        tz = lc.target_heights(cam.trimesh(part_tris), zm)
+        target = _zmap_heights(tz)
+        lo, hi = part_tris.reshape(-1, 3).min(0), part_tris.reshape(-1, 3).max(0)
+        window = window or (float(lo[0]), float(hi[0]), float(lo[1]), float(hi[1]))
+    msgs: List[str] = []
+    heights: List[Tuple[str, np.ndarray]] = []
+    stats: List[Tuple[str, float, float, float]] = []
+    W_inv = np.linalg.inv(_turned_work(station, 0.0))
+    titles = {}
+    for st_i, st in enumerate(expansion.program.steps if hasattr(expansion, "program") else []):
+        titles[st_i] = st.title()
+    cur_step, passes, cutter, skipped_tilt = None, [], None, 0
+
+    def flush():
+        nonlocal passes
+        if cutter is not None and passes:
+            lc.cut_passes(zm, cutter, passes)
+        passes = []
+
+    def close_step(step):
+        flush()
+        H = _zmap_heights(zm)
+        name = titles.get(step, "step {}".format(step + 1))
+        heights.append((name, H.copy()))
+        if target is not None and window is not None:
+            ix = slice(max(int((window[0] - zm.x0) / zm.cell), 0), int((window[1] - zm.x0) / zm.cell))
+            iy = slice(max(int((window[2] - zm.y0) / zm.cell), 0), int((window[3] - zm.y0) / zm.cell))
+            d = (H - target)[iy, ix]
+            stats.append((name, float(d.max()), float(d.mean()), float(max(0.0, -d.min()))))
+
+    for seg in expansion.segments:
+        if seg.e1 is not None and len(seg.e1) and np.ptp(np.asarray(seg.e1, float)) > 1e-9:
+            raise ValueError("the turntable turns during the program; a Z-map has one up direction")
+        if not len(seg.q) or not seg.feed.any():
+            continue
+        tool = tools.get(seg.tool)
+        if tool is None or not lc.has_cutter(tool):
+            msgs.append("zmap: step {} tool '{}' has no drop-cutter model; not cut".format(seg.step + 1, seg.tool))
+            continue
+        if cur_step is not None and seg.step != cur_step:
+            close_step(cur_step)
+        flush()
+        cur_step = seg.step
+        cutter = lc.cutter_of(tool)
+        ball = "ball" in str(getattr(tool, "kind", "")).lower()
+        R = float(tool.diameter) / 2.0
+        run_: List[np.ndarray] = []
+        for k in range(len(seg.q)):
+            if not seg.feed[k]:
+                if len(run_) > 1:
+                    passes.append(run_)
+                run_ = []
+                continue
+            T = tool_pose_mm(robot, seg, seg.q[k], W_inv)
+            tip, z = T[:3, 3], T[:3, 2]           # z: flange to tip
+            if ball:
+                cl = tip - R * z - np.array([0.0, 0.0, R])
+            else:
+                if math.degrees(math.acos(max(-1.0, min(1.0, -float(z[2]))))) > max_tilt_flat_deg:
+                    skipped_tilt += 1
+                    if len(run_) > 1:
+                        passes.append(run_)
+                    run_ = []
+                    continue
+                cl = tip
+            run_.append(cl)
+        if len(run_) > 1:
+            passes.append(run_)
+        dense = []
+        for pts in passes if isinstance(passes[0] if passes else None, list) else []:
+            P = np.asarray(pts, dtype=float)
+            out = [P[0]]
+            for a, b in zip(P[:-1], P[1:]):
+                n = max(1, int(math.ceil(np.linalg.norm(b - a) / (cell / 2.0))))
+                out += [a + (b - a) * t for t in np.linspace(0, 1, n + 1)[1:]]
+            row = []
+            for p in out:
+                c = lc.CLPoint()
+                c.x, c.y, c.z, c.contact = float(p[0]), float(p[1]), float(p[2]), True
+                row.append(c)
+            dense.append(row)
+        passes = dense
+        flush()
+    if cur_step is not None:
+        close_step(cur_step)
+    if skipped_tilt:
+        msgs.append("zmap: {} samples of non-ball cutters tilted more than {:g} deg were not cut".format(
+            skipped_tilt, max_tilt_flat_deg))
+    for name, mx, mean, g in stats:
+        msgs.append("zmap {:g} mm: after '{}': stone left over the part max {:.3f} mm, mean {:.3f} mm; gouge {:.3f} mm"
+                    .format(cell, name, mx, mean, g))
+    return ZmapRun(float(cell), float(zm.x0), float(zm.y0), heights, target, stats, msgs, time.perf_counter() - t0)
