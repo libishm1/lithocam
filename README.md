@@ -52,6 +52,21 @@ python -m lithocam.studio --smoke out.png   # simulate the demo, capture the win
 
 Toolpaths the studio generates today: face, plane (z-level) roughing, raster, waterline, steep and shallow and 5-axis surfacing, rest machining, pencil and adaptive raster on tools with a drop-cutter model; drill, core drill, tap and bore; polishing; saw cuts on outlines, combs and ruled faces; wire cuts on ruled faces. Flank and pocket run from their own modules and examples.
 
+### Studio showcases
+
+Recorded from the studio itself (`python -m lithocam.studio --record DIR N --stock station.lcs.json`, see `docs/STUDIO.md`). The stations are in `examples/studio/` and on the Examples menu.
+
+![teaching with the handle](docs/media/teach_handle.gif)
+
+Teaching by mouse: save a target, drag the move handle along z and x and turn it about z, save a second target, add a joint and a linear move, and go to each target (`--teach-record`).
+
+| | |
+|---|---|
+| ![disc saw on the KR120](docs/media/disc_saw_kr120.gif) | ![disc comb on the UR10e](docs/media/disc_comb_ur10e.gif) |
+| KR120 with a 350 mm blade: profile cuts with kerf compensation on a slab. Links rise above the stone, turn the blade and come down as linear moves (`disc_saw_kr120`) | UR10e with a 125 mm blade: comb roughing, parallel slots then a cross set, in one arm configuration (`disc_comb_ur10e`) |
+| ![five-axis dome](docs/media/five_axis_stock.gif) | ![temple relief](docs/media/temple_relief_kr120.gif) |
+| UR10e on the built-in dome: roughing, raster, then 5-axis ball finishing with the tool tilted along the surface normal, in the stock simulation | KR120 on the 600 mm padma relief panel: face, plane roughing, steep and shallow, 5-axis surfacing. Recorded with a coarse plan (8 mm stepovers) to keep the recording short; the example uses 2 mm and 1.5 mm (`temple_relief_kr120`) |
+
 Studio jogging does not check collisions. `lithocam.robot` (Tesseract) checks programs against the cell meshes. Robot programs are for simulators (URSim, KUKA.OfficeLite, RobotStudio) until a hardware gate is passed.
 
 ## Examples
