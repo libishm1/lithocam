@@ -498,7 +498,7 @@ def _order_runs(runs: List[np.ndarray]) -> List[np.ndarray]:
 
 def rest(tris, mesh, tool, stock, previous_tool_radius=None, previous_tool=None, leftover=None, threshold=0.05,
          mode="raster", stepover=1.0, stepdown=1.0, overlap=0.5, allowance=0.0, tolerance=0.01, clearance=20.0,
-         direction="climb", cell=0.0, also_previous=False, low_links=False, **_) -> List[Move]:
+         direction="climb", cell=0.0, also_previous=False, low_links=True, **_) -> List[Move]:
     """Rest machining: finishing paths of `tool` only where the previous tool left more than `threshold` mm (see
     rest_region). mode "raster": zig-zag passes along x at `stepover` mm, clipped to the region grown by `overlap`
     mm. mode "waterline": constant-z loops `stepdown` apart, clipped the same way. Empty region: no moves.

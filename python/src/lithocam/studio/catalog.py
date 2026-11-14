@@ -216,7 +216,7 @@ STEPS: List[StepSpec] = [
               ("direction", "Direction", "choice:climb|conventional", "climb", "clockwise spindle (M3)"),
               ("cell", "Grid cell", "float", 0.0, "mm, 0 = from the tool"),
               ("leftover_cell", "Z-map cell", "float", 1.0, "mm, the Z-map of the earlier milling steps"),
-              ("low_links", "Low links", "bool", False, "nearest run first; links 2 mm above the stone left, "
+              ("low_links", "Low links", "bool", True, "nearest run first; links 2 mm above the stone left, "
                                                         "not at the clearance plane"),
               ("feed", "Feed", "float", 0.0, "mm/min (0 = tool / cutting data)"),
               ("rpm", "Spindle", "float", 0.0, "rev/min (0 = tool / cutting data)")) + _LINK,
