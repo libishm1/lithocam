@@ -71,6 +71,10 @@ Teaching by mouse: save a target, drag the move handle along z and x and turn it
 
 The temple relief finished on the KR120, step by step, in a 0.5 mm Z-map cut along the robot's own joint samples (left: the cut surface; right: stone left over the part, white 0 to red 0.3 mm). Inside the panel the stone left after the B6 5-axis finish is at most 0.62 mm (mean 0.032 mm); the B3 rest and pencil passes bring it to 0.16 mm (mean 0.029 mm), nothing more than 0.05 mm below the part (`process.zmap_stock`, `docs/media/render_zmap.py`).
 
+![statue wire blank and roughing](docs/media/statue_wire_rough_irb6700.gif)
+
+Work in progress: a 1 m statue on an ABB IRB 6700 with a turntable, replayed from the posted RAPID programs. A robot-held diamond wire cuts the blank out of the block from two silhouette profiles, then indexed roughing follows on the turntable. This is a coarse planning run in a 6 mm voxel stock. Finishing is not shown: the coarse run finishes about 25% of the surface to 1 mm, and the finishing strategy is being reworked. The statue code is on a development branch and is not yet in this repository. The mesh is the CC0 Smithsonian scan of Greenough's George Washington, fetched at run time.
+
 Studio jogging does not check collisions. `lithocam.robot` (Tesseract) checks programs against the cell meshes. Robot programs are for simulators (URSim, KUKA.OfficeLite, RobotStudio) until a hardware gate is passed.
 
 ## Examples
